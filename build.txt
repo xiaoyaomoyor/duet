@@ -1,0 +1,7 @@
+npm warn Unknown env config "manage-package-manager-versions". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> duet@0.0.1 build
+> vue-tsc --noEmit -p tsconfig.app.json && npm run check:contrast && vite build
+
+src/components/layout/AppShell.vue(28,59): error TS2339: Property 'inspectorOpen' does not exist on type 'Store<"ui", Pick<{ sidebarCollapsed: Ref<boolean, boolean>; sidebarWidth: Ref<number, number>; sidebarDragging: Ref<boolean, boolean>; toasts: Ref<{ id: number; message: string; tone: ToastTone; actionLabel?: string; onAction?: () => void; }[], Toast[] | { ...; }[]>; ... 11 more ...; dismissToast: (id: number) => vo...'.
+src/components/layout/TopBar.vue(179,27): error TS2339: Property 'inspectorOpen' does not exist on type 'Store<"ui", Pick<{ sidebarCollapsed: Ref<boolean, boolean>; sidebarWidth: Ref<number, number>; sidebarDragging: Ref<boolean, boolean>; toasts: Ref<{ id: number; message: string; tone: ToastTone; actionLabel?: string; onAction?: () => void; }[], Toast[] | { ...; }[]>; ... 11 more ...; dismissToast: (id: number) => vo...'.

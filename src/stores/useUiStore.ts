@@ -91,6 +91,7 @@ export const useUiStore = defineStore('ui', () => {
     sidebarCollapsed,
     sidebarWidth,
     sidebarDragging,
+    inspectorOpen,
     toasts,
     activeDialog,
     commandPaletteOpen,

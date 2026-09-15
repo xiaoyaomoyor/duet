@@ -1,0 +1,26 @@
+npm warn Unknown env config "manage-package-manager-versions". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> duet@0.0.1 test
+> vitest run
+
+
+ RUN  v5.0.1 E:/Agent/AProject/Duet
+
+ ✓ src/lib/text.spec.ts (16 tests) 13ms
+ ✓ src/lib/clone.spec.ts (13 tests) 14ms
+ ✓ src/lib/lrc.spec.ts (18 tests) 18ms
+ ✓ src/lib/id.spec.ts (5 tests) 15ms
+ ✓ src/lib/hash.spec.ts (11 tests) 15ms
+ ✓ src/lib/time.spec.ts (14 tests) 11ms
+ ✓ src/lib/color.spec.ts (30 tests) 16ms
+ ✓ src/db/settingsRepo.spec.ts (13 tests) 21ms
+ ✓ src/services/templateService.spec.ts (14 tests) 20ms
+ ✓ src/services/commands.spec.ts (22 tests) 29ms
+ ✓ src/modules/registry.spec.ts (15 tests) 14ms
+ ✓ src/services/projectService.spec.ts (20 tests) 23ms
+
+ Test Files  12 passed (12)
+      Tests  191 passed (191)
+   Start at  20:40:01
+   Duration  1.76s (environment 82%, transform 8%, import 5%, setup 3%, tests 1%, worker 1%)
+

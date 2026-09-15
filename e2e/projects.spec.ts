@@ -94,7 +94,9 @@ test.describe('M1 项目生命周期', () => {
     await createFromTemplate(page, /视频对比/)
 
     await openItemMenu(page, '视频对比')
-    await page.getByRole('button', { name: '删除' }).click()
+    // exact: true —— 编辑视图里每个模块卡片也有一个"删除"按钮，
+    // 不加精确匹配会撞上 strict mode（这是 M2 引入的新按钮）
+    await page.getByRole('button', { name: '删除', exact: true }).click()
 
     // 确认对话框
     const dialog = page.getByRole('alertdialog')

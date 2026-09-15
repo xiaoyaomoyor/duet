@@ -7,6 +7,14 @@ import { useSettingsStore } from './stores/useSettingsStore'
 import { applyPlatformFlags } from './lib/theme'
 import { APP } from './app.config'
 
+/**
+ * ⚠️ 这一行是**必需**的，不能删：
+ * 模块注册是副作用（每个模块在自己的 index.ts 里调用 registerModule），
+ * 没有它注册表就是空的 —— 表现为"模块卡片只显示标题，既没有编辑器也没有预览"。
+ * 所有编辑器/渲染器都从注册表按 type 解析，因此必须在挂载前完成注册。
+ */
+import './modules'
+
 import './styles/tokens.css'
 import './styles/base.css'
 import './styles/animations.css'

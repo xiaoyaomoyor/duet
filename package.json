@@ -32,6 +32,7 @@
     "html-to-image": "latest",
     "pinia": "latest",
     "vue": "latest",
+    "vue-draggable-plus": "0.6.1",
     "vue-i18n": "latest",
     "vue-router": "latest"
   },
@@ -39,6 +40,7 @@
     "@eslint/js": "10.0.1",
     "@playwright/test": "latest",
     "@types/node": "latest",
+    "@types/sortablejs": "1.15.9",
     "@vitejs/plugin-vue": "latest",
     "@vitest/coverage-v8": "latest",
     "@vue/test-utils": "latest",

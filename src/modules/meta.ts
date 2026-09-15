@@ -21,6 +21,12 @@ export interface ModuleMeta {
   category: ModuleCategory
   /** 是否属于 §7.3 的 P0 必做清单 */
   priority: 'p0' | 'p1' | 'p3'
+  /**
+   * 模块选择器的搜索关键词（中英混合）。
+   * 放在这里而非 ModuleDefinition.meta：选择器只读取元数据，
+   * 不应为了搜索而加载模块实现（那会破坏代码分割）。
+   */
+  keywords?: string[]
 }
 
 export const MODULE_META: readonly ModuleMeta[] = [

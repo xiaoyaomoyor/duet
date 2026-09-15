@@ -173,6 +173,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <button
         class="topbar__icon-btn"
         type="button"
+        :disabled="!project.hasProject"
+        :title="t('inspector.title')"
+        :aria-label="t('inspector.title')"
+        :aria-pressed="ui.inspectorOpen"
+        @click="ui.toggleInspector()"
+      >
+        <AppIcon name="settings" :size="18" />
+      </button>
+
+      <button
+        class="topbar__icon-btn"
+        type="button"
         disabled
         :title="`${t('nav.switchToPresent')} · M3`"
         :aria-label="t('nav.switchToPresent')"

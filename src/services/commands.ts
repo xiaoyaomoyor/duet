@@ -96,6 +96,9 @@ export function applyCommandResult(project: Project, command: Command): Result<P
     case 'module/move':
       return moveModule(project, command.from, command.to, command.toIndex)
 
+    case 'modules/reorder':
+      return reorderModules(project, command.ref, command.moduleIds)
+
     case 'module/patch':
       return patchModule(project, command.ref, command.patch)
 
@@ -224,6 +227,45 @@ function patchModule(
   patch: Record<string, unknown>,
 ): Result<Project, string> {
   return mapModule(project, ref, (module) => ({ ...module, ...deepClone(patch) }))
+}
+
+/**
+ * 整格重排。
+ *
+ * 用于拖拽排序：一次命令替换整格顺序，因此只产生**一步撤销**。
+ * 传入的 moduleIds 必须与现有模块集合完全一致（不允许丢失或凭空新增），
+ * 否则视为调用方出错并拒绝执行——这能挡住"拖拽库返回了错误数组"这类问题。
+ */
+function reorderModules(
+  project: Project,
+  ref: CellRef,
+  moduleIds: readonly string[],
+): Result<Project, string> {
+  const row = project.sheet.rows.find((item) => item.id === ref.rowId)
+  if (!row) return err(`行不存在：${ref.rowId}`)
+  const cell = row.cells[ref.sideId]
+  if (!cell) return err(`格子不存在：${ref.rowId} / ${ref.sideId}`)
+
+  const existing = new Map(cell.modules.map((module) => [module.id, module]))
+  if (moduleIds.length !== cell.modules.length) {
+    return err('重排失败：模块数量不一致')
+  }
+
+  const next: ModuleInstance[] = []
+  for (const id of moduleIds) {
+    const module = existing.get(id)
+    if (!module) return err(`重排失败：模块不存在 ${id}`)
+    next.push(module)
+    existing.delete(id)
+  }
+  if (existing.size > 0) return err('重排失败：存在未列出的模块')
+
+  const rows = project.sheet.rows.map((item) =>
+    item.id === ref.rowId
+      ? { ...item, cells: { ...item.cells, [ref.sideId]: { ...cell, modules: next } } }
+      : item,
+  )
+  return ok(withRows(project, rows))
 }
 
 function patchModuleData(

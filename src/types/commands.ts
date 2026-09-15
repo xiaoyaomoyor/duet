@@ -41,6 +41,8 @@ export type Command =
   | { t: 'module/add'; ref: CellRef; module: ModuleInstance; at?: number }
   | { t: 'module/remove'; ref: ModuleRef }
   | { t: 'module/move'; from: ModuleRef; to: CellRef; toIndex: number }
+  /** 整格重排：拖拽排序的落点，一次原子替换，保证只有一步撤销 */
+  | { t: 'modules/reorder'; ref: CellRef; moduleIds: string[] }
   | {
       t: 'module/patch'
       ref: ModuleRef
@@ -69,6 +71,7 @@ export const COMMAND_TYPES = [
   'module/add',
   'module/remove',
   'module/move',
+  'modules/reorder',
   'module/patch',
   'module/data',
 ] as const

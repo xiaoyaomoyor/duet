@@ -24,6 +24,7 @@ import {
 import { waitFor } from '@/lib/async'
 import { deepClone } from '@/lib/clone'
 import { uuid } from '@/lib/id'
+import { getModule } from '@/modules/registry'
 import { err, ok, type Result } from '@/lib/result'
 import { useSettingsStore } from './useSettingsStore'
 import { useHistoryStore } from './useHistoryStore'
@@ -35,7 +36,7 @@ import type { CellRef, ModuleInstance, ModuleRef, Project, SideId } from '@/type
 export const MAX_OPEN_TABS = 12
 
 /** 允许通过 patchModule 修改的模块字段 */
-export type ModulePatch = Partial<Pick<ModuleInstance, 'title' | 'hidden' | 'locked'>>
+export type ModulePatch = Partial<Pick<ModuleInstance, 'title' | 'hidden' | 'locked' | 'props'>>
 
 export const useProjectStore = defineStore('project', () => {
   const projects = useProjectsStore()
@@ -373,6 +374,53 @@ export const useProjectStore = defineStore('project', () => {
     return dispatch({ t: 'module/remove', ref }, { label: '删除模块' })
   }
 
+  /** 拖拽排序的落点：整格原子重排，只占一步撤销 */
+  function reorderModules(ref: CellRef, moduleIds: readonly string[]): Result<Project, string> {
+    return dispatch(
+      { t: 'modules/reorder', ref, moduleIds: [...moduleIds] },
+      { label: '调整模块顺序' },
+    )
+  }
+
+  /** 行重排（拖拽行手柄） */
+  function moveRow(rowId: string, to: number): Result<Project, string> {
+    return dispatch({ t: 'row/move', rowId, to }, { label: '调整行顺序' })
+  }
+
+  /** 删除行 */
+  function removeRow(rowId: string): Result<Project, string> {
+    return dispatch({ t: 'row/remove', rowId }, { label: '删除行' })
+  }
+
+  /** 复制一个模块（同格内追加副本） */
+  function duplicateModule(ref: ModuleRef): Result<Project, string> {
+    const project = current.value
+    if (!project) return err('当前没有打开的项目')
+
+    const row = project.sheet.rows.find((item) => item.id === ref.rowId)
+    const cell = row?.cells[ref.sideId]
+    const source = cell?.modules.find((module) => module.id === ref.moduleId)
+    if (!source) return err('模块不存在')
+
+    const copy: ModuleInstance = {
+      ...deepClone(source),
+      id: uuid(),
+      // 标题是用户数据不是 UI 文案（不随语言切换），因此这里直接用中文后缀
+      title: `${source.title}·副本`,
+    }
+    return dispatch(
+      { t: 'module/add', ref: { rowId: ref.rowId, sideId: ref.sideId }, module: copy },
+      { label: '复制模块' },
+    )
+  }
+
+  /** 在指定格追加一个模块（模块选择器的落点） */
+  function addModuleAt(ref: CellRef, type: string, title: string): Result<Project, string> {
+    const definition = getModule(type)
+    const data = definition ? definition.schema.create() : {}
+    return addModule(ref, { type, title, data })
+  }
+
   function patchModule(ref: ModuleRef, patch: ModulePatch): Result<Project, string> {
     return dispatch(
       { t: 'module/patch', ref, patch },
@@ -472,7 +520,12 @@ export const useProjectStore = defineStore('project', () => {
     setSideField,
     setRowLabel,
     addModule,
+    addModuleAt,
     removeModule,
+    reorderModules,
+    moveRow,
+    removeRow,
+    duplicateModule,
     patchModule,
     patchModuleData,
     setMode,
