@@ -1,0 +1,21 @@
+# 让 Git 正确处理换行符与二进制文件（跨平台协作的必要配置）
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.mp4 binary
+*.webm binary
+*.glb binary
+*.gltf binary
+*.woff binary
+*.woff2 binary
+
+# 语言统计：把生成的产物排除在外
+package-lock.json -diff linguist-generated

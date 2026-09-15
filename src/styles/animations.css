@@ -1,0 +1,146 @@
+/* 对奏 Duet — 动效关键帧（§12 动效系统）
+ *
+ * 纪律：只允许动画 transform / opacity / filter / box-shadow。
+ * 需要驱动 width/height 的效果一律改用 transform: scaleX() 实现。
+ */
+
+/* A1 双侧同步入场 */
+@keyframes duet-enter-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* A2 中轴光带：自上而下缓慢扫描 */
+@keyframes duet-axis-scan {
+  0% {
+    transform: translate3d(0, -100%, 0);
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  88% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate3d(0, 100%, 0);
+    opacity: 0;
+  }
+}
+
+/* A5 播放脉冲：呼吸式光晕（box-shadow 不触发重排） */
+@keyframes duet-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--accent-ring, rgb(139 92 246 / 40%));
+  }
+
+  50% {
+    box-shadow: 0 0 18px 3px var(--accent-ring, rgb(139 92 246 / 40%));
+  }
+}
+
+/* A9 数字滚动 / 数值入场 */
+@keyframes duet-count-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* A11 标签弹出 */
+@keyframes duet-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* A13 视图切换的淡出 */
+@keyframes duet-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+/* 通用淡入 */
+@keyframes duet-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* —— 可直接复用的类（时长全部走 token，便于统一降级） —— */
+.anim-enter-up {
+  animation: duet-enter-up var(--dur-slower) var(--ease-out) both;
+}
+
+.anim-pulse {
+  animation: duet-pulse 1.6s var(--ease-in-out) infinite;
+}
+
+.anim-pop-in {
+  animation: duet-pop-in var(--dur-base) var(--ease-spring) both;
+}
+
+.anim-fade-in {
+  animation: duet-fade-in var(--dur-slow) var(--ease-out) both;
+}
+
+/* 交错入场的序号延迟（配合 .anim-enter-up 使用） */
+.stagger-1 {
+  animation-delay: 40ms;
+}
+
+.stagger-2 {
+  animation-delay: 80ms;
+}
+
+.stagger-3 {
+  animation-delay: 120ms;
+}
+
+.stagger-4 {
+  animation-delay: 160ms;
+}
+
+.stagger-5 {
+  animation-delay: 200ms;
+}
+
+.stagger-6 {
+  animation-delay: 240ms;
+}
+
+/* 导出长图 / 只读页时隐藏的元素（§8.6） */
+.no-export {
+  /* 由导出流程通过 [data-exporting] 实际隐藏 */
+}

@@ -1,0 +1,27 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
+  "exclude": ["src/**/__tests__/*"],
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+    /* 严格性：与 docs/01-施工总案.md §19.1 一致 */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+
+    /* 路径别名：不写 baseUrl（TS 7.0 已废弃该选项，paths 可直接用相对路径） */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    /* 测试环境用到 node:crypto（补齐 jsdom 缺失的 WebCrypto） */
+    "types": ["node"]
+  }
+}

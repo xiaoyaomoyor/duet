@@ -1,0 +1,45 @@
+# —— 依赖与缓存 ——
+node_modules/
+.npm-cache/
+
+# —— 构建产物 ——
+dist/
+dist-ssr/
+coverage/
+*.local
+
+# —— 测试产物 ——
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# —— Tauri ——
+src-tauri/target/
+src-tauri/gen/
+
+# —— 编辑器与系统 ——
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# —— 日志 ——
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# —— 本地环境变量（示例文件 .env.example 需要提交） ——
+.env
+.env.*
+!.env.example

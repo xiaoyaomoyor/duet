@@ -1,0 +1,142 @@
+/* 对奏 Duet — 基础样式：重置 + 排版 + 焦点 + 滚动条 */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: var(--lh-normal);
+  color: var(--text-primary);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizelegibility;
+  overflow: hidden; /* 应用外壳自身滚动，避免双层滚动条 */
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  line-height: var(--lh-tight);
+}
+
+a {
+  color: var(--accent-500);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  color: var(--text-disabled);
+}
+
+img,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+/* —— 焦点可见（§14.2：禁止 outline: none） —— */
+:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* —— 滚动条（暗色下默认滚动条过于突兀） —— */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+  background-clip: content-box;
+}
+
+/* —— 通用工具类 —— */
+.u-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.u-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-scroll-y {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media print {
+  body {
+    overflow: visible;
+    background: #fff;
+  }
+}
