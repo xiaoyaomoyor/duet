@@ -12,6 +12,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import TemplateGallery from '@/components/compare/TemplateGallery.vue'
 import CompareCanvas from '@/components/compare/CompareCanvas.vue'
+import PresentOverlay from '@/components/present/PresentOverlay.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useProjectsStore } from '@/stores/useProjectsStore'
 import { useUiStore } from '@/stores/useUiStore'
@@ -24,6 +25,9 @@ const projects = useProjectsStore()
 const ui = useUiStore()
 
 const loading = ref(false)
+
+/** 是否处于展示视图（编辑树在此时不渲染） */
+const isPresent = computed(() => store.current?.ui.mode === 'present')
 
 const routeProjectId = computed(() => {
   const raw = route.params.projectId
@@ -64,16 +68,37 @@ watch(
 if (projects.items.length === 0 && !projects.loading) {
   void projects.load()
 }
+
+/** 展示视图退出（PresentOverlay 已经写过 mode，这里只做 UI 收尾） */
+function onPresentExit(): void {
+  ui.inspectorOpen = false
+}
 </script>
 
 <template>
   <div class="compare">
     <div v-if="loading" class="compare__loading">{{ t('common.loading') }}</div>
 
-    <CompareCanvas v-else-if="store.current" :project="store.current" />
+    <!--
+      编辑视图在展示态下**不渲染**。
+      曾经的写法是让它留在 DOM 里、靠遮罩层盖住，结果
+      "展示视图绝对只读"这条要求只能用 CSS 保证——底层仍是可交互的编辑树，
+      屏幕阅读器与自动化测试都能碰到它。现在由结构保证。
+    -->
+    <CompareCanvas
+      v-else-if="store.current && !isPresent"
+      :project="store.current"
+    />
 
-    <TemplateGallery v-else />
+    <TemplateGallery v-else-if="!store.current" />
   </div>
+
+  <!-- 展示视图：独立遮罩层 + 编辑树不存在（§9.2） -->
+  <PresentOverlay
+    v-if="store.current && isPresent"
+    :project="store.current"
+    @exit="onPresentExit"
+  />
 </template>
 
 <style scoped>

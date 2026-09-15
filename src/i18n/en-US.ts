@@ -242,6 +242,41 @@ export default {
     placeholder: 'This panel lands in a later milestone',
   },
 
+  present: {
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    resetZoom: 'Reset zoom',
+    fullscreen: 'Fullscreen',
+    hotkeys: 'Esc exit · F fullscreen · +/− zoom · 0 reset',
+    enter: 'Enter present view',
+    exit: 'Exit present view',
+  },
+
+  export: {
+    title: 'Export',
+    menu: 'Export',
+    duet: 'Project file (.duet)',
+    duetHint: 'Re-importable and fully editable, includes everything',
+    image: 'Long image (PNG)',
+    imageHint: 'Capture the whole sheet as one tall image — great for sharing',
+    html: 'Read-only page (.html)',
+    htmlHint: 'A single web page others can open — view only, not editable',
+    embedMedia: 'Embed media',
+    embedMediaHint:
+      'Bundle images/audio/video into the file. Off means a smaller file but possibly missing media for the recipient',
+    includeDerived: 'Include thumbnails and waveforms',
+    exporting: 'Exporting…',
+    done: 'Exported {name}',
+    failed: 'Export failed: {message}',
+    warnTitle: 'Export finished with notes',
+    sizeEstimate: 'Estimated size {size}',
+    scale: 'Scale',
+    importTitle: 'Import project file',
+    importDone: 'Imported {n} projects',
+    importWarnings: '{n} notes during import',
+    missingAssets: '{n} media files were not included in the file',
+  },
+
   template: {
     sectionTitle: 'Start from a template',
     musicName: 'Music',

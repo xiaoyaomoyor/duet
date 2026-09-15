@@ -15,6 +15,7 @@
 import { defineAsyncComponent } from 'vue'
 import { registerModule, type AnyModuleDefinition } from '@/modules/registry'
 import type { ModuleDefinition } from '@/modules/types'
+import { isBlankText } from '../shared/guards'
 import type { LyricsData } from './data'
 
 const definition: ModuleDefinition<LyricsData> = {
@@ -34,7 +35,7 @@ const definition: ModuleDefinition<LyricsData> = {
   },
   editor: defineAsyncComponent(() => import('./LyricsEditor.vue')),
   renderer: defineAsyncComponent(() => import('./LyricsRenderer.vue')),
-  isEmpty: (data) => !data || data.text.trim() === '',
+  isEmpty: (data) => isBlankText(data?.text ?? ''),
 }
 
 registerModule(definition as AnyModuleDefinition)

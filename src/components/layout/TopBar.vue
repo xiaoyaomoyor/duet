@@ -15,7 +15,8 @@ import { useProjectStore } from '@/stores/useProjectStore'
 import { useProjectsStore } from '@/stores/useProjectsStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { useUiStore } from '@/stores/useUiStore'
-import { parseProjectFile, persistProject } from '@/services/projectService'
+import { importDuet } from '@/services/exportService'
+import { persistProject } from '@/services/projectService'
 import { APP } from '@/app.config'
 
 const { t } = useI18n()
@@ -24,6 +25,9 @@ const ui = useUiStore()
 const project = useProjectStore()
 const projects = useProjectsStore()
 const sidebar = useSidebarStore()
+
+/** 导出由外壳统一托管（对话框挂在 AppShell 上） */
+const emit = defineEmits<{ export: [] }>()
 
 const searchInput = ref<HTMLInputElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -45,6 +49,14 @@ const saveLabel = computed(() =>
 
 const undoDisabled = computed(() => !project.canUndo)
 const redoDisabled = computed(() => !project.canRedo)
+
+/** 是否处于展示视图（由当前项目的视图态决定） */
+const isPresent = computed(() => project.current?.ui.mode === 'present')
+
+function togglePresent(): void {
+  if (!project.current) return
+  project.setMode(isPresent.value ? 'edit' : 'present')
+}
 
 function openSettings(): void {
   void router.push({ name: 'settings' })
@@ -70,16 +82,16 @@ async function onFilePicked(event: Event): Promise<void> {
   importing.value = true
   try {
     const text = await file.text()
-    const parsed = parseProjectFile(text)
-    if (!parsed.ok) {
-      ui.notify(parsed.error, 'danger')
+    // 统一走 exportService 的导入实现：它会先落媒体再落项目，
+    // 并返回缺失媒体与警告信息，而不是静默吞掉问题
+    const result = await importDuet(text)
+    if (!result.ok) {
+      ui.notify(t('export.failed', { message: result.error }), 'danger')
       return
     }
 
-    for (const item of parsed.value) {
-      // 导入的项目一律换新 id，避免覆盖本机同名项目
-      const imported = { ...item, id: crypto.randomUUID(), updatedAt: Date.now() }
-      const saved = await persistProject(imported)
+    for (const item of result.value.projects) {
+      const saved = await persistProject(item)
       if (!saved.ok) {
         ui.notify(saved.error, 'danger')
         return
@@ -87,7 +99,14 @@ async function onFilePicked(event: Event): Promise<void> {
       projects.upsert(saved.value)
     }
 
-    ui.notify(t('toast.projectImported', { n: parsed.value.length }), 'success')
+    ui.notify(t('export.importDone', { n: result.value.projects.length }), 'success')
+
+    const notes = [...result.value.warnings]
+    if (result.value.missingAssets.length > 0) {
+      notes.push(t('export.missingAssets', { n: result.value.missingAssets.length }))
+    }
+    if (notes.length > 0) ui.notify(notes.join('；'), 'warning')
+
     await projects.load()
   } catch (error) {
     ui.notify(error instanceof Error ? error.message : String(error), 'danger')
@@ -185,9 +204,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <button
         class="topbar__icon-btn"
         type="button"
-        disabled
-        :title="`${t('nav.switchToPresent')} · M3`"
-        :aria-label="t('nav.switchToPresent')"
+        :disabled="!project.hasProject"
+        :title="isPresent ? t('present.exit') : t('present.enter')"
+        :aria-label="isPresent ? t('present.exit') : t('present.enter')"
+        :aria-pressed="isPresent"
+        @click="togglePresent"
       >
         <AppIcon name="present" :size="18" />
       </button>
@@ -206,9 +227,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <button
         class="topbar__icon-btn"
         type="button"
-        disabled
-        :title="`${t('nav.export')} · M3`"
-        :aria-label="t('nav.export')"
+        :disabled="!project.hasProject"
+        :title="t('export.menu')"
+        :aria-label="t('export.menu')"
+        @click="emit('export')"
       >
         <AppIcon name="export" :size="18" />
       </button>

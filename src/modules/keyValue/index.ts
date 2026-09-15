@@ -10,6 +10,7 @@
 import { defineAsyncComponent } from 'vue'
 import { registerModule, type AnyModuleDefinition } from '@/modules/registry'
 import type { ModuleDefinition } from '@/modules/types'
+import { isBlankText, safeArray } from '../shared/guards'
 import type { KeyValueData, KeyValueProps } from './data'
 
 const definition: ModuleDefinition<KeyValueData, KeyValueProps> = {
@@ -44,9 +45,9 @@ const definition: ModuleDefinition<KeyValueData, KeyValueProps> = {
   renderer: defineAsyncComponent(() => import('./KeyValueRenderer.vue')),
   // 只有"键与值都为空"的行才是空内容；只填了键也算在填写中
   isEmpty: (data) =>
-    !data ||
-    !Array.isArray(data.rows) ||
-    data.rows.every((row) => !row?.key?.trim() && !row?.value?.trim()),
+    safeArray<{ key?: string; value?: string }>(data?.rows).every(
+      (row) => isBlankText(row?.key ?? '') && isBlankText(row?.value ?? ''),
+    ),
 }
 
 registerModule(definition as AnyModuleDefinition)

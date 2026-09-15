@@ -5,13 +5,14 @@
  * 四区结构：顶栏 / 项目侧栏 / 主内容区 / 属性面板（可折叠）。
  * 设置界面与对比界面都挂在主内容区。
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import TopBar from './TopBar.vue'
 import ProjectSidebar from './ProjectSidebar.vue'
 import TabBar from './TabBar.vue'
 import InspectorPanel from '@/components/editor/InspectorPanel.vue'
+import ExportDialog from '@/components/export/ExportDialog.vue'
 import AppToasts from '@/components/common/AppToasts.vue'
 import { useUiStore } from '@/stores/useUiStore'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -27,13 +28,16 @@ const showTabs = computed(() => route.meta.layout !== 'settings')
 /** 属性面板只在对比界面、且存在打开的项目时出现 */
 const showInspector = computed(() => showTabs.value && ui.inspectorOpen && project.hasProject)
 
+/** 导出对话框（由顶栏触发） */
+const exportOpen = ref(false)
+
 /** 路由级别的标题（供侧栏与顶栏共享的语义区域使用） */
 const sectionTitle = computed(() => (showTabs.value ? t('nav.compare') : t('nav.settings')))
 </script>
 
 <template>
   <div class="shell" :class="{ 'shell--compact': ui.sidebarCollapsed }">
-    <TopBar class="shell__topbar" />
+    <TopBar class="shell__topbar" @export="exportOpen = true" />
 
     <ProjectSidebar class="shell__sidebar" :aria-label="sectionTitle" />
 
@@ -45,6 +49,8 @@ const sectionTitle = computed(() => (showTabs.value ? t('nav.compare') : t('nav.
     </main>
 
     <InspectorPanel v-if="showInspector" class="shell__inspector" />
+
+    <ExportDialog :open="exportOpen" @close="exportOpen = false" />
 
     <AppToasts />
   </div>

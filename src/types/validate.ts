@@ -157,8 +157,10 @@ export function collectAssetIds(project: Project): Set<string> {
     }
     if (!isPlainObject(value)) return
     for (const [key, item] of Object.entries(value)) {
-      // 约定：任何以 AssetId 结尾的字段都指向资源
-      if (/AssetId$/.test(key) && typeof item === 'string' && item) {
+      // 约定：任何以 AssetId 结尾的字段都指向资源。
+      // ⚠️ 必须带 i 标志：字段名实际是 `assetId`（小写 a 开头），
+      // 早期用 /AssetId$/ 会因为大小写敏感而**静默漏掉全部资源引用**。
+      if (/assetId$/i.test(key) && typeof item === 'string' && item) {
         ids.add(item)
         continue
       }

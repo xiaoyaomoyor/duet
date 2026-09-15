@@ -10,6 +10,7 @@
 import { defineAsyncComponent } from 'vue'
 import { registerModule, type AnyModuleDefinition } from '@/modules/registry'
 import type { ModuleDefinition } from '@/modules/types'
+import { isBlankText } from '../shared/guards'
 import type { TextData, TextProps } from './data'
 
 const definition: ModuleDefinition<TextData, TextProps> = {
@@ -44,7 +45,8 @@ const definition: ModuleDefinition<TextData, TextProps> = {
   editor: defineAsyncComponent(() => import('./TextEditor.vue')),
   renderer: defineAsyncComponent(() => import('./TextRenderer.vue')),
   // 空白字符不算内容："没填"与"只打了空格"必须区分对待（§7.4）
-  isEmpty: (data) => !data || data.text.trim() === '',
+  // 用 isBlankText 而不是 data.text.trim()：data 可能是 {} 或残缺对象（见 shared/guards.ts）
+  isEmpty: (data) => isBlankText(data?.text ?? ''),
 }
 
 registerModule(definition as AnyModuleDefinition)

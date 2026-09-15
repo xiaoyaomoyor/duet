@@ -11,6 +11,7 @@
 import { defineAsyncComponent } from 'vue'
 import { registerModule, type AnyModuleDefinition } from '@/modules/registry'
 import type { ModuleDefinition } from '@/modules/types'
+import { safeArray } from '../shared/guards'
 import type { GalleryData } from './data'
 
 const definition: ModuleDefinition<GalleryData> = {
@@ -30,7 +31,7 @@ const definition: ModuleDefinition<GalleryData> = {
   },
   editor: defineAsyncComponent(() => import('./GalleryEditor.vue')),
   renderer: defineAsyncComponent(() => import('./GalleryRenderer.vue')),
-  isEmpty: (data) => !data || !Array.isArray(data.items) || data.items.length === 0,
+  isEmpty: (data) => safeArray(data?.items).length === 0,
 }
 
 registerModule(definition as AnyModuleDefinition)

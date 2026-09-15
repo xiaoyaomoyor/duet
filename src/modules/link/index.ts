@@ -11,6 +11,7 @@
 import { defineAsyncComponent } from 'vue'
 import { registerModule, type AnyModuleDefinition } from '@/modules/registry'
 import type { ModuleDefinition } from '@/modules/types'
+import { isBlankText } from '../shared/guards'
 import type { LinkData } from './data'
 
 const definition: ModuleDefinition<LinkData> = {
@@ -30,7 +31,7 @@ const definition: ModuleDefinition<LinkData> = {
   },
   editor: defineAsyncComponent(() => import('./LinkEditor.vue')),
   renderer: defineAsyncComponent(() => import('./LinkRenderer.vue')),
-  isEmpty: (data) => !data || data.url.trim() === '',
+  isEmpty: (data) => isBlankText(data?.url ?? ''),
 }
 
 registerModule(definition as AnyModuleDefinition)

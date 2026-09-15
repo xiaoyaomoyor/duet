@@ -15,20 +15,30 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { VueDraggable } from 'vue-draggable-plus'
 import SideHeader from './SideHeader.vue'
-import ModuleCard from '@/components/editor/ModuleCard.vue'
+import CanvasRow from './CanvasRow.vue'
 import ModulePicker from '@/components/editor/ModulePicker.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUiStore } from '@/stores/useUiStore'
+import { isPresentable } from '@/modules/visibility'
 import { moduleTitle } from '@/i18n/helper'
-import { hexToSoft } from '@/lib/color'
-import type { CellRef, ModuleInstance, Project, Row, SideId } from '@/types/project'
+import type { CellRef, ModuleInstance, ModuleRef, Project, Row, SideId } from '@/types/project'
 
-const props = defineProps<{ project: Project }>()
+const props = defineProps<{
+  project: Project
+  /**
+   * 只读（展示视图 / 只读导出）。
+   * 为 true 时：不渲染编辑器与增删按钮、不启用拖拽排序，
+   * 直接渲染各模块的展示视图渲染器。
+   */
+  readonly?: boolean
+}>()
 
 const { t } = useI18n()
 const store = useProjectStore()
 const ui = useUiStore()
+
+const isReadonly = computed(() => props.readonly === true)
 
 const sides = computed(() => props.project.sheet.sides)
 const rows = computed(() => props.project.sheet.rows)
@@ -104,8 +114,55 @@ function modulesOf(row: Row, sideId: SideId): ModuleInstance[] {
   return row.cells[sideId]?.modules ?? []
 }
 
-function cellRef(row: Row, sideId: SideId): CellRef {
-  return { rowId: row.id, sideId }
+/**
+ * 展示视图下应该渲染的行：左右两格都没有可见模块时整行跳过，
+ * 避免出现"空行把内容撑开"的观感问题。
+ *
+ * 注意：单个模块的"空/隐藏"判定在 CanvasRow 内（那里才有渲染细节），
+ * 这里只做行级筛选——两处规则必须一致，因此都调用同一个 isPresentable。
+ */
+const visibleRows = computed<Row[]>(() => {
+  if (!isReadonly.value) return rows.value
+  return rows.value.filter((row) =>
+    sides.value.some((side) =>
+      modulesOf(row, side.id).some((module) => isPresentable(module)),
+    ),
+  )
+})
+
+/** 读取某个模块当前的 props（用于合并式更新，避免覆盖其他选项） */
+function moduleProps(ref: ModuleRef): Record<string, unknown> {
+  const row = rows.value.find((item) => item.id === ref.rowId)
+  const module = row?.cells[ref.sideId]?.modules.find((item) => item.id === ref.moduleId)
+  return module?.props ?? {}
+}
+
+// —— 交给 CanvasRow 的回调 ——
+// 写成具名函数而不是模板内联箭头：内联写法在泛型 emits 下无法推断参数类型。
+
+function onRelabel(rowId: string, label: string): void {
+  store.setRowLabel(rowId, label)
+}
+
+function onPatchModule(ref: ModuleRef, patch: { title?: string; hidden?: boolean }): void {
+  store.patchModule(ref, patch)
+}
+
+function onPatchModuleData(ref: ModuleRef, patch: Record<string, unknown>): void {
+  store.patchModuleData(ref, patch)
+}
+
+function onPatchModuleProps(ref: ModuleRef, patch: Record<string, unknown>): void {
+  // 合并而非替换：模块选项是逐项修改的
+  store.patchModule(ref, { props: { ...moduleProps(ref), ...patch } })
+}
+
+function onRemoveModule(ref: ModuleRef): void {
+  store.removeModule(ref)
+}
+
+function onDuplicateModule(ref: ModuleRef): void {
+  store.duplicateModule(ref)
 }
 </script>
 
@@ -123,9 +180,9 @@ function cellRef(row: Row, sideId: SideId): CellRef {
         />
       </div>
 
-      <!-- 行（可拖拽排序） -->
+      <!-- 行列表：编辑态可拖拽排序，展示态是普通容器（只读） -->
       <VueDraggable
-        v-if="rows.length > 0"
+        v-if="!isReadonly && visibleRows.length > 0"
         :model-value="rows"
         class="canvas__rows"
         handle=".row-drag-handle"
@@ -133,87 +190,41 @@ function cellRef(row: Row, sideId: SideId): CellRef {
         ghost-class="canvas__row--ghost"
         @update:model-value="onRowsReorder"
       >
-        <div v-for="(row, rowIndex) in rows" :key="row.id" class="canvas__row">
-          <div class="canvas__row-head">
-            <span class="row-drag-handle canvas__row-grip" :title="t('row.moveRow')">
-              <AppIcon name="grip" :size="13" />
-            </span>
-
-            <input
-              class="canvas__row-label-input"
-              type="text"
-              :value="row.label ?? ''"
-              :placeholder="t('row.labelPlaceholder')"
-              @change="store.setRowLabel(row.id, ($event.target as HTMLInputElement).value)"
-            />
-
-            <div class="canvas__row-tools">
-              <button
-                class="canvas__row-tool"
-                type="button"
-                :title="t('row.insertAbove')"
-                :aria-label="t('row.insertAbove')"
-                @click="insertRowAt(rowIndex)"
-              >
-                <AppIcon name="plus" :size="12" />
-              </button>
-              <button
-                class="canvas__row-tool canvas__row-tool--danger"
-                type="button"
-                :title="t('row.deleteRow')"
-                :aria-label="t('row.deleteRow')"
-                @click="removeRow(row)"
-              >
-                <AppIcon name="trash" :size="12" />
-              </button>
-            </div>
-          </div>
-
-          <div class="canvas__cells">
-            <div
-              v-for="side in sides"
-              :key="side.id"
-              class="canvas__cell"
-              :style="{ '--accent': side.accent, '--accent-soft': hexToSoft(side.accent, 8) }"
-            >
-              <VueDraggable
-                :model-value="modulesOf(row, side.id)"
-                class="canvas__cell-modules"
-                handle=".module-drag-handle"
-                group="duet-modules"
-                :animation="180"
-                ghost-class="module-ghost"
-                @update:model-value="(next: ModuleInstance[]) => onModulesReorder(cellRef(row, side.id), next)"
-              >
-                <ModuleCard
-                  v-for="module in modulesOf(row, side.id)"
-                  :key="module.id"
-                  :module="module"
-                  :side-id="side.id"
-                  :accent="side.accent"
-                  draggable
-                  @patch="(patch) => store.patchModule({ rowId: row.id, sideId: side.id, moduleId: module.id }, patch)"
-                  @patch-data="(patch) => store.patchModuleData({ rowId: row.id, sideId: side.id, moduleId: module.id }, patch)"
-                  @patch-props="(patch) => store.patchModule({ rowId: row.id, sideId: side.id, moduleId: module.id }, { props: { ...module.props, ...patch } })"
-                  @remove="store.removeModule({ rowId: row.id, sideId: side.id, moduleId: module.id })"
-                  @duplicate="store.duplicateModule({ rowId: row.id, sideId: side.id, moduleId: module.id })"
-                />
-              </VueDraggable>
-
-              <div class="canvas__cell-actions">
-                <button class="canvas__add-module" type="button" @click="openPicker(row, side.id)">
-                  <AppIcon name="plus" :size="13" />
-                  {{ t('module.addModule') }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <template v-for="(row, rowIndex) in visibleRows" :key="row.id">
+          <CanvasRow
+            :row="row"
+            :row-index="rowIndex"
+            :sides="sides"
+            @insert="insertRowAt"
+            @remove="removeRow"
+            @relabel="onRelabel"
+            @open-picker="openPicker"
+            @reorder-modules="onModulesReorder"
+            @patch-module="onPatchModule"
+            @patch-data="onPatchModuleData"
+            @patch-props="onPatchModuleProps"
+            @remove-module="onRemoveModule"
+            @duplicate-module="onDuplicateModule"
+          />
+        </template>
       </VueDraggable>
 
-      <p v-else class="canvas__empty">{{ t('compare.emptyRows') }}</p>
+      <div v-else-if="visibleRows.length > 0" class="canvas__rows">
+        <CanvasRow
+          v-for="(row, rowIndex) in visibleRows"
+          :key="row.id"
+          :row="row"
+          :row-index="rowIndex"
+          :sides="sides"
+          readonly
+        />
+      </div>
 
-      <div class="canvas__footer">
+      <p v-else class="canvas__empty">
+        {{ isReadonly ? t('compare.nothingToPresent') : t('compare.emptyRows') }}
+      </p>
+
+      <div v-if="!isReadonly" class="canvas__footer">
         <button class="canvas__add-row" type="button" @click="store.addRow()">
           <AppIcon name="plus" :size="15" />
           {{ t('row.addRow') }}

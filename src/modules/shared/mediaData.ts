@@ -31,3 +31,15 @@ export function isMediaEmpty(data: MediaData | undefined): boolean {
   if (!data) return true
   return !data.assetId && !data.sourceUrl
 }
+
+/**
+ * 同上，但对**任意**输入都安全。
+ *
+ * isEmpty 会在渲染期被调用，data 可能是 `{}` 或残缺对象；
+ * 用 unknown 入参可以强制调用方不假定形状（见 guards.ts 的说明）。
+ */
+export function isMediaEmptySafe(data: unknown): boolean {
+  if (typeof data !== 'object' || data === null) return true
+  const record = data as Record<string, unknown>
+  return !record.assetId && !record.sourceUrl
+}
