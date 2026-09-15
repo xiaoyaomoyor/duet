@@ -48,6 +48,23 @@ export function hashInt(input: string): number {
   return h >>> 0
 }
 
+/**
+ * 内容指纹：判断"这份数据是否变了"（渲染 key、脏检查等）。
+ *
+ * 为什么不用 crypto.subtle：它是异步的，而渲染期需要同步拿到稳定字符串。
+ * 这里只要求"内容变则指纹变"，不要求抗碰撞强度，32 位哈希足够。
+ * 无法序列化时返回固定标记，调用方自行容错。
+ */
+export function contentStamp(value: unknown): string {
+  let json: string
+  try {
+    json = JSON.stringify(value ?? null) ?? 'null'
+  } catch {
+    return 'unserializable'
+  }
+  return `${json.length.toString(36)}-${hashInt(json).toString(36)}`
+}
+
 function toHex(bytes: Uint8Array): string {
   let out = ''
   for (const b of bytes) out += b.toString(16).padStart(2, '0')

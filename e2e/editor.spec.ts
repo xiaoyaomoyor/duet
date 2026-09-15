@@ -199,11 +199,13 @@ test.describe('M2 模块系统', () => {
 
     await cell.locator('input[type="file"]').first().setInputFiles(WAV_FILE)
 
-    // 编辑器展示探测到的时长
-    await expect(cell.getByText(/时长/)).toBeVisible({ timeout: 10_000 })
+    // 时长由导入时探测得到，展示在**渲染器**（.card__preview）里，因此要限定作用域
+    await expect(cell.locator('.card__preview').getByText(/\d{2}:\d{2}/)).toBeVisible({
+      timeout: 10_000,
+    })
 
-    // 渲染器出现可播放的音频元素
-    await expect(cell.locator('audio')).toBeVisible()
+    // 渲染器出现可播放的音频元素（编辑器预览里也有一个 audio，需限定为第一个）
+    await expect(cell.locator('audio').first()).toBeVisible()
   })
 
   test('导入 .lrc 歌词：识别时间轴并开启同步开关', async ({ page }) => {
@@ -240,11 +242,13 @@ test.describe('M2 模块系统', () => {
     const firstTitle = await rows.nth(0).locator('.card__title').first().textContent()
     const secondTitle = await rows.nth(1).locator('.card__title').first().textContent()
 
-    // "在上方插入行"会在指定位置插入一行（拖拽在 headless 下不稳定，
-    // 但两者最终都落到 row/move 命令，因此这里验证的是命令语义）
+    // "在上方插入行"会让行数 +1；新行是**空行**（没有模块，等待用户填写），
+    // 且插入点就是被点击行的索引。
     await rows.nth(2).locator('[aria-label="在上方插入行"]').click()
     await expect(rows).toHaveCount(5)
+    await expect(rows.nth(2).locator('.card')).toHaveCount(0)
 
+    // 单条命令 = 一步撤销：撤销后行数与内容都回到原样
     await page.getByRole('button', { name: '撤销' }).click()
     await expect(rows).toHaveCount(4)
     await expect(rows.nth(0).locator('.card__title').first()).toHaveText(firstTitle ?? '')

@@ -64,11 +64,13 @@ function removeRow(row: Row): void {
   ui.notify(t('toast.rowRemoved'), 'info')
 }
 
+/**
+ * 在指定位置插入行。
+ * 走 store 的 insertRowAt（单条命令），因此只占**一步撤销**——
+ * 早先版本在组件里"先 addRow 再 moveRow"，会留下两条历史记录。
+ */
 function insertRowAt(index: number): void {
-  store.addRow()
-  // addRow 追加到末尾，这里把它移动到目标位置
-  const created = rows.value[rows.value.length - 1]
-  if (created && index < rows.value.length - 1) store.moveRow(created.id, index)
+  store.insertRowAt(index)
 }
 
 // ————————————————————————————————————————————————————————

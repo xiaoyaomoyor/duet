@@ -10,6 +10,7 @@ const props = defineProps<ModuleEditorProps>()
 
 const assets = useAssetsStore()
 
+// computed 而非快照：见 CoverRenderer 的注释
 const data = computed(() => props.module.data as MediaData)
 
 const metaLabel = computed(() => {

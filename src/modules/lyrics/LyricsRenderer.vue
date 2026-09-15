@@ -26,6 +26,9 @@ const data = computed<LyricsData>(() => {
   }
 })
 
+// 注：上面这种 computed 写法本身就是响应式的（在每次求值时读取 props.module），
+// 因此不存在"setup 快照"问题。真正需要警惕的是 `const data = props.module.data`。
+
 const parsed = computed(() => parseLrc(data.value.text))
 const timed = computed(() => parsed.value.timed && data.value.syncWithAudio)
 

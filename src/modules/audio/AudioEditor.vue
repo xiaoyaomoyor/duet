@@ -16,8 +16,9 @@ const data = computed(() => props.module.data as MediaData)
 
 /** 导入时已探测过时长，这里直接展示，避免用户二次点击才知道有多长 */
 const durationLabel = computed(() => {
-  if (!data.value.assetId) return null
-  const meta = assets.metaById(data.value.assetId)
+  const assetId = data.value.assetId
+  if (!assetId) return null
+  const meta = assets.metaById(assetId)
   if (!meta?.derived?.durationMs) return null
   return formatDuration(meta.derived.durationMs)
 })

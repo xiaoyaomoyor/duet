@@ -30,7 +30,7 @@ import { useSettingsStore } from './useSettingsStore'
 import { useHistoryStore } from './useHistoryStore'
 import { useProjectsStore } from './useProjectsStore'
 import type { Command, NewModuleInput } from '@/types/commands'
-import type { CellRef, ModuleInstance, ModuleRef, Project, SideId } from '@/types/project'
+import type { CellRef, ModuleInstance, ModuleRef, Project, Row, SideId } from '@/types/project'
 
 /** 标签页同时打开数量的软上限（超出时自动关闭最久未使用的） */
 export const MAX_OPEN_TABS = 12
@@ -442,24 +442,34 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function addRow(): Result<Project, string> {
+    return insertRowAt(Number.POSITIVE_INFINITY)
+  }
+
+  /**
+   * 在指定位置插入一个空行。
+   *
+   * 只发**一条**命令：早先版本用"先追加再移动"两次 dispatch，
+   * 会产生两条历史记录，用户按一次撤销只退回一半（行数没变），
+   * 违反"一次用户操作 = 一步撤销"。
+   */
+  function insertRowAt(index: number): Result<Project, string> {
     const project = current.value
     if (!project) return err('当前没有打开的项目')
 
     const [sideA, sideB] = project.sheet.sides
     if (!sideA || !sideB) return err('对比页缺少对比方')
 
-    return dispatch(
-      {
-        t: 'row/add',
-        row: {
-          id: uuid(),
-          kind: 'paired',
-          cells: { [sideA.id]: createEmptyCell(), [sideB.id]: createEmptyCell() },
-          collapsed: false,
-        },
-      },
-      { label: '添加行' },
-    )
+    const row: Row = {
+      id: uuid(),
+      kind: 'paired',
+      cells: { [sideA.id]: createEmptyCell(), [sideB.id]: createEmptyCell() },
+      collapsed: false,
+    }
+
+    const at = Number.isFinite(index) ? Math.max(0, Math.trunc(index)) : undefined
+    return dispatch(at === undefined ? { t: 'row/add', row } : { t: 'row/add', row, at }, {
+      label: '添加行',
+    })
   }
 
   /** 应用启动时恢复上次位置（"保持位置"设置） */
@@ -530,6 +540,7 @@ export const useProjectStore = defineStore('project', () => {
     patchModuleData,
     setMode,
     addRow,
+    insertRowAt,
     flush,
     dispose,
   }
