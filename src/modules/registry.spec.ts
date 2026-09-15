@@ -31,9 +31,10 @@ describe('meta.ts 与注册表的一致性', () => {
     }
   })
 
-  it('已注册模块的数量与 M2 交付一致（10 个 P0 + 1 个图片集）', () => {
+  it('已注册模块的数量与 M5 交付一致（11 个 M2 模块 + 12 个 M5 模块）', () => {
     expect(registeredTypes().sort()).toEqual(
       [
+        // M2：基础 P0 模块 + 图片集
         'audio',
         'cover',
         'divider',
@@ -45,6 +46,19 @@ describe('meta.ts 与注册表的一致性', () => {
         'progress',
         'text',
         'video',
+        // M5：轻量比较模块
+        'code',
+        'diff',
+        'iframe',
+        'markdown',
+        'model3d',
+        'note',
+        'placeholder',
+        'richText',
+        'score',
+        'stars',
+        'tagList',
+        'timeline',
       ].sort(),
     )
   })
@@ -85,9 +99,9 @@ describe('模块定义契约', () => {
   })
 
   it('新建的模块默认是"空"的（否则展示视图会立刻出现空白内容）', () => {
-    // 例外：divider 与 progress 的 isEmpty 恒为 false（它们本身就承载信息），
+    // 例外：这几个模块的"尺寸/开关"本身就是内容，没有"未填写"状态，
     // 见下一条用例的显式断言。
-    const alwaysVisible = new Set(['divider', 'progress'])
+    const alwaysVisible = new Set(['divider', 'placeholder', 'progress'])
 
     for (const definition of allModules()) {
       if (alwaysVisible.has(definition.type)) continue
@@ -101,12 +115,28 @@ describe('模块定义契约', () => {
     }
   })
 
-  it('分割线与进度条是 isEmpty 的显式特例（恒为 false）', () => {
-    // 这两个模块没有"未填写"状态：它们本身就承载信息
+  it('分割线、占位块与进度条是 isEmpty 的显式特例（恒为 false）', () => {
+    // 这三个模块没有"未填写"状态：它们本身就承载信息
     const divider = getModule('divider')
     const progress = getModule('progress')
+    const placeholder = getModule('placeholder')
     expect(divider?.isEmpty({ style: 'solid', label: '' }, {})).toBe(false)
     expect(progress?.isEmpty({ showTime: true, showWaveform: true }, {})).toBe(false)
+    expect(placeholder?.isEmpty({ height: 48, hint: '' }, {})).toBe(false)
+  })
+
+  it('星级与评分条把"未评分"与"0 分"分开（0 是有效评分）', () => {
+    // 这是 M5 最容易写错的一处：夹取范围时若不先判哨兵值，
+    // Math.max(0, -1) 会把"未评分"变成"0 分"，新建模块立刻显示成已评分。
+    const stars = getModule('stars')
+    expect(stars?.isEmpty({ value: -1, max: 5 }, {})).toBe(true)
+    expect(stars?.isEmpty({ value: 0, max: 5 }, {})).toBe(false)
+    expect(stars?.isEmpty({ value: 5, max: 5 }, {})).toBe(false)
+
+    const score = getModule('score')
+    expect(score?.isEmpty({ score: null, max: 10 }, {})).toBe(true)
+    expect(score?.isEmpty({ score: 0, max: 10 }, {})).toBe(false)
+    expect(score?.isEmpty({ score: -3, max: 10 }, {})).toBe(true)
   })
 
   it('文本模块把纯空白视为未填写', () => {

@@ -22,6 +22,7 @@ import {
   clearAllData,
   countAll,
   exportAllProjects,
+  restoreFromBackup,
   type DataCounts,
 } from '@/services/maintenanceService'
 import { downloadJson } from '@/lib/download'
@@ -37,6 +38,7 @@ const usage = ref({ usage: 0, quota: 0, ratio: 0, persisted: false })
 const counts = ref<DataCounts>({ projects: 0, assets: 0, tools: 0 })
 const busy = ref(false)
 const confirmClear = ref(false)
+const restoreInput = ref<HTMLInputElement | null>(null)
 
 const usageLabel = computed(() =>
   usage.value.quota > 0
@@ -90,6 +92,37 @@ async function exportAll(): Promise<void> {
   }
   downloadJson(result.value, backupFileName())
   ui.notify(t('toast.saved'), 'success')
+}
+
+/** 从备份文件恢复：与顶栏的"导入"共用同一套语义 */
+async function onRestorePicked(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  busy.value = true
+  try {
+    const result = await restoreFromBackup(await file.text())
+    if (!result.ok) {
+      ui.notify(t('export.failed', { message: result.error }), 'danger')
+      return
+    }
+
+    await projects.load()
+    await refresh()
+    ui.notify(t('export.importDone', { n: result.value.projects }), 'success')
+
+    const notes = [...result.value.warnings]
+    if (result.value.missingAssets.length > 0) {
+      notes.push(t('export.missingAssets', { n: result.value.missingAssets.length }))
+    }
+    if (notes.length > 0) ui.notify(notes.join('；'), 'warning')
+  } catch (error) {
+    ui.notify(error instanceof Error ? error.message : String(error), 'danger')
+  } finally {
+    busy.value = false
+  }
 }
 
 async function doClearAll(): Promise<void> {
@@ -152,15 +185,32 @@ async function doClearAll(): Promise<void> {
     </ul>
   </SettingsField>
 
+  <SettingsField :label="t('settings.backup')" :hint="t('settings.backupHint')">
+    <div class="actions">
+      <button class="ghost-btn" type="button" :disabled="busy" @click="exportAll">
+        <AppIcon name="export" :size="13" />
+        {{ t('settings.backupExport') }}
+      </button>
+      <button class="ghost-btn" type="button" :disabled="busy" @click="restoreInput?.click()">
+        <AppIcon name="import" :size="13" />
+        {{ t('settings.backupRestore') }}
+      </button>
+      <input
+        ref="restoreInput"
+        class="actions__file"
+        type="file"
+        accept=".duet,application/json"
+        @change="onRestorePicked"
+      />
+    </div>
+    <p class="actions__note">{{ t('settings.backupRestoreNote') }}</p>
+  </SettingsField>
+
   <SettingsField :label="t('settings.cleanup')" :hint="t('settings.cleanupHint')">
     <div class="actions">
       <button class="ghost-btn" type="button" :disabled="busy" @click="runCleanup">
         <AppIcon name="trash" :size="13" />
         {{ t('settings.cleanup') }}
-      </button>
-      <button class="ghost-btn" type="button" :disabled="busy" @click="exportAll">
-        <AppIcon name="export" :size="13" />
-        {{ t('nav.export') }}
       </button>
     </div>
   </SettingsField>
@@ -252,6 +302,18 @@ async function doClearAll(): Promise<void> {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
+  align-items: center;
+}
+
+/* 文件选择框只作为触发入口，界面上不出现（按钮负责呈现） */
+.actions__file {
+  display: none;
+}
+
+.actions__note {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 .ghost-btn {

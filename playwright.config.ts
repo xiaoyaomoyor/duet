@@ -15,7 +15,20 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+
+  /**
+   * 并发上限刻意压到 2（CI 为 1）。
+   *
+   * 原因（实测，不是"保守起见"）：E2E 跑的是 `vite dev`，模块**按需转换**。
+   * M5 把模块从 11 个加到 23 个之后，默认并发（按 CPU 核数）会让多个 worker
+   * 同时请求首次编译的重模块图，dev server 来不及转换，
+   * 页面就一直白屏到 30s 超时——表现为"4 个用例莫名失败"，
+   * 但单独跑其中任何一个是 2.6s 通过。
+   *
+   * 这种偶发失败的排查成本远高于多跑十几秒，所以宁可串一点。
+   * 若将来改成对 `vite preview`（产物已预构建）跑 E2E，可以把这里调回去。
+   */
+  workers: process.env.CI ? 1 : 2,
   reporter: [['list'], ['html', { open: 'never' }]],
 
   use: {

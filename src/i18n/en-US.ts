@@ -230,6 +230,11 @@ export default {
     counts: 'Statistics',
     projectsCount: 'Projects',
     assetsCount: 'Media assets',
+    backup: 'Backup and restore',
+    backupHint: 'Export every project and asset into a single file, or restore from one',
+    backupExport: 'Export all data',
+    backupRestore: 'Restore from backup',
+    backupRestoreNote: 'Restored items are copies — existing projects are never overwritten.',
     cleanup: 'Clean up unreferenced media',
     cleanupHint: 'Scan every project and delete media that nothing references',
     cleanupDone: 'Removed {n} files, freed {size}',
@@ -297,6 +302,114 @@ export default {
       'cross-origin': 'Media comes from another site without CORS — mirror it locally to enable sync',
       'no-tracks': 'Both sides need audio to play in sync',
     },
+  },
+
+  note: {
+    text: 'Note',
+    placeholder: 'One-line verdict, e.g. “cleaner tone, flatter chorus”',
+    tone: 'Tone',
+    toneNeutral: 'Neutral',
+    toneGood: 'Positive',
+    toneWarn: 'Caution',
+    toneBad: 'Negative',
+  },
+
+  stars: {
+    value: 'Stars',
+    max: 'Out of',
+  },
+
+  score: {
+    label: 'Dimension',
+    labelPlaceholder: 'e.g. “Audio” or “Visuals”',
+    value: 'Score',
+    max: 'Out of',
+    showNumber: 'Show number',
+  },
+
+  tagList: {
+    text: 'Tags',
+    placeholder: 'One per line, or comma separated',
+    tone: 'Tone',
+    toneNeutral: 'Neutral',
+    toneAccent: 'Accent',
+    toneGood: 'Positive',
+    toneWarn: 'Caution',
+  },
+
+  placeholder: {
+    height: 'Height (px)',
+    hint: 'Label (optional)',
+    hintPlaceholder: 'e.g. “to be added”',
+  },
+
+  markdown: {
+    placeholder: '# Heading\n- list item\n**bold**, `inline code`, [link](https://example.com)',
+  },
+
+  richText: {
+    placeholder: 'Type here, or use the buttons to bold / list',
+    bold: 'Bold',
+    italic: 'Italic',
+    underline: 'Underline',
+    bulletList: 'Bullet list',
+    numberedList: 'Numbered list',
+    clearFormat: 'Clear formatting',
+  },
+
+  model3d: {
+    autoRotate: 'Auto-rotate',
+    background: 'Background',
+    bgVoid: 'Dark',
+    bgPanel: 'Panel',
+    bgTransparent: 'Transparent',
+    empty: 'No model selected yet',
+    noWebgl: 'This browser does not support WebGL, so the 3D model cannot be shown',
+    shaderFailed: '3D renderer failed to initialise',
+    unsupportedHint:
+      'Common causes: Draco compression, or an external .bin file. Please export as a single .glb',
+    stats: '{v} vertices · {t} triangles',
+  },
+
+  iframe: {
+    urlPlaceholder: 'https://… (an embeddable URL from the other site)',
+    urlHint: 'Only http/https URLs are supported',
+    height: 'Height (px)',
+    sandboxNote:
+      'The embedded page runs in a sandbox and cannot access any data in this app. If the site forbids embedding, you will see a blank area.',
+  },
+
+  timeline: {
+    text: 'Timeline',
+    placeholder: 'One event per line, e.g.\n1.2s | first frame\n8s | full video',
+  },
+
+  code: {
+    content: 'Code / text',
+    placeholder: 'Paste code, a prompt or command output…',
+    lang: 'Language tag (optional)',
+    langPlaceholder: 'e.g. html, ts, python',
+    theme: 'Background',
+    themeInherit: 'Follow theme',
+    themePanel: 'Inset panel',
+  },
+
+  diff: {
+    leftLabel: 'Left title',
+    rightLabel: 'Right title',
+    leftLabelPlaceholder: 'e.g. GLM-4.6',
+    rightLabelPlaceholder: 'e.g. DeepSeek-V3.2',
+    leftFallback: 'Left',
+    rightFallback: 'Right',
+    leftPlaceholder: 'Paste the left side',
+    rightPlaceholder: 'Paste the right side',
+    lineCount: '{count} lines',
+    oneSidedHint: 'Only one side is filled in — the result shows as a whole block added or removed.',
+    identical: 'Both sides are identical',
+    truncated: 'Content is too large; shown as a whole-block replacement without line-by-line comparison.',
+    tableLabel: 'Code differences',
+    showWhenEqual: 'Show a note when identical',
+    ignoreTrailingWhitespace: 'Ignore trailing whitespace',
   },
 
   template: {
@@ -515,5 +628,17 @@ export default {
     unknown: 'Something went wrong',
     projectLoad: 'Failed to load project: {message}',
     autosave: 'Autosave failed: {message}',
+  },
+
+  pwa: {
+    offlineReady: 'Ready for offline use — it will open without a network',
+    updateReady: 'A new version is available',
+    reload: 'Update now',
+    installHint: 'Install Duet on your desktop and open it like a native app',
+    install: 'Install',
+    installed: 'Installed',
+    installUnavailable:
+      'This browser exposes no install prompt (on iOS Safari use Share → Add to Home Screen)',
+    alreadyInstalled: 'Running as an installed app',
   },
 }

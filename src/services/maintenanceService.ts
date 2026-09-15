@@ -14,7 +14,8 @@ import { listTools } from '@/db/toolsRepo'
 import { clearSettings } from '@/db/settingsRepo'
 import { APP } from '@/app.config'
 import { err, ok, type Result } from '@/lib/result'
-import { serializeProjects, type ProjectFileEnvelope } from './projectService'
+import { importDuet } from './exportService'
+import { persistProject, serializeProjects, type ProjectFileEnvelope } from './projectService'
 
 export interface DataCounts {
   projects: number
@@ -43,14 +44,53 @@ export async function exportAllProjects(): Promise<Result<ProjectFileEnvelope, s
   }
 }
 
+export interface RestoreReport {
+  /** 恢复的项目数 */
+  projects: number
+  /** 一并恢复的媒体数 */
+  importedAssets: number
+  /** 备份文件里缺失（未内嵌）的媒体 id */
+  missingAssets: string[]
+  warnings: string[]
+}
+
+/**
+ * 从备份文件恢复数据。
+ *
+ * 刻意复用 `exportService.importDuet`，而不是自己再解析一遍：
+ * 导入与恢复必须是同一套语义（先落媒体再落项目、缺失媒体如实上报、
+ * 版本过高拒绝），写成两份实现迟早会漂移。
+ *
+ * 冲突处理：importDuet 默认给每个恢复的项目换新 id，
+ * 因此"恢复备份"不会覆盖用户当前正在编辑的同名项目——
+ * 宁可多出一份，也不要静默毁掉现有数据。
+ */
+export async function restoreFromBackup(text: string): Promise<Result<RestoreReport, string>> {
+  const imported = await importDuet(text)
+  if (!imported.ok) return imported
+
+  const persisted = []
+  for (const project of imported.value.projects) {
+    const saved = await persistProject(project)
+    if (!saved.ok) return err(saved.error)
+    persisted.push(saved.value)
+  }
+
+  return ok({
+    projects: persisted.length,
+    importedAssets: imported.value.importedAssets,
+    missingAssets: imported.value.missingAssets,
+    warnings: imported.value.warnings,
+  })
+}
+
 /**
  * 清空所有数据。
  *
  * 实现选择"删库重建"而非逐表 clear：
  * 逐表清理会留下自增主键与索引碎片，且容易漏掉将来新增的表。
  * 删库后必须 resetDb()，否则后续操作会拿到已失效的连接。
- */
-export async function clearAllData(): Promise<Result<void, string>> {
+ */export async function clearAllData(): Promise<Result<void, string>> {
   try {
     await resetDb()
     await deleteDatabase()

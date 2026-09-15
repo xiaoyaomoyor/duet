@@ -14,18 +14,32 @@ import './image'
 import './gallery'
 import './audio'
 import './video'
+import './model3d'
 
 // 文本
 import './text'
 import './lyrics'
+import './markdown'
+import './richText'
+import './note'
+import './code'
+import './diff'
 
 // 数据
 import './keyValue'
 import './link'
 import './progress'
+import './score'
+import './stars'
+import './tagList'
+import './timeline'
 
 // 布局
 import './divider'
+import './placeholder'
+
+// 高级
+import './iframe'
 
 export { allModules, getModule, hasModule, registerModule, registeredTypes } from './registry'
 export type { AnyModuleDefinition } from './registry'

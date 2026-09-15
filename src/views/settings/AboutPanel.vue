@@ -1,12 +1,18 @@
 <script setup lang="ts">
 /**
- * 关于：版本、协议、仓库、快捷键一览
+ * 关于：版本、协议、仓库、快捷键一览、安装入口
  */
 import { useI18n } from 'vue-i18n'
 import { APP } from '@/app.config'
 import { isDesktop } from '@/services/themeService'
+import { install, pwaState } from '@/composables/usePwa'
+import { useUiStore } from '@/stores/useUiStore'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const { t } = useI18n()
+const ui = useUiStore()
+
+const { canInstall, installed } = pwaState()
 
 const shortcuts: Array<{ keys: string; labelKey: string }> = [
   { keys: 'Ctrl/Cmd + K', labelKey: 'topbar.commandPalette' },
@@ -14,6 +20,19 @@ const shortcuts: Array<{ keys: string; labelKey: string }> = [
   { keys: 'Ctrl/Cmd + Z', labelKey: 'nav.undo' },
   { keys: 'Shift + Ctrl/Cmd + Z', labelKey: 'nav.redo' },
 ]
+
+/**
+ * iOS Safari 与部分浏览器不提供 beforeinstallprompt，
+ * 此时按钮没用——但也不能让用户对着一个点不动的按钮猜原因，
+ * 所以给出"怎么手动装"的说明。
+ */
+async function onInstall(): Promise<void> {
+  if (!canInstall.value) {
+    ui.notify(t('pwa.installUnavailable'), 'info', { duration: 6000 })
+    return
+  }
+  await install()
+}
 </script>
 
 <template>
@@ -47,6 +66,16 @@ const shortcuts: Array<{ keys: string; labelKey: string }> = [
       <dd>{{ APP.taglineZh }}</dd>
     </div>
   </dl>
+
+  <!-- 已经装过就不再劝装一次；装在 Tauri 里也没有意义 -->
+  <template v-if="!isDesktop() && !installed">
+    <h4 class="about__subheading">{{ t('pwa.install') }}</h4>
+    <button class="install-btn" type="button" @click="onInstall">
+      <AppIcon name="export" :size="13" />
+      {{ t('pwa.install') }}
+    </button>
+    <p class="install-hint">{{ t('pwa.installHint') }}</p>
+  </template>
 
   <h4 class="about__subheading">{{ t('topbar.commandPalette') }}</h4>
   <ul class="shortcuts">
@@ -114,5 +143,29 @@ kbd {
   background: var(--bg-surface-2);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-xs);
+}
+
+.install-btn {
+  display: inline-flex;
+  gap: var(--sp-1);
+  align-items: center;
+  width: fit-content;
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.install-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.install-hint {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 </style>

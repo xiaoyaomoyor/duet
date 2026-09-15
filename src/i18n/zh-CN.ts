@@ -229,6 +229,11 @@ export default {
     counts: '数据统计',
     projectsCount: '项目',
     assetsCount: '媒体资源',
+    backup: '备份与恢复',
+    backupHint: '把全部项目与媒体导出为一个工程文件，或从该文件恢复',
+    backupExport: '导出全部数据',
+    backupRestore: '从备份恢复',
+    backupRestoreNote: '恢复的会是副本：不会覆盖当前已有的同名项目。',
     cleanup: '清理未引用媒体',
     cleanupHint: '扫描全部项目，删除没有任何项目引用的媒体文件',
     cleanupDone: '已清理 {n} 个文件，释放 {size}',
@@ -295,6 +300,112 @@ export default {
       'cross-origin': '媒体来自其他站点且未开放跨域访问，无法同步（可先"镜像"为本地资源）',
       'no-tracks': '两侧都需要有音频才能同步播放',
     },
+  },
+
+  note: {
+    text: '备注内容',
+    placeholder: '一句话结论，如「音色更干净但副歌略平」',
+    tone: '语气',
+    toneNeutral: '中性',
+    toneGood: '正面',
+    toneWarn: '提醒',
+    toneBad: '负面',
+  },
+
+  stars: {
+    value: '星级',
+    max: '满分',
+  },
+
+  score: {
+    label: '维度名称',
+    labelPlaceholder: '如「音质」「画面」',
+    value: '分数',
+    max: '满分',
+    showNumber: '显示数值',
+  },
+
+  tagList: {
+    text: '标签',
+    placeholder: '每行一个，或用逗号分隔',
+    tone: '配色',
+    toneNeutral: '中性',
+    toneAccent: '主色',
+    toneGood: '正面',
+    toneWarn: '提醒',
+  },
+
+  placeholder: {
+    height: '高度（像素）',
+    hint: '提示文字（可选）',
+    hintPlaceholder: '如「待补充」',
+  },
+
+  markdown: {
+    placeholder: '# 标题\n- 列表项\n**加粗**、`行内代码`、[链接](https://example.com)',
+  },
+
+  richText: {
+    placeholder: '直接输入，或用上方按钮加粗 / 列表',
+    bold: '加粗',
+    italic: '斜体',
+    underline: '下划线',
+    bulletList: '无序列表',
+    numberedList: '有序列表',
+    clearFormat: '清除格式',
+  },
+
+  model3d: {
+    autoRotate: '自动旋转',
+    background: '背景',
+    bgVoid: '深色',
+    bgPanel: '面板色',
+    bgTransparent: '透明',
+    empty: '还没有选择模型',
+    noWebgl: '当前浏览器不支持 WebGL，无法显示 3D 模型',
+    shaderFailed: '3D 渲染初始化失败',
+    unsupportedHint: '常见原因：模型使用了 Draco 压缩或引用了外部 .bin 文件。请导出为单文件 .glb',
+    stats: '{v} 顶点 · {t} 三角面',
+  },
+
+  iframe: {
+    urlPlaceholder: 'https://…（对方页面的可嵌入地址）',
+    urlHint: '只支持 http/https 地址',
+    height: '高度（像素）',
+    sandboxNote: '嵌入的页面在沙箱中运行，无法访问本应用的任何数据。若对方站点禁止嵌入，这里会显示空白。',
+  },
+
+  timeline: {
+    text: '时间线',
+    placeholder: '每行一个事件，如：\n1.2s | 出首帧\n8s | 完整视频',
+  },
+
+  code: {
+    content: '代码 / 文本',
+    placeholder: '粘贴代码、提示词或命令行输出…',
+    lang: '语言标识（可选）',
+    langPlaceholder: '如 html、ts、python',
+    theme: '底色',
+    themeInherit: '跟随主题',
+    themePanel: '内嵌面板色',
+  },
+
+  diff: {
+    leftLabel: '左侧标题',
+    rightLabel: '右侧标题',
+    leftLabelPlaceholder: '如 GLM-4.6',
+    rightLabelPlaceholder: '如 DeepSeek-V3.2',
+    leftFallback: '左侧',
+    rightFallback: '右侧',
+    leftPlaceholder: '粘贴左侧代码 / 文案',
+    rightPlaceholder: '粘贴右侧代码 / 文案',
+    lineCount: '{count} 行',
+    oneSidedHint: '只填了一侧，对比结果会显示为整段新增或删除。',
+    identical: '两侧内容一致',
+    truncated: '内容过大，已退化为整段替换显示（未做逐行比对）。',
+    tableLabel: '代码差异',
+    showWhenEqual: '内容相同时显示提示',
+    ignoreTrailingWhitespace: '忽略行尾空白',
   },
 
   template: {
@@ -512,5 +623,16 @@ export default {
     unknown: '发生未知错误',
     projectLoad: '读取项目失败：{message}',
     autosave: '自动保存失败：{message}',
+  },
+
+  pwa: {
+    offlineReady: '已可离线使用，之后断网也能打开',
+    updateReady: '有新版本可用',
+    reload: '立即更新',
+    installHint: '可以把「对奏」装到桌面，像本地应用一样打开',
+    install: '安装',
+    installed: '已安装到桌面',
+    installUnavailable: '当前浏览器未提供安装入口（iOS Safari 请用「分享 → 添加到主屏幕」）',
+    alreadyInstalled: '正在以已安装的应用方式运行',
   },
 }
