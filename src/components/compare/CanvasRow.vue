@@ -11,7 +11,7 @@
  * 展示态规则（§7.4）由本组件落实：
  *   空模块不渲染、手动隐藏的不渲染、整行都没有可见模块时整行跳过。
  */
-import { computed } from 'vue'
+import { computed, provide } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { VueDraggable } from 'vue-draggable-plus'
 import ModuleCard from '@/components/editor/ModuleCard.vue'
@@ -27,7 +27,18 @@ const props = defineProps<{
   sides: readonly Side[]
   /** 只读（展示视图）：不渲染编辑器、不允许拖拽与增删 */
   readonly?: boolean
+  /** 所属项目 id（音频模块登记同步音轨时需要） */
+  projectId?: string
 }>()
+
+/**
+ * 把 projectId 透传给模块渲染器。
+ *
+ * 为什么用 provide 而不是 props：projectId 只被"音频/视频模块"用到，
+ * 而模块渲染器的 props 契约（ModuleRendererProps）是对所有模块统一的，
+ * 为一个模块加字段会污染全部模块。provide/inject 更适合这种旁路信息。
+ */
+provide('duet:projectId', computed(() => props.projectId ?? ''))
 
 const emit = defineEmits<{
   insert: [index: number]
@@ -141,15 +152,25 @@ defineExpose({ rowHasContent })
       >
         <!-- 展示态：只渲染非空且未隐藏的模块 -->
         <template v-if="isReadonly">
-          <component
-            :is="getModule(module.type)?.renderer"
-            v-for="module in presentModules(side.id)"
+          <!--
+            A1 双侧同步入场：每个模块包一层，按行内序号做 60ms 交错。
+            放在这里而不是各模块内部，是为了让"新增模块忘记加入场动效"
+            这件事在结构上不可能发生。
+          -->
+          <div
+            v-for="(module, index) in presentModules(side.id)"
             :key="module.id"
-            :module="module"
-            :side-id="side.id"
-            :accent="side.accent"
-            :readonly="true"
-          />
+            class="row__module anim-enter-up"
+            :style="{ animationDelay: `${Math.min(index, 6) * 60}ms` }"
+          >
+            <component
+              :is="getModule(module.type)?.renderer"
+              :module="module"
+              :side-id="side.id"
+              :accent="side.accent"
+              :readonly="true"
+            />
+          </div>
         </template>
 
         <!-- 编辑态：可拖拽排序的模块卡片 -->
@@ -301,6 +322,11 @@ defineExpose({ rowHasContent })
   flex-direction: column;
   gap: var(--sp-3);
   min-height: 8px;
+}
+
+/* 展示态的模块容器：只负责入场动效与间距，不引入额外视觉 */
+.row__module {
+  min-width: 0;
 }
 
 .module-ghost {

@@ -7,20 +7,28 @@
  *   2. 把播放时间上报到侧内时钟，供歌词与进度条联动
  *   3. 播放时给出律动光效（A5 动效的 M2 版本，M4 换成真实频谱）
  */
-import { computed, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import MediaImage from '@/components/media/MediaImage.vue'
 import { useResolvedMedia, assetSource } from '@/composables/useResolvedMedia'
-import { reportAudioState } from '@/composables/useAudioClock'
+import { registerSyncTrack, reportAudioState, unregisterSyncTrack } from '@/composables/useAudioClock'
+import { getSyncEngine } from '@/composables/useAudioClock'
+import { onRafTick } from '@/composables/useRafTicker'
 import { formatDuration } from '@/lib/time'
 import type { ModuleRendererProps } from '../types'
 import type { MediaData } from '../shared/mediaData'
 import type { AudioProps } from './data'
 
+/** 频谱竖条数量（与 §12.2 A6 的 48 根一致） */
+const SPECTRUM_BARS = 48
+
 const props = defineProps<ModuleRendererProps>()
 
 const { t } = useI18n()
+
+/** 所属项目 id（由 CanvasRow 通过 provide 透传，见那里的说明） */
+const projectId = inject<Ref<string> | null>('duet:projectId', null)
 
 const data = computed(() => props.module.data as MediaData)
 const audioProps = computed<AudioProps>(() => ({
@@ -39,12 +47,29 @@ const audioEl = ref<HTMLAudioElement | null>(null)
 const playing = ref(false)
 const durationMs = ref(0)
 
-/** 播放进度（0~1），用于律动条的活跃比例 */
-const progress = computed(() => {
-  const duration = durationMs.value
-  if (duration <= 0) return 0
-  return Math.min(1, (audioEl.value?.currentTime ?? 0) * 1000 / duration)
-})
+/** 频谱数据（A6 动效）：由统一的 rAF 调度器驱动，而不是每个模块各起一个循环 */
+const spectrum = ref<number[]>(new Array<number>(SPECTRUM_BARS).fill(0))
+let unsubscribeRaf: (() => void) | null = null
+
+function startSpectrum(): void {
+  if (unsubscribeRaf) return
+  unsubscribeRaf = onRafTick(() => {
+    spectrum.value = readSpectrum()
+  })
+}
+
+function stopSpectrum(): void {
+  unsubscribeRaf?.()
+  unsubscribeRaf = null
+  spectrum.value = new Array<number>(SPECTRUM_BARS).fill(0)
+}
+
+/** 从同步引擎取该侧的频谱；引擎没接管时返回空（动效退化为静态条） */
+function readSpectrum(): number[] {
+  const id = projectId?.value
+  if (!id) return new Array<number>(SPECTRUM_BARS).fill(0)
+  return getSyncEngine(id).getSpectrum(props.sideId, SPECTRUM_BARS)
+}
 
 function onLoadedMetadata(): void {
   const el = audioEl.value
@@ -68,15 +93,18 @@ function onTimeUpdate(): void {
 function onPlay(): void {
   playing.value = true
   if (audioProps.value.reportClock) reportAudioState(props.sideId, { playing: true })
+  startSpectrum()
 }
 
 function onPause(): void {
   playing.value = false
   if (audioProps.value.reportClock) reportAudioState(props.sideId, { playing: false })
+  stopSpectrum()
 }
 
 function onEnded(): void {
   playing.value = false
+  stopSpectrum()
   if (audioProps.value.reportClock) {
     reportAudioState(props.sideId, { playing: false, currentMs: durationMs.value })
   }
@@ -89,6 +117,30 @@ watch(source, () => {
   if (audioProps.value.reportClock) {
     reportAudioState(props.sideId, { currentMs: 0, durationMs: 0, playing: false })
   }
+})
+
+/**
+ * 把自己登记到同步引擎。
+ *
+ * 为什么需要 nextTick：媒体元素要等渲染完成才存在；
+ * 而 `createMediaElementSource` 对同一元素只能调用一次，
+ * 因此登记与注销必须成对，且登记前要确保元素是当前这一个。
+ */
+watch(
+  [audioEl, () => projectId?.value],
+  async ([element]) => {
+    await nextTick()
+    unregisterSyncTrack(props.sideId)
+    if (element && projectId?.value) {
+      registerSyncTrack({ projectId: projectId.value, sideId: props.sideId, element })
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  unregisterSyncTrack(props.sideId)
+  stopSpectrum()
 })
 </script>
 
@@ -113,13 +165,14 @@ watch(source, () => {
       </div>
     </div>
 
-    <!-- 律动条：播放时点亮，M4 会换成真实频谱（A6） -->
+    <!-- 频谱：播放时由 rAF 驱动（A6）；静态时是错落的波形示意 -->
     <div v-if="audioProps.showWaveform" class="wave" aria-hidden="true">
       <span
-        v-for="index in 48"
+        v-for="(value, index) in spectrum"
         :key="index"
         class="wave__bar"
-        :class="{ 'wave__bar--active': playing && index / 48 <= progress }"
+        :class="{ 'wave__bar--active': playing }"
+        :style="playing ? { height: `${Math.max(8, Math.round(value * 100))}%` } : undefined"
       />
     </div>
 

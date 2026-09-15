@@ -13,6 +13,7 @@ import { useRoute, useRouter } from 'vue-router'
 import TemplateGallery from '@/components/compare/TemplateGallery.vue'
 import CompareCanvas from '@/components/compare/CompareCanvas.vue'
 import PresentOverlay from '@/components/present/PresentOverlay.vue'
+import SyncPlayerBar from '@/components/present/SyncPlayerBar.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useProjectsStore } from '@/stores/useProjectsStore'
 import { useUiStore } from '@/stores/useUiStore'
@@ -79,21 +80,27 @@ function onPresentExit(): void {
   <div class="compare">
     <div v-if="loading" class="compare__loading">{{ t('common.loading') }}</div>
 
-    <!--
-      编辑视图在展示态下**不渲染**。
-      曾经的写法是让它留在 DOM 里、靠遮罩层盖住，结果
-      "展示视图绝对只读"这条要求只能用 CSS 保证——底层仍是可交互的编辑树，
-      屏幕阅读器与自动化测试都能碰到它。现在由结构保证。
-    -->
-    <CompareCanvas
-      v-else-if="store.current && !isPresent"
-      :project="store.current"
-    />
+    <template v-else-if="store.current">
+      <!-- 同步播放控制栏：两侧都有音轨时才出现（条件在组件内部判断） -->
+      <SyncPlayerBar :project="store.current" />
 
-    <TemplateGallery v-else-if="!store.current" />
+      <!--
+        画布在两种视图态下都渲染，但形态不同：
+          编辑态 → readonly=false，带编辑器与增删
+          展示态 → readonly=true，只渲染展示态渲染器；外层由 PresentOverlay 呈现
+        展示态保留画布的原因：只读导出（长图/HTML）需要 [data-present-root] 这个节点，
+        它就在 PresentOverlay 里。把画布抽掉会让导出拿不到根节点。
+
+        "绝对只读"由两件事共同保证：readonly 分支不渲染任何输入元素 +
+        PresentOverlay 覆盖在上层（编辑态下遮罩层根本不存在）。
+      -->
+      <CompareCanvas :project="store.current" :readonly="isPresent" />
+    </template>
+
+    <TemplateGallery v-else />
   </div>
 
-  <!-- 展示视图：独立遮罩层 + 编辑树不存在（§9.2） -->
+  <!-- 展示视图：独立遮罩层（§9.2） -->
   <PresentOverlay
     v-if="store.current && isPresent"
     :project="store.current"

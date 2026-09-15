@@ -195,6 +195,7 @@ function onDuplicateModule(ref: ModuleRef): void {
             :row="row"
             :row-index="rowIndex"
             :sides="sides"
+            :project-id="project.id"
             @insert="insertRowAt"
             @remove="removeRow"
             @relabel="onRelabel"
@@ -216,6 +217,7 @@ function onDuplicateModule(ref: ModuleRef): void {
           :row="row"
           :row-index="rowIndex"
           :sides="sides"
+          :project-id="project.id"
           readonly
         />
       </div>

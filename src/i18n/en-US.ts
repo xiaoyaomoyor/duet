@@ -277,6 +277,28 @@ export default {
     missingAssets: '{n} media files were not included in the file',
   },
 
+  sync: {
+    play: 'Play in sync',
+    pause: 'Pause',
+    seek: 'Playback position',
+    solo: 'Solo',
+    mute: 'Mute',
+    volume: 'Volume',
+    drift: 'Drift',
+    corrected: '{n} corrections',
+    advanced: 'Advanced',
+    offset: 'Offset',
+    setMaster: 'Set as master',
+    restart: 'Back to start',
+    hint: 'Both sides start at the same instant — solo one, or nudge an offset',
+    degrade: {
+      'no-audio-context': 'This browser cannot play audio in sync — fell back to independent playback',
+      'source-node-failed': 'Could not create audio nodes — fell back to independent playback',
+      'cross-origin': 'Media comes from another site without CORS — mirror it locally to enable sync',
+      'no-tracks': 'Both sides need audio to play in sync',
+    },
+  },
+
   template: {
     sectionTitle: 'Start from a template',
     musicName: 'Music',

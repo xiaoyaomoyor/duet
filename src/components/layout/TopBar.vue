@@ -143,7 +143,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <AppIcon name="sidebar" :size="18" />
       </button>
 
-      <RouterLink class="topbar__brand" to="/compare">
+      <RouterLink class="topbar__brand" to="/compare" data-testid="nav-compare">
         <AppLogo :size="22" />
         <span class="topbar__brand-zh">{{ t('app.name') }}</span>
         <span class="topbar__brand-en">{{ APP.nameEn }}</span>

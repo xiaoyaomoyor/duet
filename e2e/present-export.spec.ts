@@ -83,8 +83,9 @@ test.describe('M3 展示视图', () => {
 
     // 全部为空 → 展示视图一行都不渲染
     await expect(page.locator('.canvas__row')).toHaveCount(0)
-    // 并给出空状态引导，而不是白屏
-    await expect(page.getByText('还没有可展示的内容')).toBeVisible()
+    // 并给出空状态引导，而不是白屏（限定在展示遮罩层内：
+    // 画布自身也有一份同样文案的空状态，不限定会撞上 strict mode）
+    await expect(page.locator('.present').getByText('还没有可展示的内容')).toBeVisible()
   })
 
   test('有内容的模块出现，被隐藏的模块不出现', async ({ page }) => {

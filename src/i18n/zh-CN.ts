@@ -275,6 +275,28 @@ export default {
     missingAssets: '有 {n} 个媒体未能随文件带来',
   },
 
+  sync: {
+    play: '同步播放',
+    pause: '暂停',
+    seek: '播放位置',
+    solo: '独听',
+    mute: '静音',
+    volume: '音量',
+    drift: '漂移',
+    corrected: '已校正 {n} 次',
+    advanced: '高级',
+    offset: '偏移',
+    setMaster: '设为主轨',
+    restart: '回到开头',
+    hint: '两侧从同一时刻起播，可单独试听或微调偏移',
+    degrade: {
+      'no-audio-context': '当前浏览器不支持音频同步播放，已降级为两侧独立播放',
+      'source-node-failed': '音频节点创建失败，已降级为两侧独立播放',
+      'cross-origin': '媒体来自其他站点且未开放跨域访问，无法同步（可先"镜像"为本地资源）',
+      'no-tracks': '两侧都需要有音频才能同步播放',
+    },
+  },
+
   template: {
     sectionTitle: '从模板开始',
     musicName: '音乐对比',
