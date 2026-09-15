@@ -1,24 +1,113 @@
 <script setup lang="ts">
 /**
- * 顶栏：品牌 / 全局搜索 / 视图切换 / 导出 / 设置
+ * 顶栏：品牌 / 全局搜索 / 撤销重做 / 视图切换 / 导出 / 设置
  *
- * M0 阶段仅"侧栏折叠"与"设置跳转"为可用功能，
- * 其余按钮以禁用态呈现并标注所属里程碑，避免给出无法兑现的交互。
+ * M1 可用：搜索（同时驱动侧栏列表）、撤销重做、保存状态、导入、设置。
+ * M3 启用：视图切换（展示视图）与导出。
+ * 未启用的按钮一律**禁用并标注所属里程碑**，不提供无法兑现的交互。
  */
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
+import { useProjectStore } from '@/stores/useProjectStore'
+import { useProjectsStore } from '@/stores/useProjectsStore'
+import { useSidebarStore } from '@/stores/useSidebarStore'
 import { useUiStore } from '@/stores/useUiStore'
+import { parseProjectFile, persistProject } from '@/services/projectService'
 import { APP } from '@/app.config'
 
 const { t } = useI18n()
 const router = useRouter()
 const ui = useUiStore()
+const project = useProjectStore()
+const projects = useProjectsStore()
+const sidebar = useSidebarStore()
+
+const searchInput = ref<HTMLInputElement | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const importing = ref(false)
+
+const saveState = computed<'saved' | 'saving' | 'dirty'>(() => {
+  if (project.saving) return 'saving'
+  if (project.dirty) return 'dirty'
+  return 'saved'
+})
+
+const saveLabel = computed(() =>
+  saveState.value === 'saving'
+    ? t('compare.saving')
+    : saveState.value === 'dirty'
+      ? t('compare.unsaved')
+      : t('compare.saved'),
+)
+
+const undoDisabled = computed(() => !project.canUndo)
+const redoDisabled = computed(() => !project.canRedo)
 
 function openSettings(): void {
   void router.push({ name: 'settings' })
 }
+
+function focusSearch(): void {
+  searchInput.value?.focus()
+  searchInput.value?.select()
+}
+
+// —— 导入工程文件 ——
+
+function triggerImport(): void {
+  fileInput.value?.click()
+}
+
+async function onFilePicked(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  importing.value = true
+  try {
+    const text = await file.text()
+    const parsed = parseProjectFile(text)
+    if (!parsed.ok) {
+      ui.notify(parsed.error, 'danger')
+      return
+    }
+
+    for (const item of parsed.value) {
+      // 导入的项目一律换新 id，避免覆盖本机同名项目
+      const imported = { ...item, id: crypto.randomUUID(), updatedAt: Date.now() }
+      const saved = await persistProject(imported)
+      if (!saved.ok) {
+        ui.notify(saved.error, 'danger')
+        return
+      }
+      projects.upsert(saved.value)
+    }
+
+    ui.notify(t('toast.projectImported', { n: parsed.value.length }), 'success')
+    await projects.load()
+  } catch (error) {
+    ui.notify(error instanceof Error ? error.message : String(error), 'danger')
+  } finally {
+    importing.value = false
+  }
+}
+
+// —— 快捷键：Ctrl/Cmd + K 聚焦搜索 ——
+
+function onKeydown(event: KeyboardEvent): void {
+  const meta = event.ctrlKey || event.metaKey
+  if (meta && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    focusSearch()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -45,23 +134,61 @@ function openSettings(): void {
     <div class="topbar__search">
       <AppIcon name="search" :size="15" class="topbar__search-icon" />
       <input
+        ref="searchInput"
+        :value="sidebar.query"
         class="topbar__search-input"
         type="search"
-        disabled
         :placeholder="t('topbar.searchPlaceholder')"
         :aria-label="t('topbar.searchPlaceholder')"
+        @input="sidebar.setQuery(($event.target as HTMLInputElement).value)"
       />
     </div>
 
     <div class="topbar__group topbar__group--end">
+      <span class="topbar__save" :class="`topbar__save--${saveState}`">{{ saveLabel }}</span>
+
+      <button
+        class="topbar__icon-btn"
+        type="button"
+        :disabled="undoDisabled"
+        :title="project.undoLabel ? `${t('nav.undo')} · ${project.undoLabel}` : t('nav.undo')"
+        :aria-label="t('nav.undo')"
+        @click="project.undo()"
+      >
+        <AppIcon name="undo" :size="18" />
+      </button>
+      <button
+        class="topbar__icon-btn"
+        type="button"
+        :disabled="redoDisabled"
+        :title="project.redoLabel ? `${t('nav.redo')} · ${project.redoLabel}` : t('nav.redo')"
+        :aria-label="t('nav.redo')"
+        @click="project.redo()"
+      >
+        <AppIcon name="redo" :size="18" />
+      </button>
+
+      <span class="topbar__divider" aria-hidden="true" />
+
       <button
         class="topbar__icon-btn"
         type="button"
         disabled
-        :title="`${t('nav.switchToPresent')} · M4`"
+        :title="`${t('nav.switchToPresent')} · M3`"
         :aria-label="t('nav.switchToPresent')"
       >
         <AppIcon name="present" :size="18" />
+      </button>
+
+      <button
+        class="topbar__icon-btn"
+        type="button"
+        :disabled="importing"
+        :title="t('nav.import')"
+        :aria-label="t('nav.import')"
+        @click="triggerImport"
+      >
+        <AppIcon name="import" :size="18" />
       </button>
 
       <button
@@ -84,6 +211,14 @@ function openSettings(): void {
         <AppIcon name="settings" :size="18" />
       </button>
     </div>
+
+    <input
+      ref="fileInput"
+      class="u-visually-hidden"
+      type="file"
+      :accept="`.${APP.fileExt},application/json`"
+      @change="onFilePicked"
+    />
   </header>
 </template>
 
@@ -166,6 +301,28 @@ function openSettings(): void {
 
 .topbar__search-input::placeholder {
   color: var(--text-disabled);
+}
+
+.topbar__save {
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-disabled);
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+.topbar__save--saving {
+  color: var(--accent-500);
+}
+
+.topbar__save--dirty {
+  color: var(--warning);
+}
+
+.topbar__divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--sp-2);
+  background: var(--border-default);
 }
 
 .topbar__icon-btn {

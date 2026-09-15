@@ -2,19 +2,22 @@
 /**
  * 模板画廊（空状态引导，§9.4）
  *
- * M0：展示模板卡片的视觉与信息结构，点击提示所属里程碑；
- * M1：点击后交由 projectStore.createFromTemplate() 真正创建项目并打开。
+ * 点击模板即创建一个项目并打开（走 store 的创建流程，自动落盘）。
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { useUiStore } from '@/stores/useUiStore'
+import { useProjectStore } from '@/stores/useProjectStore'
 import { BUILTIN_TEMPLATES } from '@/services/templateService'
 import { t as translate } from '@/i18n/helper'
 import { getModuleMeta } from '@/modules/meta'
 
 const { t } = useI18n()
 const ui = useUiStore()
+const store = useProjectStore()
+
+const creating = ref<string | null>(null)
 
 const cards = computed(() =>
   BUILTIN_TEMPLATES.map((template) => ({
@@ -28,9 +31,18 @@ const cards = computed(() =>
   })),
 )
 
-function pick(name: string): void {
-  ui.notify(t('common.comingSoon'), 'info')
-  if (import.meta.env.DEV) console.debug(`[duet] template picked: ${name}`)
+async function pick(templateId: string, name: string): Promise<void> {
+  if (creating.value) return
+  creating.value = templateId
+
+  const result = await store.create({ templateId, name })
+
+  creating.value = null
+  if (!result.ok) {
+    ui.notify(t('errors.projectLoad', { message: result.error }), 'danger')
+    return
+  }
+  ui.notify(t('toast.projectCreated', { title: result.value.title }), 'success')
 }
 </script>
 
@@ -43,7 +55,12 @@ function pick(name: string): void {
 
     <ul class="gallery__grid">
       <li v-for="card in cards" :key="card.id">
-        <button class="gallery-card" type="button" @click="pick(card.name)">
+        <button
+          class="gallery-card"
+          type="button"
+          :disabled="creating !== null"
+          @click="pick(card.id, card.name)"
+        >
           <span
             class="gallery-card__band"
             :style="{
