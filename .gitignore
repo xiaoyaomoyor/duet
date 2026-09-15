@@ -39,6 +39,11 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# —— 开发时重定向的命令输出（避免误提交） ——
+*.txt
+!README*.txt
+!FAQ*.txt
+
 # —— 本地环境变量（示例文件 .env.example 需要提交） ——
 .env
 .env.*
