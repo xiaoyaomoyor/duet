@@ -214,7 +214,55 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    to: 5,
+    /**
+     * v4 → v5：删掉 layout.density。
+     *
+     * 密度原本是三档（紧凑 / 标准 / 宽松），v0.4.0 按实测反馈整档移除、
+     * 固定为紧凑。字段留着不删的后果不是"多一个没用的键"这么轻——
+     * 渲染层已经不再读它，于是老工程里那个 `'comfy'` 会永远躺在那儿，
+     * 下一个读代码的人会以为它还有效，去改却看不到任何变化。
+     *
+     * 幂等：删一个不存在的键不会出任何事。
+     */
+    run: (_db, tx) => {
+      const store = tx.objectStore(STORE.projects)
+      const cursorReq = store.openCursor()
+
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result
+        if (!cursor) return
+
+        const project = cursor.value as {
+          schemaVersion?: number
+          sheet?: { layout?: Record<string, unknown> }
+        }
+
+        const sheet = project.sheet
+        if (!sheet?.layout) {
+          cursor.continue()
+          return
+        }
+
+        cursor.update({
+          ...project,
+          schemaVersion: 5,
+          sheet: { ...sheet, layout: migrateLayout(sheet.layout) },
+        })
+
+        cursor.continue()
+      }
+    },
+  },
 ]
+
+/** 单个 sheet.layout 的 v4→v5 改写（导出是为了能直接单测） */
+export function migrateLayout(layout: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...layout }
+  delete next.density
+  return next
+}
 
 /**
  * 单个对比方的 v3→v4 改写（导出是为了能直接单测）。

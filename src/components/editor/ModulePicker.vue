@@ -6,10 +6,10 @@
  * 只展示**已在注册表登记**的模块；meta.ts 中规划中的模块以"规划中"标注并禁用，
  * 避免给出点了没反应的选项（诚实边界）。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
-import { groupModuleMeta, MODULE_META, type ModuleCategory } from '@/modules/meta'
+import { groupModuleMeta, MODULE_META, moduleMaturity, type ModuleCategory } from '@/modules/meta'
 import { getModule, registeredTypes } from '@/modules/registry'
 import { normalizeForSearch } from '@/lib/text'
 import { t as translate } from '@/i18n/helper'
@@ -81,6 +81,24 @@ function categoryLabel(category: ModuleCategory): string {
   return t(`modules.category.${category}`)
 }
 
+/**
+ * 一个模块选项当前的状态标签。
+ *
+ * 三态（v0.4.0 起）：
+ *   未实现            → 规划中（禁用，点了也没反应的东西不该给出来）
+ *   已实现但未实测     → 实验（**可选**，只是如实告诉用户作者还没实测过）
+ *   已实测            → 可用
+ *
+ * 为什么"实验"仍然可选：这个应用的核心价值是"什么都能往里放"，
+ * 把二十个模块锁掉只剩三个会直接毁掉可用性。
+ * 用户要的是**知情**，不是限制——他明确说了原因是"因为我还没有进行实测"。
+ */
+function statusOf(type: string): { label: string; tone: 'ready' | 'beta' | 'planned' } {
+  if (!available.value.has(type)) return { label: t('picker.planned'), tone: 'planned' }
+  if (moduleMaturity(type) === 'stable') return { label: t('picker.implemented'), tone: 'ready' }
+  return { label: t('picker.experimental'), tone: 'beta' }
+}
+
 function pick(type: string): void {
   if (!available.value.has(type)) return
   emit('pick', type)
@@ -90,11 +108,31 @@ function pick(type: string): void {
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') emit('close')
 }
+
+/*
+ * Esc 监听在 **window** 上，而不是挂在弹窗元素上。
+ *
+ * 这是本项目已经踩过两次的坑（模块编辑弹窗、工具卡片弹窗）：挂在元素上就要求
+ * "焦点恰好在弹窗内部"，而自动聚焦有可能失败——一旦失败，Esc 完全失效、
+ * 弹窗关不掉，而模态遮罩会留在页面上**拦截所有后续点击**，
+ * 表现为"后面什么都点不动"（实测截图核验时就这样卡住过一次）。
+ * 选择器是纯列表，没有需要保留焦点的输入状态，全局监听没有副作用。
+ */
+watch(
+  () => props.open,
+  (open) => {
+    if (open) window.addEventListener('keydown', onKeydown)
+    else window.removeEventListener('keydown', onKeydown)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="mask" @click.self="emit('close')" @keydown="onKeydown">
+    <div v-if="open" class="mask" @click.self="emit('close')">
       <div class="picker" role="dialog" aria-modal="true" :aria-label="t('picker.title')">
         <header class="picker__head">
           <h2 class="picker__title">{{ t('picker.title') }}</h2>
@@ -133,8 +171,11 @@ function onKeydown(event: KeyboardEvent): void {
                   <AppIcon :name="meta.icon" :size="16" class="card__icon" />
                   <span class="card__text">
                     <span class="card__name">{{ translate(meta.titleKey) }}</span>
-                    <span class="card__badge">
-                      {{ available.has(meta.type) ? t('picker.implemented') : t('picker.planned') }}
+                    <span
+                      class="card__badge"
+                      :class="`card__badge--${statusOf(meta.type).tone}`"
+                    >
+                      {{ statusOf(meta.type).label }}
                     </span>
                   </span>
                 </button>
@@ -296,6 +337,19 @@ function onKeydown(event: KeyboardEvent): void {
 
 .card__badge {
   font-size: 10px;
+  color: var(--text-disabled);
+}
+
+/* 三种状态的角标配色：可用=成功色、实验=警示色、规划中=最弱一级 */
+.card__badge--ready {
+  color: var(--success);
+}
+
+.card__badge--beta {
+  color: var(--warning);
+}
+
+.card__badge--planned {
   color: var(--text-disabled);
 }
 </style>

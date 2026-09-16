@@ -87,6 +87,13 @@ import {
 export const ICONS: Record<string, LucideIcon> = {
   // —— 通用操作 ——
   plus: Plus,
+  /*
+   * 减号。**必须单独登记**——M9 给展示视图的缩小按钮用了 `name="minus"`，
+   * 但表里只有 `divider: Minus`，于是 getIcon 返回 undefined、
+   * 图标位置一片空白（用户实测："缩放的减号没有显示"）。
+   * 图标名与语义名是两个命名空间，同一个 Lucide 组件可以被多个语义名引用。
+   */
+  minus: Minus,
   close: X,
   check: Check,
   search: Search,

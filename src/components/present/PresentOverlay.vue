@@ -232,17 +232,6 @@ defineExpose({ zoom, hasContent })
         <button
           class="present__icon"
           type="button"
-          :title="t('nav.switchToEdit')"
-          :aria-label="t('nav.switchToEdit')"
-          @click="exit"
-        >
-          <!-- 铅笔：去的是"编辑"这个状态，不是一个"上一页" -->
-          <AppIcon name="toEdit" :size="16" />
-        </button>
-
-        <button
-          class="present__icon"
-          type="button"
           :title="t('present.fullscreen')"
           :aria-label="t('present.fullscreen')"
           :aria-pressed="isFullscreen"
@@ -250,6 +239,23 @@ defineExpose({ zoom, hasContent })
         >
           <!-- 全屏 / 退出全屏用两个图标，避免同一个图标表示相反动作 -->
           <AppIcon :name="isFullscreen ? 'minimize' : 'maximize'" :size="16" />
+        </button>
+
+        <!--
+          「编辑视图」放在**最右**、并且带文字（用户要求）：
+          它与应用顶栏最右的「演示」按钮位置对称、样式一致——
+          进入与退出同一个模式的两个入口，长相和位置都该对得上。
+        -->
+        <button
+          class="present__action"
+          type="button"
+          :title="t('nav.switchToEdit')"
+          :aria-label="t('nav.switchToEdit')"
+          data-testid="present-to-edit"
+          @click="exit"
+        >
+          <AppIcon name="toEdit" :size="16" />
+          <span>{{ t('common.edit') }}</span>
         </button>
       </header>
 
@@ -364,6 +370,33 @@ defineExpose({ zoom, hasContent })
 
 .present__cta:hover {
   background: var(--accent-solid-hover);
+}
+
+/*
+ * 「编辑视图」：带文字的动作按钮，与顶栏那个「演示」按钮同一套长相。
+ * 展示视图的工具栏本身就是半透明浮层，所以这个按钮只在被指到时才给底色，
+ * 平时保持"安静"，免得在成稿上方一直亮着一块。
+ */
+.present__action {
+  display: inline-flex;
+  gap: var(--sp-2);
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.present__action:hover {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  border-color: var(--accent-500);
 }
 
 .present__icon {

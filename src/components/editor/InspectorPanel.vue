@@ -21,14 +21,12 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
-import { useUiStore } from '@/stores/useUiStore'
 import { useResolvedTheme } from '@/composables/useResolvedTheme'
 import { ACCENT_PRESETS, presetColor, resolveAccent } from '@/data/accentPresets'
 import type { LayoutConfig, SideId } from '@/types/project'
 
 const { t } = useI18n()
 const store = useProjectStore()
-const ui = useUiStore()
 const theme = useResolvedTheme()
 
 const layout = computed<LayoutConfig | undefined>(() => store.current?.sheet.layout)
@@ -41,17 +39,43 @@ function patch(patchValue: Partial<LayoutConfig>): void {
   )
 }
 
+// ————————————————————————————————————————————————————————
+// 数值项：滚轮微调 + 直接填写
+// ————————————————————————————————————————————————————————
+
+/**
+ * 在滑块上滚动滚轮即可微调（用户要求）。
+ *
+ * `preventDefault` 是必须的：不拦的话页面会跟着一起滚，
+ * 用户调完一个数就不知道滚到哪去了。
+ * 步长用滑块自己的 step，`Shift` 加速 ×5——与项目里其他拖拽的约定一致。
+ */
+function onWheel(event: WheelEvent, key: 'gutter' | 'maxWidth' | 'backgroundScale', min: number, max: number, step: number): void {
+  event.preventDefault()
+  const current = Number(layout.value?.[key] ?? 0)
+  const direction = event.deltaY > 0 ? -1 : 1
+  const delta = direction * step * (event.shiftKey ? 5 : 1)
+  patch({ [key]: clampNumber(String(current + delta), min, max, current) })
+}
+
+/**
+ * 把手填的数值夹到合法区间。
+ *
+ * 三个兜底都不是多余的：用户可能清空输入框（NaN）、
+ * 手打一个超范围的数、或者粘贴一段文本。夹取之后**回落到原值**，
+ * 而不是给一个"看起来生效了"的错值。
+ */
+function clampNumber(raw: string, min: number, max: number, fallback: number): number {
+  const value = Number(raw)
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, Math.round(value)))
+}
+
 /** 背景图案的类型（含"无"） */
 const backgrounds: Array<{ value: LayoutConfig['background']; labelKey: string }> = [
   { value: 'solid', labelKey: 'inspector.backgroundSolid' },
   { value: 'grid', labelKey: 'inspector.backgroundGrid' },
   { value: 'dots', labelKey: 'inspector.backgroundDots' },
-]
-
-const densities: Array<{ value: LayoutConfig['density']; labelKey: string }> = [
-  { value: 'compact', labelKey: 'settings.densityCompact' },
-  { value: 'normal', labelKey: 'settings.densityNormal' },
-  { value: 'comfy', labelKey: 'settings.densityComfy' },
 ]
 
 const spotlights: Array<{ value: NonNullable<LayoutConfig['spotlight']>; labelKey: string }> = [
@@ -103,15 +127,11 @@ const fontSizeMax = 64
     <header class="config__head">
       <AppIcon name="options" :size="14" class="config__icon" />
       <span class="config__title">{{ t('inspector.title') }}</span>
-      <button
-        class="config__close"
-        type="button"
-        :title="t('inspector.close')"
-        :aria-label="t('inspector.close')"
-        @click="ui.toggleInspector()"
-      >
-        <AppIcon name="close" :size="14" />
-      </button>
+      <!--
+        这里刻意**没有**关闭按钮（用户实测反馈"移除右上角的叉号"）：
+        对比页工具条上那个开关图标已经能收起面板，一个面板两个关闭入口没有意义，
+        而且它占着标题栏最显眼的位置。
+      -->
     </header>
 
     <div class="config__body u-scroll-y">
@@ -129,8 +149,18 @@ const fontSizeMax = 64
             step="4"
             :value="layout.gutter"
             @input="patch({ gutter: Number(($event.target as HTMLInputElement).value) })"
+            @wheel="onWheel($event, 'gutter', 8, 96, 4)"
           />
-          <span class="field__value">{{ layout.gutter }}</span>
+          <input
+            class="field__number"
+            type="number"
+            min="8"
+            max="96"
+            step="4"
+            :value="layout.gutter"
+            :aria-label="t('inspector.gutter')"
+            @change="patch({ gutter: clampNumber(($event.target as HTMLInputElement).value, 8, 96, layout.gutter) })"
+          />
         </label>
 
         <label class="field">
@@ -143,23 +173,20 @@ const fontSizeMax = 64
             step="40"
             :value="layout.maxWidth"
             @input="patch({ maxWidth: Number(($event.target as HTMLInputElement).value) })"
+            @wheel="onWheel($event, 'maxWidth', 720, 1920, 40)"
           />
-          <span class="field__value">{{ layout.maxWidth }}</span>
-        </label>
-
-        <label class="field field--stack">
-          <span class="field__label">{{ t('inspector.density') }}</span>
-          <select
-            class="field__select"
-            :value="layout.density"
+          <input
+            class="field__number"
+            type="number"
+            min="720"
+            max="1920"
+            step="40"
+            :value="layout.maxWidth"
+            :aria-label="t('inspector.maxWidth')"
             @change="
-              patch({ density: ($event.target as HTMLSelectElement).value as LayoutConfig['density'] })
+              patch({ maxWidth: clampNumber(($event.target as HTMLInputElement).value, 720, 1920, layout.maxWidth) })
             "
-          >
-            <option v-for="item in densities" :key="item.value" :value="item.value">
-              {{ t(item.labelKey) }}
-            </option>
-          </select>
+          />
         </label>
 
         <label class="field field--switch">
@@ -276,8 +303,27 @@ const fontSizeMax = 64
             step="2"
             :value="layout.backgroundScale ?? 32"
             @input="patch({ backgroundScale: Number(($event.target as HTMLInputElement).value) })"
+            @wheel="onWheel($event, 'backgroundScale', 8, fontSizeMax, 2)"
           />
-          <span class="field__value">{{ layout.backgroundScale ?? 32 }}</span>
+          <input
+            class="field__number"
+            type="number"
+            min="8"
+            :max="fontSizeMax"
+            step="2"
+            :value="layout.backgroundScale ?? 32"
+            :aria-label="t('inspector.backgroundScale')"
+            @change="
+              patch({
+                backgroundScale: clampNumber(
+                  ($event.target as HTMLInputElement).value,
+                  8,
+                  fontSizeMax,
+                  layout.backgroundScale ?? 32,
+                ),
+              })
+            "
+          />
         </label>
 
         <div class="field">
@@ -485,6 +531,28 @@ const fontSizeMax = 64
   font-size: var(--fs-xs);
   color: var(--text-secondary);
   text-align: right;
+}
+
+/*
+ * 可直接填写的数值框（用户要求"直接填写数值"）。
+ * 与滑块并排、宽度固定，改完按回车或失焦生效（change 事件）。
+ */
+.field__number {
+  flex: none;
+  width: 56px;
+  padding: 2px var(--sp-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  text-align: right;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xs);
+}
+
+.field__number:focus {
+  border-color: var(--accent-500);
+  outline: none;
 }
 
 .field__select {

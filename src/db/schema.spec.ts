@@ -9,7 +9,7 @@
  * 因此这里逐条锁住改写结果，而不是只断言"类型变了"。
  */
 import { describe, expect, it } from 'vitest'
-import { migrateModule, migrateSideAccent } from './schema'
+import { migrateLayout, migrateModule, migrateSideAccent } from './schema'
 
 describe('migrateModule：cover → image', () => {
   it('补上原封面的默认观感', () => {
@@ -169,5 +169,40 @@ describe('migrateSideAccent：hex → 预设', () => {
     expect(() => migrateSideAccent({})).not.toThrow()
     expect(() => migrateSideAccent({ accent: 123 })).not.toThrow()
     expect(migrateSideAccent({ accent: null }).accentPreset).toBeUndefined()
+  })
+})
+
+/**
+ * v4 → v5：删掉 layout.density。
+ *
+ * 为什么要删而不是留着不管：渲染层已经不再读它，留着的话老工程里的
+ * `'comfy'` 会永远躺在那儿，下一个读代码的人会以为它还有效、
+ * 去改却看不到任何变化——这种"看起来能用的死字段"比缺字段更难查。
+ */
+describe('migrateLayout：移除 density', () => {
+  it('删掉 density，其余字段原样保留', () => {
+    const result = migrateLayout({
+      ratio: [1, 1],
+      gutter: 32,
+      density: 'comfy',
+      showAxis: true,
+      background: 'grid',
+      maxWidth: 1440,
+    })
+
+    expect('density' in result).toBe(false)
+    expect(result.gutter).toBe(32)
+    expect(result.background).toBe('grid')
+    expect(result.maxWidth).toBe(1440)
+  })
+
+  it('幂等：再跑一次结果不变', () => {
+    const once = migrateLayout({ gutter: 8, density: 'normal' })
+    expect(migrateLayout(once)).toEqual(once)
+  })
+
+  it('没有 density 时是空操作（不能顺手改动别的）', () => {
+    const layout = { ratio: [2, 1], gutter: 48, showAxis: false }
+    expect(migrateLayout(layout)).toEqual(layout)
   })
 })

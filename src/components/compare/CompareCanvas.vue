@@ -136,8 +136,6 @@ const canvasStyle = computed(() => {
 /** 背景样式类：solid / grid / dots（§9.2 的 LayoutConfig.background） */
 const backgroundClass = computed(() => `canvas--bg-${layout.value.background}`)
 
-const densityClass = computed(() => `canvas--${layout.value.density}`)
-
 // ————————————————————————————————————————————————————————
 // 背景图案参数（对比配置里可调）
 // ————————————————————————————————————————————————————————
@@ -376,7 +374,6 @@ function onDuplicateModule(ref: ModuleRef): void {
     <div
       class="canvas"
       :class="[
-        densityClass,
         backgroundClass,
         { 'canvas--bg-hidden': !showBackground, 'canvas--bg-fill': solidFill },
       ]"
@@ -531,7 +528,8 @@ function onDuplicateModule(ref: ModuleRef): void {
 .canvas__rows {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
+  /* 行距固定为紧凑档（v0.4.0 移除了密度选项） */
+  gap: var(--sp-3);
   margin-top: var(--sp-5);
 }
 
@@ -721,13 +719,7 @@ function onDuplicateModule(ref: ModuleRef): void {
   border-color: var(--accent-500);
 }
 
-.canvas--compact .canvas__rows {
-  gap: var(--sp-3);
-}
-
-.canvas--comfy .canvas__rows {
-  gap: var(--sp-8);
-}
+/* 密度三档已移除，行距固定在 .canvas__rows 里 */
 
 /* —— 背景样式（对比配置里可切换） ——
  *

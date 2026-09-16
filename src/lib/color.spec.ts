@@ -13,6 +13,7 @@ import {
   readableTextOn,
   relativeLuminance,
   shade,
+  sideTint,
   toHex,
 } from './color'
 
@@ -104,6 +105,29 @@ describe('hexToSoft', () => {
   it('透明度被限制在 0~100', () => {
     expect(hexToSoft('#ffffff', 999)).toBe('rgb(255 255 255 / 100%)')
     expect(hexToSoft('#ffffff', -5)).toBe('rgb(255 255 255 / 0%)')
+  })
+})
+
+/**
+ * 卡片底色（v0.4.0 统一）。
+ *
+ * 工具卡片原先走 color-mix(accent 10%)、模块卡片走 hexToSoft(accent, 8)——
+ * 两条路径两个浓度，并排看就是两种颜色（用户实测反馈）。
+ * 现在两边都走 sideTint，浓度只有一个数字。
+ */
+describe('sideTint', () => {
+  it('默认 10%——与工具卡片原本的浓度一致', () => {
+    expect(sideTint('#a78bfa')).toBe('rgb(167 139 250 / 10%)')
+  })
+
+  it('与工具卡片、模块卡片共用同一个实现（不会各写一套）', () => {
+    // 同一个输入，两边拿到的必须是同一个字符串
+    expect(sideTint('#22d3ee')).toBe(hexToSoft('#22d3ee', 10))
+  })
+
+  it('非法色值退回 transparent，而不是抛错', () => {
+    expect(sideTint('')).toBe('transparent')
+    expect(sideTint('nope')).toBe('transparent')
   })
 })
 

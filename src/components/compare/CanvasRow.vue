@@ -18,7 +18,7 @@ import ModuleCard from '@/components/editor/ModuleCard.vue'
 import ModuleView from '@/components/compare/ModuleView.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { isPresentable } from '@/modules/visibility'
-import { hexToSoft } from '@/lib/color'
+import { sideTint } from '@/lib/color'
 import type { CellRef, ModuleInstance, ModuleRef, Row, Side, SideId } from '@/types/project'
 
 const props = defineProps<{
@@ -219,7 +219,12 @@ function cellStyle(side: Side): Record<string, string> {
   if (isFullRow.value) {
     return { '--accent': 'var(--accent-500)' }
   }
-  return { '--accent': side.accent, '--accent-soft': hexToSoft(side.accent, 8) }
+  /*
+   * 卡片底色与工具卡片共用 sideTint（同一个函数、同一个浓度）。
+   * 此前这里是 hexToSoft(accent, 8)、工具卡片是 color-mix(accent 10%)，
+   * 两条路径两个浓度，并排看就是两种颜色——正是用户反馈的那件事。
+   */
+  return { '--accent': side.accent, '--accent-soft': sideTint(side.accent) }
 }
 
 /** 展示视图下，该行是否整行跳过 */
@@ -402,8 +407,13 @@ defineExpose({ rowHasContent })
         <!--
           编辑态：可拖拽排序的模块卡片。
           整张卡片都可以拖（不再要求抓住左侧那个小手柄），
-          但按钮/输入框/链接这些**交互元素**必须排除，
-          否则点"编辑"会变成拖拽（filter + preventOnFilter）。
+          但按钮/输入框/链接这些**交互元素**必须排除。
+
+          ⚠️ `prevent-on-filter` 必须是 **false**（实测反馈"进度条拨不动"的根因）：
+          SortableJS 默认会在被过滤的元素上调用 `preventDefault()`，
+          而 range 滑块的原生拖动正是靠 mousedown 的默认行为启动的——
+          被 preventDefault 之后就完全拖不动了，而且不报任何错、控制台也一片安静。
+          关掉它之后，卡片不会从这些元素上开始拖，元素自己的交互则照常。
         -->
         <VueDraggable
           v-else
@@ -411,7 +421,7 @@ defineExpose({ rowHasContent })
           class="row__modules"
           group="duet-modules"
           filter=".card__actions, .card__empty, button, input, textarea, select, a, audio, video, [contenteditable='true']"
-          :prevent-on-filter="true"
+          :prevent-on-filter="false"
           :animation="180"
           ghost-class="module-ghost"
           @update:model-value="(next: ModuleInstance[]) => emit('reorderModules', cellRef(side.id), next)"

@@ -91,6 +91,19 @@ const playedRatio = computed(() => {
   return Math.min(1, Math.max(0, currentMs.value / durationMs.value))
 })
 
+/**
+ * 频谱是否真的有数据。
+ *
+ * 没有数据时**不要**把 48 根柱子都写成 8%（那会摊成一条直线，
+ * 看起来像"波形死了"）——保持样式表里那套错落的静态波形即可，
+ * 它至少还像一条波形，而且播放时整条会变成工具强调色，
+ * "正在播放"这件事仍然看得出来。
+ *
+ * 什么时候会没有数据：只有一侧有音频（引擎不接管）、浏览器不支持 Web Audio、
+ * 或媒体跨域。这些都不是缺陷，而是降级路径。
+ */
+const hasSpectrum = computed(() => spectrum.value.some((value) => value > 0))
+
 /** 频谱数据（A6 动效）：由统一的 rAF 调度器驱动，而不是每个模块各起一个循环 */
 const spectrum = ref<number[]>(new Array<number>(SPECTRUM_BARS).fill(0))
 let unsubscribeRaf: (() => void) | null = null
@@ -137,19 +150,60 @@ function onTimeUpdate(): void {
   })
 }
 
-/** 自研播放条的播放 / 暂停（与原生控件等价，只是外观归我们管） */
+/**
+ * 自研播放条的播放 / 暂停。
+ *
+ * 引擎已经接管两侧时**交给引擎**，而不是直接 `el.play()`：
+ * 频谱（波形动效）是引擎的 AnalyserNode 出来的，绕开引擎播就等于
+ * 没有频谱数据 → 波形摊成一条线（实测反馈"动态波形不动了"就是这个）。
+ * 引擎没接管（只有一侧有音频、浏览器不支持等）时才直接操作元素。
+ */
 function togglePlay(): void {
   const el = audioEl.value
   if (!el) return
+
+  const id = projectId?.value
+  const engine = id ? getSyncEngine(id) : null
+
+  if (engine?.isAttached) {
+    if (!el.paused) {
+      engine.pause()
+      return
+    }
+    void engine.play().catch(() => void 0)
+    return
+  }
+
   if (el.paused) void el.play().catch(() => void 0)
   else el.pause()
 }
 
-/** 拖动进度：直接写 currentTime，随后由 timeupdate 自然回填 */
+/**
+ * 拖动进度。
+ *
+ * 引擎接管时**必须交给引擎**（`engine.seek`）：引擎每 250ms 采样一次、
+ * 把两侧对齐到主轨，直接写 `el.currentTime` 会被下一次采样**拉回去**——
+ * 表现就是"进度条拨不动"（其实拨动了，只是立刻被同步逻辑纠正回原处）。
+ * 交给引擎既没有这个冲突，也与「音频控制台」的定位行为一致。
+ *
+ * 同时立刻更新本地 `currentMs`：不然要等下一个 `timeupdate` 才回填，
+ * 拖动时手感会顿一下。
+ */
 function onSeek(event: Event): void {
   const el = audioEl.value
   if (!el) return
-  el.currentTime = Number((event.target as HTMLInputElement).value) / 1000
+
+  const ms = Number((event.target as HTMLInputElement).value)
+  currentMs.value = ms
+
+  const id = projectId?.value
+  const engine = id ? getSyncEngine(id) : null
+  if (engine?.isAttached) {
+    engine.seek(ms)
+    return
+  }
+
+  el.currentTime = ms / 1000
 }
 
 function onPlay(): void {
@@ -242,14 +296,17 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 频谱：播放时由 rAF 驱动（A6）；静态时是错落的波形示意 -->
+    <!--
+      频谱：引擎接管的播放由 rAF 驱动真实的频率数据（A6）；
+      没有数据时保持样式表里那套错落的静态波形（见 hasSpectrum 的说明）。
+    -->
     <div v-if="audioProps.showWaveform" class="wave" aria-hidden="true">
       <span
         v-for="(value, index) in spectrum"
         :key="index"
         class="wave__bar"
         :class="{ 'wave__bar--active': playing }"
-        :style="playing ? { height: `${Math.max(8, Math.round(value * 100))}%` } : undefined"
+        :style="playing && hasSpectrum ? { height: `${Math.max(8, Math.round(value * 100))}%` } : undefined"
       />
     </div>
 

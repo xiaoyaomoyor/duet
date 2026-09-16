@@ -27,6 +27,7 @@ import AppIcon from '@/components/common/AppIcon.vue'
 import ToolIcon from '@/components/common/ToolIcon.vue'
 import SideEditorDialog from './SideEditorDialog.vue'
 import { clampScale } from './sideScale'
+import { sideTint } from '@/lib/color'
 import { useToolsStore } from '@/stores/useToolsStore'
 import { useResolvedTheme } from '@/composables/useResolvedTheme'
 import { mosaicDataUri } from '@/lib/mosaic'
@@ -68,7 +69,8 @@ const versionLabel = computed(() => {
 
 const headerStyle = computed(() => ({
   '--accent': props.side.accent,
-  '--accent-soft': `color-mix(in srgb, ${props.side.accent} 10%, transparent)`,
+  /* 与模块卡片共用同一个派生函数（见 lib/color.ts 的 sideTint） */
+  '--accent-soft': sideTint(props.side.accent),
   /*
    * 字号倍率以 CSS 变量下发，由样式表里的 calc() 乘到基准字号上。
    * 这样"默认字号"仍然只定义在 CSS 一处，JS 只负责给倍率，

@@ -225,6 +225,13 @@ function forwardProps(patch: Record<string, unknown>): void {
 }
 
 /* —— 右上角操作区 —— */
+/*
+ * 只显示图标、**透明底**（用户实测反馈）。
+ * 原先它是一块带底色的浮层（--bg-elevated + 描边 + 阴影），
+ * 悬浮时像是卡片上贴了一张小票；而卡片本身已经有自己的背景，
+ * 再叠一层不透明的浮层就把内容盖住了。现在这几个按钮直接浮在卡片上，
+ * 只在各自悬停时给一点点底色作为反馈。
+ */
 .card__actions {
   position: absolute;
   top: var(--sp-1);
@@ -232,11 +239,6 @@ function forwardProps(patch: Record<string, unknown>): void {
   z-index: 1;
   display: flex;
   gap: 2px;
-  padding: 2px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-sm);
   /*
    * 默认隐藏、悬浮或键盘聚焦时出现。
    * 用 opacity 而不是 display/visibility：后者会让按钮无法成为
@@ -261,9 +263,15 @@ function forwardProps(patch: Record<string, unknown>): void {
     background var(--dur-fast) var(--ease-out);
 }
 
+/*
+ * 悬停反馈用"毛玻璃 + 半透明"而不是不透明底色：
+ * 这几个按钮浮在任意模块内容之上（可能是图片、代码、表格），
+ * 半透明底既能保证图标可读，又不会把底下的内容整块盖掉。
+ */
 .card__action:hover {
   color: var(--text-primary);
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--bg-elevated) 85%, transparent);
+  backdrop-filter: blur(2px);
 }
 
 .card__action--on,

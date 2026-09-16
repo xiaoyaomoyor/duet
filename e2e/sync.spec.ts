@@ -131,8 +131,49 @@ test.describe('M4 同步播放', () => {
     await expect(page.locator('.syncbar__drift').first()).toBeVisible()
   })
 
-  test('只有一侧有音频时不显示控制栏（没有"双轨"可言）', async ({ page }) => {
+  /**
+   * 回归：音频模块自研播放条的进度必须能用鼠标拖动。
+   *
+   * 这条来自实测反馈"进度条拨不动"。排查过程中踩到的第一个坑很值得记下来：
+   * 探针最初没把元素滚进视口就去算坐标，`elementFromPoint` 返回 null，
+   * 于是拖拽事件根本没落到元素上——**假阳性**，看起来就像"拨不动"。
+   * 因此这个用例显式 `scrollIntoViewIfNeeded`，并把"拖完之后音频的
+   * currentTime 真的变了"作为判据（而不是只看 input.value）。
+   */
+  test('音频播放条的进度可以用鼠标拖动定位', async ({ page }) => {
     await page.goto('/')
+    await createFromTemplate(page, /音乐对比/)
+
+    const row = page.locator('.canvas__row').nth(1)
+    const cell = row.locator('.canvas__cell').first()
+    await importMedia(page, cell.locator('.card').first(), WAV_A)
+    await waitAudioReady(row)
+
+    const seek = cell.locator('.player__seek')
+    await seek.scrollIntoViewIfNeeded()
+    await expect(seek).toBeVisible()
+
+    const box = await seek.boundingBox()
+    expect(box).not.toBeNull()
+    if (!box) return
+
+    // 从 20% 拖到 80%
+    const y = box.y + box.height / 2
+    await page.mouse.move(box.x + box.width * 0.2, y)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width * 0.8, y, { steps: 8 })
+    await page.mouse.up()
+
+    // 判据是"音频真的跳到了后半段"，而不是"输入框的值变了"——
+    // 只改输入框、没改播放位置，对用户来说依然是"拨不动"
+    await expect
+      .poll(() => row.locator('audio').first().evaluate((el) => (el as HTMLAudioElement).currentTime), {
+        timeout: 5000,
+      })
+      .toBeGreaterThan(1)
+  })
+
+  test('只有一侧有音频时不显示控制栏（没有"双轨"可言）', async ({ page }) => {    await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
 
     const row = page.locator('.canvas__row').nth(1)

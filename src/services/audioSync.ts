@@ -152,6 +152,17 @@ export class AudioSyncEngine {
     return this.status.supported
   }
 
+  /**
+   * 引擎是否已接管音轨。
+   *
+   * 音频模块的播放键据此决定怎么播：引擎接管了就交给引擎（这样频谱与漂移校正
+   * 都有效），没接管就直接操作元素。M9 之前模块用的是浏览器原生控件，
+   * 那时它**永远**绕开引擎，频谱也就永远是空的（表现为波形摊成一条线）。
+   */
+  get isAttached(): boolean {
+    return this.tracks.length > 0 && this.context !== null
+  }
+
   getStatus(): SyncStatus {
     return this.status
   }

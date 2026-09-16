@@ -38,13 +38,6 @@ const saveLabel = computed(() =>
       ? t('compare.unsaved')
       : t('compare.saved'),
 )
-
-const isPresent = computed(() => project.current?.ui.mode === 'present')
-
-function togglePresent(): void {
-  if (!project.current) return
-  project.setMode(isPresent.value ? 'edit' : 'present')
-}
 </script>
 
 <template>
@@ -59,18 +52,6 @@ function togglePresent(): void {
     </span>
 
     <div class="compare-toolbar__actions">
-      <button
-        class="compare-toolbar__btn"
-        type="button"
-        :title="`${isPresent ? t('present.exit') : t('present.enter')} (Ctrl+E)`"
-        :aria-label="isPresent ? t('present.exit') : t('present.enter')"
-        :aria-pressed="isPresent"
-        @click="togglePresent"
-      >
-        <AppIcon name="present" :size="15" />
-        <span class="compare-toolbar__btn-text">{{ isPresent ? t('common.edit') : t('compare.present') }}</span>
-      </button>
-
       <button
         class="compare-toolbar__btn"
         type="button"

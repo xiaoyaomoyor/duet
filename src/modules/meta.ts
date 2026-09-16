@@ -19,6 +19,21 @@
 
 export type ModuleCategory = 'media' | 'text' | 'data' | 'layout' | 'advanced'
 
+/**
+ * 模块的成熟度（展示给用户看的一句话）。
+ *
+ *   stable       可用 —— 作者本人实测过，可以放心用
+ *   experimental 实验 —— 能选、能用，但作者还没实测，行为可能还会变
+ *   planned      规划中 —— 连实现都还没有，选择器里禁用
+ *
+ * 为什么值得单列一个字段而不是复用 `priority`：
+ *   priority 是**开发计划**（这个模块属于哪个里程碑），
+ *   maturity 是**作者对它的信心**。两者经常不一致——
+ *   一个 P0 模块也可能还没被真人用过。
+ *   用户要的恰恰是后者："因为我还没有进行实测"。
+ */
+export type ModuleMaturity = 'stable' | 'experimental'
+
 export interface ModuleMeta {
   type: string
   /** 标题与说明的 i18n key（形如 'modules.image'） */
@@ -29,11 +44,27 @@ export interface ModuleMeta {
   /** 是否属于 §7.3 的 P0 必做清单 */
   priority: 'p0' | 'p1' | 'p3'
   /**
+   * 成熟度。省略 = 'experimental'（保守默认）——
+   * 让"标成可用"成为一个需要**主动写出来**的动作，
+   * 而不是忘了写就自动变成"可用"。
+   */
+  maturity?: ModuleMaturity
+  /**
    * 模块选择器的搜索关键词（中英混合）。
    * 放在这里而非 ModuleDefinition.meta：选择器只读取元数据，
    * 不应为了搜索而加载模块实现（那会破坏代码分割）。
    */
   keywords?: string[]
+}
+
+/** 已被作者实测、标为"可用"的模块类型（v0.4.0） */
+export const STABLE_MODULE_TYPES: readonly string[] = ['image', 'text', 'audio']
+
+/** 某个模块类型是否已实测 */
+export function moduleMaturity(type: string): ModuleMaturity {
+  const meta = MODULE_META.find((item) => item.type === type)
+  if (!meta) return 'experimental'
+  return meta.maturity ?? (STABLE_MODULE_TYPES.includes(type) ? 'stable' : 'experimental')
 }
 
 export const MODULE_META: readonly ModuleMeta[] = [

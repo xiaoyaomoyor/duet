@@ -73,6 +73,21 @@ export function hexToSoft(hex: string, percent = 12): string {
   return `rgb(${rgb.r} ${rgb.g} ${rgb.b} / ${Math.round(alpha * 100)}%)`
 }
 
+/**
+ * 对比双方主题色派生出的卡片底色（**全应用唯一**的实现）。
+ *
+ * 为什么要抽出来（M9 实测反馈"全部的模块卡片背景使用统一的背景着色，
+ * 对齐工具名卡片的"）：工具卡片走的是 `color-mix(accent 10%)`，
+ * 模块卡片走的是 `hexToSoft(accent, 8)` —— 两条路径、两个浓度，
+ * 并排看就是两种颜色。现在两边都调这一个函数，浓度只剩一个数字。
+ *
+ * 浓度取 10%：它是工具卡片原本的取值，也是两者中更"看得见"的一档；
+ * 要以它为准去对齐模块卡片，而不是反过来。
+ */
+export function sideTint(accent: string, percent = 10): string {
+  return hexToSoft(accent, percent)
+}
+
 /** 更亮 / 更暗（amount 为 -1 ~ 1） */
 export function shade(hex: string, amount: number): string {
   const rgb = parseHex(hex)

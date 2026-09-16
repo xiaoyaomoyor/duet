@@ -275,6 +275,28 @@ test.describe('M2 模块系统', () => {
     await expect(rows.nth(1).locator('.module-view__title').first()).toHaveText(secondTitle ?? '')
   })
 
+  test('模块选择器可以用 Esc 关闭（焦点不在其中时也要有效）', async ({ page }) => {
+    await page.goto('/')
+    await createFromTemplate(page, /空白对比/)
+
+    const dialog = page.getByRole('dialog', { name: '选择模块类型' })
+    await page.locator('.canvas__row').first().locator('.canvas__add-module').first().click()
+    await expect(dialog).toBeVisible()
+
+    /*
+     * 先把焦点挪到弹窗之外再按 Esc——这正是实测踩到的场景：
+     * 自动聚焦没生效时，挂在弹窗元素上的 keydown 收不到事件，
+     * 弹窗关不掉、遮罩留在页面上拦截所有后续点击
+     * （表现为"后面什么都点不动"，而日志里只有一堆超时）。
+     */
+    await page.locator('body').click({ position: { x: 5, y: 5 } })
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+
+    // 遮罩真的没了：顶栏的按钮重新可点
+    await expect(page.getByTestId('nav-compare')).toBeVisible()
+  })
+
   test('对比配置面板可调整布局参数并持久化', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
@@ -292,8 +314,14 @@ test.describe('M2 模块系统', () => {
     await expect(page.locator('.compare-toolbar')).toBeVisible()
     await expect(page.locator('.compare .compare__main')).toContainText('对比配置')
 
-    // 第一个下拉是「背景样式」（分组顺序：布局 → 配色 → 序号 → 背景 → 聚光灯）
-    await config.locator('select').nth(1).selectOption('grid')
+    // v0.4.0：面板右上角不再有关闭按钮（工具条上的开关图标已经能收起它）
+    await expect(config.getByRole('button', { name: /收起对比配置|关闭/ })).toHaveCount(0)
+
+    /*
+     * 下拉框顺序（v0.4.0 起密度那一档已删除）：
+     *   0 = 背景样式（布局组）、1 = 填充形式（背景组）
+     */
+    await config.locator('select').first().selectOption('grid')
     await expect(page.locator('.canvas')).toHaveClass(/canvas--bg-grid/)
 
     await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })

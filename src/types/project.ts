@@ -16,7 +16,7 @@
  *   这是**破坏性**变更：旧 type 的实现已从注册表删除，
  *   不迁移就会命中"模块类型未注册"分支、表现为内容消失。
  */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 // ——————————————————————————————————————————————————————————
 // 工具（生产源）
@@ -214,7 +214,13 @@ export interface LayoutConfig {
   ratio: [number, number]
   /** 中轴间距 px */
   gutter: number
-  density: 'compact' | 'normal' | 'comfy'
+  /**
+   * 密度曾经是可选的三档（紧凑 / 标准 / 宽松）。
+   *
+   * v0.4.0 把它整档删掉了（用户："删除密度选项，默认为紧凑的布局，
+   * 无需用户调整"）。留一个只有一种取值、又没有界面的开关，
+   * 只会让下一个读代码的人以为它还能用。
+   */
   showAxis: boolean
   background: 'solid' | 'grid' | 'dots'
   maxWidth: number

@@ -19,10 +19,12 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import AppIcon from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
+import { useProjectStore } from '@/stores/useProjectStore'
 import { APP } from '@/app.config'
 
 const { t } = useI18n()
 const route = useRoute()
+const project = useProjectStore()
 
 /**
  * 当前页面。
@@ -33,6 +35,14 @@ const route = useRoute()
 const activePage = computed<'compare' | 'settings'>(() =>
   route.meta.layout === 'settings' ? 'settings' : 'compare',
 )
+
+/** 是否处于展示视图（由当前项目的视图态决定） */
+const isPresent = computed(() => project.current?.ui.mode === 'present')
+
+function togglePresent(): void {
+  if (!project.current) return
+  project.setMode(isPresent.value ? 'edit' : 'present')
+}
 </script>
 
 <template>
@@ -78,6 +88,27 @@ const activePage = computed<'compare' | 'settings'>(() =>
       >
         <AppIcon name="settings" :size="17" class="u-selected-icon" />
       </RouterLink>
+
+      <!--
+        「演示」按钮（v0.4.0 从对比页工具条搬到这里，用户要求"和演示模式里的
+        「编辑」按钮相呼应"）。两个按钮的位置对称：进入演示在应用顶栏最右，
+        退出演示在展示视图顶栏最右。
+        它**带文字**，与那三个纯图标入口刻意区分：这是一个动作，
+        不是"我在哪一页"的状态。没有打开项目时禁用。
+      -->
+      <button
+        class="topbar__action"
+        type="button"
+        :disabled="!project.hasProject"
+        :title="`${isPresent ? t('present.exit') : t('present.enter')} (Ctrl+E)`"
+        :aria-label="isPresent ? t('present.exit') : t('present.enter')"
+        :aria-pressed="isPresent"
+        data-testid="toggle-present"
+        @click="togglePresent"
+      >
+        <AppIcon :name="isPresent ? 'toEdit' : 'present'" :size="16" />
+        <span>{{ isPresent ? t('common.edit') : t('compare.present') }}</span>
+      </button>
     </nav>
   </header>
 </template>
@@ -164,6 +195,38 @@ const activePage = computed<'compare' | 'settings'>(() =>
 
 .topbar__nav.u-selected:hover {
   background: var(--accent-soft);
+}
+
+/*
+ * 「演示」按钮：带文字的动作按钮。
+ * 与左边三个纯图标入口刻意做出区别——那边是"我在哪一页"，这边是"做一件事"。
+ */
+.topbar__action {
+  display: inline-flex;
+  gap: var(--sp-2);
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--sp-3);
+  margin-left: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.topbar__action:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  border-color: var(--accent-500);
+}
+
+.topbar__action:disabled {
+  color: var(--text-disabled);
+  opacity: 0.6;
 }
 .topbar__icon-btn {
   display: inline-flex;
