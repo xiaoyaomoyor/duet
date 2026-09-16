@@ -81,15 +81,31 @@ export async function closeDialog(page: Page): Promise<void> {
 }
 
 /**
+ * 在模块编辑弹窗里执行一段编辑操作，完成后关闭。
+ *
+ * 比"专用助手"更通用：像「代码对比」这种一个弹窗里有多个输入框的模块，
+ * 用它可以一次把操作写清楚，不必为每种模块各造一个函数。
+ */
+export async function editModule(
+  page: Page,
+  target: Locator,
+  edit: (dialog: Locator) => Promise<void>,
+): Promise<void> {
+  const dialog = await openModuleEditor(page, target)
+  await edit(dialog)
+  await closeDialog(page)
+}
+
+/**
  * 改模块正文：打开弹窗 → 填第一个 textarea → 关闭。
  *
  * 这是最高频的组合，单独抽出来可以让绝大多数既有用例
  * 只改一行就继续成立。
  */
 export async function fillModuleText(page: Page, target: Locator, value: string): Promise<void> {
-  const dialog = await openModuleEditor(page, target)
-  await dialog.locator('textarea').first().fill(value)
-  await closeDialog(page)
+  await editModule(page, target, async (dialog) => {
+    await dialog.locator('textarea').first().fill(value)
+  })
 }
 
 /** 改模块标题：打开弹窗 → 填标题 → 关闭 */
@@ -104,4 +120,41 @@ export async function renameModule(page: Page, target: Locator, title: string): 
 /** 等待自动保存完成（顶栏出现"已保存"） */
 export async function waitSaved(page: Page, timeout = 5000): Promise<void> {
   await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout })
+}
+
+/** setInputFiles 能接受的载荷 */
+export interface FilePayload {
+  name: string
+  mimeType: string
+  buffer: Buffer
+}
+
+/**
+ * 通过模块编辑弹窗导入媒体。
+ *
+ * ⚠️ 必须等导入**真正完成**再关弹窗。
+ *   `setInputFiles` 只保证"change 事件已派发"，而导入是异步的
+ *   （读文件 → 内容哈希 → 探测尺寸/时长 → 落库 → 回写模块数据）。
+ *   紧接着关窗会把 MediaPicker 卸载在这次异步流程的中途，
+ *   结果是"文件选了、内容没进来"，而且**不报任何错**——
+ *   在 E2E 里表现为后续断言莫名找不到元素，极难定位。
+ *
+ *   完成信号用"选择器里出现了 blob: 预览"：
+ *   blob URL 只有在资源已落库、并被 useResolvedMedia 解析出来之后才存在，
+ *   因此它比"等固定毫秒数"可靠，也同时适用于图片 / 音频 / 视频。
+ */
+export async function importMedia(
+  page: Page,
+  target: Locator,
+  file: FilePayload,
+): Promise<void> {
+  const dialog = await openModuleEditor(page, target)
+  await dialog.locator('input[type="file"]').first().setInputFiles(file)
+
+  await expect(
+    dialog.locator('audio, video, img[src^="blob:"]').first(),
+    '导入未完成：选择器里始终没有出现媒体预览',
+  ).toBeVisible({ timeout: 15_000 })
+
+  await closeDialog(page)
 }

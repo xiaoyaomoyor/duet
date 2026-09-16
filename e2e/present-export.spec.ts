@@ -190,13 +190,15 @@ test.describe('M3 导出', () => {
 
     expect(html).toContain('<!doctype html>')
     expect(html).toContain('只读页内容标记')
-    // 只读页不应包含编辑器痕迹（注意别误判 <style> 里的 CSS 规则名）
-    expect(html).not.toContain('card__editor')
-    // M6 起编辑器搬进了模块编辑弹窗；弹窗是 Teleport 到 body 的，
-    // 一旦被误序列化进导出文件，就会留下一个永远打不开的空壳
-    expect(html).not.toContain('card__actions')
+    // 只读页不应包含编辑器痕迹。
+    // ⚠️ 只能断言**元素/属性**，不能断言类名字符串：导出会内联整份样式表，
+    // 任何类名都会出现在 <style> 的 CSS 规则里（这个坑早先已经踩过一次）。
     expect(html).not.toContain('<textarea')
     expect(html).not.toContain('<input')
+    // 模块编辑弹窗是 Teleport 到 body 的：一旦被误序列化进来，
+    // 就会在只读页里留下一个永远打不开的空壳。aria-modal 只在元素上出现。
+    expect(html).not.toContain('aria-modal')
+    expect(html).not.toContain('contenteditable')
     // 应内联样式（否则打开后是裸 HTML）
     expect(html).toContain('--bg-base')
   })

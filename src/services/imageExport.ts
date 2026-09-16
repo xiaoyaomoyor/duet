@@ -19,6 +19,14 @@ const MAX_CANVAS_EDGE = 16384
 /** 单个资源等待上限：外链挂了也不该让导出永远卡住 */
 const MEDIA_WAIT_TIMEOUT_MS = 8000
 
+/**
+ * 整张图渲染的上限。
+ *
+ * 比 MEDIA_WAIT_TIMEOUT_MS 宽松得多：真实的整页光栅化在内容多时确实要几秒，
+ * 我们要拦的是"永久挂起"，不是"慢"。30 秒还没出来就一定出问题了。
+ */
+const EXPORT_RENDER_TIMEOUT_MS = 30_000
+
 export interface ExportImageOptions {
   /** 像素倍率 */
   scale?: 1 | 2
@@ -166,15 +174,35 @@ async function safeToBlob(
   options: { width: number; height: number; backgroundColor: string; scale: number },
 ): Promise<Result<Blob, string>> {
   try {
-    const blob = await toBlob(root, {
-      width: options.width,
-      height: options.height,
-      backgroundColor: options.backgroundColor,
-      pixelRatio: options.scale,
-      cacheBust: true,
-      // 排除工具栏、悬浮按钮等不该出现在导出图里的元素
-      filter: (node) => !(node instanceof Element && node.classList.contains('no-export')),
-    })
+    /*
+     * 给 html-to-image 加一道超时兜底。
+     *
+     * 原因（实测踩到）：它内部的图片加载写成
+     *     img.onload = () => { img.decode().then(() => rAF(() => resolve())) }
+     * `decode()` **没有 catch**：一旦它 reject，这个 Promise 永不 settle，
+     * 整个导出会**无限挂起**——不抛异常、不报错、不下载，
+     * 用户只看到一个卡住的对话框，完全无从判断出了什么事。
+     *
+     * 库内部修不了，但可以在外面兜底：超时后明确告知失败，
+     * 至少让用户知道是导出这一步的问题，而不是以为应用死了。
+     */
+    const blob = await Promise.race([
+      toBlob(root, {
+        width: options.width,
+        height: options.height,
+        backgroundColor: options.backgroundColor,
+        pixelRatio: options.scale,
+        cacheBust: true,
+        // 排除工具栏、悬浮按钮等不该出现在导出图里的元素
+        filter: (node) => !(node instanceof Element && node.classList.contains('no-export')),
+      }),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(
+          () => reject(new Error(`渲染超过 ${EXPORT_RENDER_TIMEOUT_MS / 1000} 秒仍未完成`)),
+          EXPORT_RENDER_TIMEOUT_MS,
+        )
+      }),
+    ])
 
     if (!blob) return err('导出失败：未能生成图片数据（可能是画布被跨域资源污染）')
     if (blob.size === 0) return err('导出失败：生成的图片为空')

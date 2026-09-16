@@ -315,7 +315,7 @@ function onDuplicateModule(ref: ModuleRef): void {
         class="canvas__axis-resizer"
         role="separator"
         aria-orientation="vertical"
-        :aria-label="t('canvas.resizeColumns')"
+        :aria-label="t('compare.resizeColumns')"
         tabindex="0"
         @pointerdown="onColumnResizeStart"
         @pointermove="onColumnResizeMove"

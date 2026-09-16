@@ -10,7 +10,7 @@
  * 因此由 `scripts/check-pwa.mjs` 在 `npm run build` 之后校验，不放在这里。
  */
 import { expect, test, type Page } from '@playwright/test'
-import { renameModule, addedCard } from './helpers'
+import { addedCard, editModule, fillModuleText, renameModule } from './helpers'
 
 async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
   const sidebar = page.getByRole('complementary')
@@ -42,7 +42,7 @@ test.describe('M5 代码块模块', () => {
     await addModule(page, 0, '代码块')
 
     const card = addedCard(page)
-    await card.locator('.inline-editor__area').first().fill('第一行\n第二行\n第三行')
+    await fillModuleText(page, card, '第一行\n第二行\n第三行')
 
     const preview = card.locator('.module-view')
     await expect(preview.locator('.code-block')).toBeVisible()
@@ -62,7 +62,7 @@ test.describe('M5 代码块模块', () => {
     await addModule(page, 0, '代码块')
 
     const card = addedCard(page)
-    await card.locator('.inline-editor__area').first().fill('<script>alert(1)</script>\n正常一行')
+    await fillModuleText(page, card, '<script>alert(1)</script>\n正常一行')
 
     const preview = card.locator('.module-view')
     await expect(preview).toContainText('<script>alert(1)</script>')
@@ -76,10 +76,10 @@ test.describe('M5 代码块模块', () => {
     await createFromTemplate(page, /空白对比/)
     await addModule(page, 0, '代码块')
 
-    // 注意：编辑视图的"实时预览"**总是**渲染模块渲染器（ModuleCard 的设计如此），
-    // 所以"空模块不渲染"这条规则只能在展示视图上验证。
+    // 注意：编辑视图的卡片正文**就是**展示视图的呈现，
+    // 所以"空模块不渲染"这条规则要在展示视图上验证。
     const card = addedCard(page)
-    await card.locator('.inline-editor__area').first().fill('   \n  ')
+    await fillModuleText(page, card, '   \n  ')
 
     await page.getByRole('button', { name: '进入展示视图' }).click()
     await expect(page.locator('.present')).toBeVisible()
@@ -97,11 +97,12 @@ test.describe('M5 代码对比模块', () => {
     await addModule(page, 0, '代码对比')
 
     const card = addedCard(page)
-    const areas = card.locator('.diff-editor__area')
-    await expect(areas).toHaveCount(2)
-
-    await areas.nth(0).fill('相同行\n左边旧\n尾行')
-    await areas.nth(1).fill('相同行\n右边新\n尾行')
+    await editModule(page, card, async (dialog) => {
+      const areas = dialog.locator('.diff-editor__area')
+      await expect(areas).toHaveCount(2)
+      await areas.nth(0).fill('相同行\n左边旧\n尾行')
+      await areas.nth(1).fill('相同行\n右边新\n尾行')
+    })
 
     const preview = card.locator('.module-view')
     await expect(preview.locator('.diff-view')).toBeVisible()
@@ -120,15 +121,18 @@ test.describe('M5 代码对比模块', () => {
     await addModule(page, 0, '代码对比')
 
     const card = addedCard(page)
-    const areas = card.locator('.diff-editor__area')
-    await areas.nth(0).fill('')
-    await areas.nth(1).fill('甲\n乙')
+    await editModule(page, card, async (dialog) => {
+      const areas = dialog.locator('.diff-editor__area')
+      await areas.nth(0).fill('')
+      await areas.nth(1).fill('甲\n乙')
+
+      // 只填一侧时在弹窗里就给出提示，而不是让人怀疑是不是没生效
+      await expect(dialog.locator('.diff-editor__hint')).toBeVisible()
+    })
 
     const preview = card.locator('.module-view')
     await expect(preview.locator('.diff-view__row--add')).toHaveCount(2)
     await expect(preview.locator('.diff-view__cell--add')).toHaveCount(2)
-    // 只填一侧时给出提示，而不是让人怀疑是不是没生效
-    await expect(card.locator('.diff-editor__hint')).toBeVisible()
   })
 
   test('两侧完全相同时提示"一致"，且不高亮任何行', async ({ page }) => {
@@ -137,9 +141,11 @@ test.describe('M5 代码对比模块', () => {
     await addModule(page, 0, '代码对比')
 
     const card = addedCard(page)
-    const areas = card.locator('.diff-editor__area')
-    await areas.nth(0).fill('一模一样')
-    await areas.nth(1).fill('一模一样')
+    await editModule(page, card, async (dialog) => {
+      const areas = dialog.locator('.diff-editor__area')
+      await areas.nth(0).fill('一模一样')
+      await areas.nth(1).fill('一模一样')
+    })
 
     const preview = card.locator('.module-view')
     await expect(preview.locator('.diff-view__equal')).toBeVisible()
@@ -152,9 +158,11 @@ test.describe('M5 代码对比模块', () => {
     await addModule(page, 0, '代码对比')
 
     const card = addedCard(page)
-    const areas = card.locator('.diff-editor__area')
-    await areas.nth(0).fill('同一行')
-    await areas.nth(1).fill('同一行   ')
+    await editModule(page, card, async (dialog) => {
+      const areas = dialog.locator('.diff-editor__area')
+      await areas.nth(0).fill('同一行')
+      await areas.nth(1).fill('同一行   ')
+    })
 
     await expect(card.locator('.module-view .diff-view__equal')).toBeVisible()
   })

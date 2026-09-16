@@ -7,7 +7,7 @@
  * 动效开关是否真的关掉了动效。
  */
 import { expect, test, type Page } from '@playwright/test'
-import { fillModuleText } from './helpers'
+import { fillModuleText, importMedia } from './helpers'
 
 /** 生成一段指定时长的静音 WAV（8kHz 单声道 16bit） */
 function silentWav(seconds: number): Buffer {
@@ -46,23 +46,14 @@ async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
 /**
  * 音乐模板第二行是音频模块；给左右两格各导入一段音频。
  *
- * M6 起媒体选择器位于**模块编辑弹窗**内，所以每侧都要：
- * 打开对应卡片的编辑弹窗 → 选文件 → 关掉弹窗。
+ * 走共享的 importMedia：它会等导入真正完成再关弹窗
+ * （立刻关窗会把 MediaPicker 卸载在异步导入中途，且不报错）。
  */
 async function importBothTracks(page: Page): Promise<void> {
   const row = page.locator('.canvas__row').nth(1)
 
-  for (const [index, file] of [WAV_A, WAV_B].entries()) {
-    const target = row.locator('.canvas__cell').nth(index).locator('.card').first()
-    await target.hover()
-    await target.getByRole('button', { name: '编辑模块' }).click()
-
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    await dialog.locator('input[type="file"]').first().setInputFiles(file)
-    await page.keyboard.press('Escape')
-    await expect(dialog).toBeHidden()
-  }
+  await importMedia(page, row.locator('.canvas__cell').nth(0).locator('.card').first(), WAV_A)
+  await importMedia(page, row.locator('.canvas__cell').nth(1).locator('.card').first(), WAV_B)
 
   // 等两侧都完成元数据探测（时长 > 0 才会出现控制栏）
   await expect(row.locator('audio').first()).toBeVisible({ timeout: 10_000 })
@@ -100,7 +91,7 @@ test.describe('M4 同步播放', () => {
     await createFromTemplate(page, /音乐对比/)
 
     const row = page.locator('.canvas__row').nth(1)
-    await row.locator('.canvas__cell').nth(0).locator('input[type="file"]').first().setInputFiles(WAV_A)
+    await importMedia(page, row.locator('.canvas__cell').nth(0).locator('.card').first(), WAV_A)
     await expect(row.locator('audio').first()).toBeVisible({ timeout: 10_000 })
     await page.waitForTimeout(800)
 
