@@ -22,13 +22,19 @@ describe('内置模板', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('音乐模板具备封面/音频/歌词/进度条四行', () => {
+  it('音乐模板具备图片/音频/歌词/进度条四行', () => {
+    // M7 起封面并入图片模块，模板首行改用 image + { fit: 'cover', ratio: '1/1' } 还原原观感
     expect(music?.fields.map((f) => f.field.type)).toEqual([
-      'cover',
+      'image',
       'audio',
       'lyrics',
       'progress',
     ])
+  })
+
+  it('原封面的默认观感被保留下来（1:1 + 裁切填满）', () => {
+    const first = music?.fields[0]?.field
+    expect(first?.props).toMatchObject({ fit: 'cover', ratio: '1/1' })
   })
 
   it('getTemplate 对未知 id 返回 undefined', () => {

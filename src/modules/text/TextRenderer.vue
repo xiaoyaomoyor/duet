@@ -1,4 +1,11 @@
 <script setup lang="ts">
+/**
+ * 文字渲染器
+ *
+ * M7 起同时承担原「备注」模块的职责：
+ * `variant === 'note'` 时渲染成带语气色的标注块，否则是普通正文。
+ * 两者共用同一份数据（`TextData`），因此合并后旧工程文件不会丢内容。
+ */
 import { computed } from 'vue'
 import type { ModuleRendererProps } from '../types'
 import type { TextData } from './data'
@@ -14,12 +21,28 @@ const data = computed<TextData>(() => {
 })
 
 const large = computed(() => props.module.props.size === 'large')
+
+/** 标注样式（原「备注」模块）：短句 + 语气色 */
+const variant = computed(() => (props.module.props.variant === 'note' ? 'note' : 'body'))
+
+const TONES = ['neutral', 'good', 'warn', 'bad'] as const
+const tone = computed(() => {
+  const value = props.module.props.tone
+  return (TONES as readonly unknown[]).includes(value)
+    ? (`note--${String(value)}` as const)
+    : 'note--neutral'
+})
+
 /** 保留段落分隔：编辑时怎么换行，展示时就怎么换行 */
 const paragraphs = computed(() => data.value.text.split(/\n{2,}/).filter((p) => p.trim() !== ''))
 </script>
 
 <template>
+  <!-- 标注样式：单块带色标注，不分段 -->
+  <p v-if="variant === 'note'" class="note" :class="tone">{{ data.text }}</p>
+
   <div
+    v-else
     class="text"
     :class="{ 'text--large': large }"
     :style="{ textAlign: data.align }"

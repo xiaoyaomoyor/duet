@@ -5,11 +5,14 @@
  * 其余任何地方都不应该出现"模块类型 → 组件"的映射。
  *
  * 注册顺序不影响功能（选择器按 modules/meta.ts 的声明顺序排列），
- * 但为可读性仍按"媒体 → 文本 → 数据 → 布局"分组。
+ * 但为可读性仍按"媒体 → 文本 → 数据 → 布局 → 通用"分组。
+ *
+ * M7 归纳：`cover` 并入 `image`、`stars` 并入 `score`、`note` 并入 `text`。
+ * 三者都是"同一份数据、只差观感"的重复，合并后由选项区分
+ * （image.fit / score.style / text.variant）。
  */
 
 // 媒体
-import './cover'
 import './image'
 import './gallery'
 import './audio'
@@ -21,7 +24,6 @@ import './text'
 import './lyrics'
 import './markdown'
 import './richText'
-import './note'
 import './code'
 import './diff'
 
@@ -30,7 +32,6 @@ import './keyValue'
 import './link'
 import './progress'
 import './score'
-import './stars'
 import './tagList'
 import './timeline'
 
@@ -40,6 +41,7 @@ import './placeholder'
 
 // 高级
 import './iframe'
+import './audioConsole'
 
 export { allModules, getModule, hasModule, registerModule, registeredTypes } from './registry'
 export type { AnyModuleDefinition } from './registry'

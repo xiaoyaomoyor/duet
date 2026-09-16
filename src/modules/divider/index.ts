@@ -24,6 +24,8 @@ const definition: ModuleDefinition<DividerData> = {
     create: () => ({ style: 'solid', label: '' }),
     isData: (value): value is DividerData => typeof value === 'object' && value !== null,
   },
+  // 分割线纯粹是排版手段，两侧与整行都用得上
+  scope: 'both',
   editor: defineAsyncComponent(() => import('./DividerEditor.vue')),
   renderer: defineAsyncComponent(() => import('./DividerRenderer.vue')),
   // 分割线永远有内容（§7.4 的特例，写在这里以免后人误判为 bug）

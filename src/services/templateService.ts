@@ -75,7 +75,15 @@ export const BUILTIN_TEMPLATES: readonly ProjectTemplate[] = [
     descKey: 'template.musicDesc',
     accent: DEFAULT_ACCENT_PAIR,
     fields: [
-      { kind: 'paired', field: { type: 'cover', titleKey: 'modules.cover' } },
+      {
+        kind: 'paired',
+        field: {
+          type: 'image',
+          titleKey: 'modules.image',
+          // 原「封面图」的默认观感：1:1 且裁切填满
+          props: { fit: 'cover', ratio: '1/1' },
+        },
+      },
       {
         kind: 'paired',
         field: { type: 'audio', titleKey: 'modules.audio', props: { showWaveform: true } },
@@ -91,7 +99,15 @@ export const BUILTIN_TEMPLATES: readonly ProjectTemplate[] = [
     descKey: 'template.imageDesc',
     accent: ['#f472b6', '#60a5fa'],
     fields: [
-      { kind: 'paired', field: { type: 'cover', titleKey: 'modules.cover' } },
+      {
+        kind: 'paired',
+        field: {
+          type: 'image',
+          titleKey: 'modules.image',
+          // 原「封面图」的默认观感：1:1 且裁切填满
+          props: { fit: 'cover', ratio: '1/1' },
+        },
+      },
       { kind: 'paired', field: { type: 'image', titleKey: 'modules.image' } },
       { kind: 'paired', field: { type: 'keyValue', titleKey: 'modules.keyValue' } },
     ],
@@ -103,7 +119,15 @@ export const BUILTIN_TEMPLATES: readonly ProjectTemplate[] = [
     descKey: 'template.videoDesc',
     accent: ['#fb923c', '#34d399'],
     fields: [
-      { kind: 'paired', field: { type: 'cover', titleKey: 'modules.cover' } },
+      {
+        kind: 'paired',
+        field: {
+          type: 'image',
+          titleKey: 'modules.image',
+          // 原「封面图」的默认观感：1:1 且裁切填满
+          props: { fit: 'cover', ratio: '1/1' },
+        },
+      },
       { kind: 'paired', field: { type: 'video', titleKey: 'modules.video' } },
       { kind: 'paired', field: { type: 'keyValue', titleKey: 'modules.keyValue' } },
     ],

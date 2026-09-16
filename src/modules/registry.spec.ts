@@ -31,12 +31,11 @@ describe('meta.ts 与注册表的一致性', () => {
     }
   })
 
-  it('已注册模块的数量与 M5 交付一致（11 个 M2 模块 + 12 个 M5 模块）', () => {
+  it('已注册模块的数量与 M7 归纳后一致（20 个）', () => {
     expect(registeredTypes().sort()).toEqual(
       [
         // M2：基础 P0 模块 + 图片集
         'audio',
-        'cover',
         'divider',
         'gallery',
         'image',
@@ -52,15 +51,24 @@ describe('meta.ts 与注册表的一致性', () => {
         'iframe',
         'markdown',
         'model3d',
-        'note',
         'placeholder',
         'richText',
         'score',
-        'stars',
         'tagList',
         'timeline',
+        // M7：通用模块
+        'audioConsole',
       ].sort(),
     )
+  })
+
+  it('被合并掉的模块类型确实已从注册表移除（不能只做一半）', () => {
+    // cover → image、stars → score、note → text。
+    // 这条断言的意义：这三个 type 只要还留在注册表里，
+    // v2→v3 迁移就失去意义，而且"合并"会退化成"多出三个别名"。
+    for (const retired of ['cover', 'stars', 'note']) {
+      expect(hasModule(retired), `${retired} 应当已被合并移除`).toBe(false)
+    }
   })
 
   it('每个模块的 type 与其 meta.titleKey 后缀一致（防止复制粘贴后忘改）', () => {
@@ -99,9 +107,10 @@ describe('模块定义契约', () => {
   })
 
   it('新建的模块默认是"空"的（否则展示视图会立刻出现空白内容）', () => {
-    // 例外：这几个模块的"尺寸/开关"本身就是内容，没有"未填写"状态，
+    // 例外：这几个模块没有"未填写"状态——它们的尺寸/开关本身是内容，
+    // 或者（音频控制台）是用户主动放进去的东西，不该凭空消失。
     // 见下一条用例的显式断言。
-    const alwaysVisible = new Set(['divider', 'placeholder', 'progress'])
+    const alwaysVisible = new Set(['divider', 'placeholder', 'progress', 'audioConsole'])
 
     for (const definition of allModules()) {
       if (alwaysVisible.has(definition.type)) continue
@@ -115,28 +124,33 @@ describe('模块定义契约', () => {
     }
   })
 
-  it('分割线、占位块与进度条是 isEmpty 的显式特例（恒为 false）', () => {
-    // 这三个模块没有"未填写"状态：它们本身就承载信息
+  it('分割线、占位块、进度条与音频控制台是 isEmpty 的显式特例（恒为 false）', () => {
     const divider = getModule('divider')
     const progress = getModule('progress')
     const placeholder = getModule('placeholder')
+    const console_ = getModule('audioConsole')
     expect(divider?.isEmpty({ style: 'solid', label: '' }, {})).toBe(false)
     expect(progress?.isEmpty({ showTime: true, showWaveform: true }, {})).toBe(false)
     expect(placeholder?.isEmpty({ height: 48, hint: '' }, {})).toBe(false)
+    // 控制台没有"内容"可言，但用户既然主动添加了它，就不该让它凭空消失；
+    // 真正没准备好时（只有一侧有音轨）由组件内部说明原因。
+    expect(console_?.isEmpty({}, {})).toBe(false)
   })
 
-  it('星级与评分条把"未评分"与"0 分"分开（0 是有效评分）', () => {
-    // 这是 M5 最容易写错的一处：夹取范围时若不先判哨兵值，
+  it('评分模块把"未评分"与"0 分"分开（0 是有效评分）', () => {
+    // 这是最容易写错的一处：夹取范围时若不先判哨兵值，
     // Math.max(0, -1) 会把"未评分"变成"0 分"，新建模块立刻显示成已评分。
-    const stars = getModule('stars')
-    expect(stars?.isEmpty({ value: -1, max: 5 }, {})).toBe(true)
-    expect(stars?.isEmpty({ value: 0, max: 5 }, {})).toBe(false)
-    expect(stars?.isEmpty({ value: 5, max: 5 }, {})).toBe(false)
-
+    // M7 合并「星级」后，两种外观（条 / 星）共用这一份语义——
+    // 外观不该影响"算不算已填写"。
     const score = getModule('score')
     expect(score?.isEmpty({ score: null, max: 10 }, {})).toBe(true)
     expect(score?.isEmpty({ score: 0, max: 10 }, {})).toBe(false)
     expect(score?.isEmpty({ score: -3, max: 10 }, {})).toBe(true)
+
+    // 星级外观下同样是 0 有效、null 为空
+    expect(score?.isEmpty({ score: null, max: 5 }, { style: 'stars' })).toBe(true)
+    expect(score?.isEmpty({ score: 0, max: 5 }, { style: 'stars' })).toBe(false)
+    expect(score?.isEmpty({ score: 5, max: 5 }, { style: 'stars' })).toBe(false)
   })
 
   it('文本模块把纯空白视为未填写', () => {
@@ -154,7 +168,8 @@ describe('模块定义契约', () => {
   })
 
   it('媒体模块在任一来源存在时即为非空', () => {
-    for (const type of ['cover', 'image', 'audio', 'video']) {
+    // M7 起封面已并入图片模块，因此这里不再单列 cover
+    for (const type of ['image', 'audio', 'video']) {
       const definition = getModule(type)
       expect(definition?.isEmpty({}, {})).toBe(true)
       expect(definition?.isEmpty({ assetId: 'a' }, {})).toBe(false)

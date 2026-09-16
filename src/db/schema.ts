@@ -106,7 +106,125 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    to: 3,
+    /**
+     * v2 → v3：把三个被合并掉的模块改写成它们的新家。
+     *
+     *   cover → image    （补 fit=cover、ratio=1/1，即原封面的默认观感）
+     *   stars → score    （补 style=stars；-1 的"未评分"哨兵转成 null）
+     *   note  → text     （补 variant=note 与 tone，正文原样搬过去）
+     *
+     * 为什么必须写迁移而不是"读的时候兼容"：
+     *   模块实现已经从注册表里删掉了。留着旧 type 的记录会在渲染时
+     *   命中 `getModule()` 返回 undefined 的分支，表现为"模块消失"——
+     *   而用户的内容其实还在数据里。那是最糟的一种失败：看着像丢数据。
+     *
+     * 迁移是**幂等**的：已经是新 type 的记录不会被再次处理。
+     */
+    run: (_db, tx) => {
+      const store = tx.objectStore(STORE.projects)
+      const cursorReq = store.openCursor()
+
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result
+        if (!cursor) return
+
+        const project = cursor.value as {
+          schemaVersion?: number
+          sheet?: {
+            rows?: Array<{
+              kind?: string
+              label?: string
+              cells?: Record<string, { modules?: Array<Record<string, unknown>> }>
+            }>
+          }
+        }
+
+        const sheet = project.sheet
+        if (!sheet?.rows) {
+          cursor.continue()
+          return
+        }
+
+        const rows = sheet.rows.map((row) => ({
+          ...row,
+          cells: Object.fromEntries(
+            Object.entries(row.cells ?? {}).map(([sideId, cell]) => [
+              sideId,
+              {
+                ...cell,
+                modules: (cell.modules ?? []).map(migrateModule),
+              },
+            ]),
+          ),
+        }))
+
+        cursor.update({
+          ...project,
+          schemaVersion: 3,
+          sheet: { ...sheet, rows },
+        })
+
+        cursor.continue()
+      }
+    },
+  },
 ]
+
+/**
+ * 单个模块的 v2→v3 改写（见上面迁移的说明）。
+ *
+ * 导出是为了能直接单测：迁移里真正有风险的是**字段改写**
+ * （哨兵值、默认观感、props 合并），而不是游标遍历那段样板代码。
+ */
+export function migrateModule(module: Record<string, unknown>): Record<string, unknown> {
+  const type = module.type
+  const data = (typeof module.data === 'object' && module.data !== null ? module.data : {}) as Record<
+    string,
+    unknown
+  >
+  const props = (typeof module.props === 'object' && module.props !== null ? module.props : {}) as Record<
+    string,
+    unknown
+  >
+
+  if (type === 'cover') {
+    return {
+      ...module,
+      type: 'image',
+      data,
+      props: { fit: 'cover', ratio: '1/1', ...props },
+    }
+  }
+
+  if (type === 'stars') {
+    const raw = Number(data.value)
+    return {
+      ...module,
+      type: 'score',
+      // -1（或缺失/非法）是原「星级」的"未评分"哨兵，新模型用 null
+      data: {
+        score: Number.isFinite(raw) && raw >= 0 ? raw : null,
+        max: Number(data.max) || 5,
+        label: '',
+        showNumber: false,
+      },
+      props: { style: 'stars', ...props },
+    }
+  }
+
+  if (type === 'note') {
+    return {
+      ...module,
+      type: 'text',
+      data: { text: typeof data.text === 'string' ? data.text : '', align: 'left' },
+      props: { variant: 'note', tone: typeof data.tone === 'string' ? data.tone : 'neutral', ...props },
+    }
+  }
+
+  return module
+}
 
 /** 建表：仅在新库或版本升级时执行 */
 function createStores(db: IDBDatabase): void {

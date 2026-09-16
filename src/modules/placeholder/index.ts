@@ -31,6 +31,8 @@ const definition: ModuleDefinition<PlaceholderData> = {
     create: (): PlaceholderData => ({ height: 48, hint: '' }),
     isData: (value): value is PlaceholderData => typeof value === 'object' && value !== null,
   },
+  // 占位块是排版手段，两侧与整行都用得上
+  scope: 'both',
   editor: createFieldEditor([
     { key: 'height', type: 'number', labelKey: 'placeholder.height', min: 8, max: 800, step: 8, default: 48 },
     { key: 'hint', type: 'text', labelKey: 'placeholder.hint', placeholderKey: 'placeholder.hintPlaceholder' },

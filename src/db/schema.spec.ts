@@ -1,0 +1,134 @@
+/**
+ * 数据迁移单测（v2 → v3）
+ *
+ * 这一层的风险不在"遍历游标"，而在**字段改写**：
+ * 哨兵值（星级用 -1 表示未评分，评分用 null）、默认观感（封面是 1:1 + 裁切）、
+ * props 合并顺序。改错任何一处，用户的旧工程文件打开后都会"少东西"——
+ * 而那是所有失败里最难被接受的一种：看起来像丢数据。
+ *
+ * 因此这里逐条锁住改写结果，而不是只断言"类型变了"。
+ */
+import { describe, expect, it } from 'vitest'
+import { migrateModule } from './schema'
+
+describe('migrateModule：cover → image', () => {
+  it('补上原封面的默认观感', () => {
+    const result = migrateModule({
+      type: 'cover',
+      data: { assetId: 'abc' },
+      props: {},
+      title: '封面图',
+      hidden: false,
+    })
+
+    expect(result.type).toBe('image')
+    expect(result.props).toMatchObject({ fit: 'cover', ratio: '1/1' })
+    // 内容原样保留
+    expect(result.data).toEqual({ assetId: 'abc' })
+    // 标题、可见性等外壳字段不能丢
+    expect(result.title).toBe('封面图')
+    expect(result.hidden).toBe(false)
+  })
+
+  it('用户已有的 props 优先于迁移默认值', () => {
+    const result = migrateModule({
+      type: 'cover',
+      data: {},
+      props: { ratio: '16/9' },
+      title: '',
+      hidden: false,
+    })
+    expect(result.props).toMatchObject({ fit: 'cover', ratio: '16/9' })
+  })
+})
+
+describe('migrateModule：stars → score', () => {
+  const migrate = (value: unknown, max?: unknown) =>
+    migrateModule({ type: 'stars', data: { value, max }, props: {}, title: '', hidden: false })
+
+  it('正常分数转成 score 并标记为星级外观', () => {
+    const result = migrate(4, 5)
+    expect(result.type).toBe('score')
+    expect(result.data).toEqual({ score: 4, max: 5, label: '', showNumber: false })
+    expect(result.props).toMatchObject({ style: 'stars' })
+  })
+
+  it('-1 的"未评分"哨兵转成 null（不能变成 0 分）', () => {
+    // 这是本次迁移最容易写错的一处：直接搬数值会让"没打分"变成"打了 0 分"
+    const result = migrate(-1, 5)
+    expect((result.data as { score: unknown }).score).toBeNull()
+  })
+
+  it('0 星是有效评分，必须保持为 0 而不是 null', () => {
+    const result = migrate(0, 5)
+    expect((result.data as { score: unknown }).score).toBe(0)
+  })
+
+  it('缺失或非法分数一律转成未评分', () => {
+    expect((migrate(undefined, 5).data as { score: unknown }).score).toBeNull()
+    expect((migrate('abc', 5).data as { score: unknown }).score).toBeNull()
+    expect((migrate(Number.NaN, 5).data as { score: unknown }).score).toBeNull()
+  })
+
+  it('缺失满分时回落到 5（星级的默认满分）', () => {
+    expect((migrate(3, undefined).data as { max: unknown }).max).toBe(5)
+    expect((migrate(3, 0).data as { max: unknown }).max).toBe(5)
+  })
+})
+
+describe('migrateModule：note → text', () => {
+  it('正文搬进 text，语气色搬进 props', () => {
+    const result = migrateModule({
+      type: 'note',
+      data: { text: '音色更干净', tone: 'good' },
+      props: {},
+      title: '简评',
+      hidden: false,
+    })
+
+    expect(result.type).toBe('text')
+    expect(result.data).toEqual({ text: '音色更干净', align: 'left' })
+    expect(result.props).toMatchObject({ variant: 'note', tone: 'good' })
+    expect(result.title).toBe('简评')
+  })
+
+  it('缺失语气色时回落到中性', () => {
+    const result = migrateModule({ type: 'note', data: { text: 'x' }, props: {} })
+    expect(result.props).toMatchObject({ tone: 'neutral' })
+  })
+
+  it('缺失文本时给空串（而不是 undefined，否则 isEmpty 会读到 undefined）', () => {
+    const result = migrateModule({ type: 'note', data: {}, props: {} })
+    expect((result.data as { text: unknown }).text).toBe('')
+  })
+})
+
+describe('migrateModule：幂等与不影响其他模块', () => {
+  it('已经是新类型的模块原样返回', () => {
+    const image = { type: 'image', data: { assetId: 'a' }, props: {}, title: 'x', hidden: false }
+    expect(migrateModule(image)).toEqual(image)
+
+    const score = { type: 'score', data: { score: 3 }, props: {}, title: 'x', hidden: false }
+    expect(migrateModule(score)).toEqual(score)
+  })
+
+  it('再跑一次迁移不会二次改写（幂等）', () => {
+    const once = migrateModule({
+      type: 'cover',
+      data: { assetId: 'a' },
+      props: {},
+      title: '',
+      hidden: false,
+    })
+    expect(migrateModule(once)).toEqual(once)
+  })
+
+  it('data / props 缺失或类型异常时不崩', () => {
+    expect(() => migrateModule({ type: 'cover' })).not.toThrow()
+    expect(() => migrateModule({ type: 'stars' })).not.toThrow()
+    expect(() => migrateModule({ type: 'note', data: null, props: null })).not.toThrow()
+
+    const result = migrateModule({ type: 'cover', data: null, props: null })
+    expect(result.type).toBe('image')
+  })
+})

@@ -147,7 +147,6 @@ export default {
     text: '文字',
     markdown: 'Markdown',
     richText: '富文本',
-    cover: '封面图',
     image: '图片',
     gallery: '图片集',
     audio: '音频',
@@ -156,7 +155,7 @@ export default {
     progress: '进度条',
     link: '链接',
     keyValue: '参数表',
-    score: '评分条',
+    score: '评分',
     tagList: '标签组',
     divider: '分割线',
     placeholder: '占位块',
@@ -165,8 +164,7 @@ export default {
     diff: '代码对比',
     model3d: '3D 模型',
     timeline: '时间线',
-    note: '备注',
-    stars: '星级',
+    audioConsole: '音频控制台',
   },
 
   tools: {
@@ -328,19 +326,17 @@ export default {
     },
   },
 
-  note: {
-    text: '备注内容',
-    placeholder: '一句话结论，如「音色更干净但副歌略平」',
-    tone: '语气',
+  // 「备注」已并入文字模块（variant = note），语气色选项因此挂在 text 下
+  text: {
+    variant: '样式',
+    variantBody: '正文',
+    variantNote: '标注（带语气色）',
+    tone: '语气色',
     toneNeutral: '中性',
     toneGood: '正面',
     toneWarn: '提醒',
     toneBad: '负面',
-  },
-
-  stars: {
-    value: '星级',
-    max: '满分',
+    placeholder: '一句话结论，如「音色更干净但副歌略平」',
   },
 
   score: {
@@ -349,6 +345,14 @@ export default {
     value: '分数',
     max: '满分',
     showNumber: '显示数值',
+    // 「星级」已并入评分模块（style = stars）
+    displayStyle: '显示为',
+    styleBar: '进度条',
+    styleStars: '星级',
+  },
+
+  audioConsole: {
+    editorHint: '这个模块没有需要填写的内容：它在编辑视图里就是控制台本身。把两侧都加上音频后即可同步播放。',
   },
 
   tagList: {

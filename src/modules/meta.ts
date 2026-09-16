@@ -8,13 +8,20 @@
  *     依赖 Vue 组件，只允许 UI 层引用。
  *
  * 两者的 type 必须一一对应，由 modules/registry.spec.ts 断言（M2 落地）。
+ *
+ * M7 归纳：`cover` → `image`、`stars` → `score`、`note` → `text`。
+ * 三组都是"同一份数据、只差观感"的重复；合并后由各自的选项区分，
+ * 旧工程文件由 v2→v3 迁移自动转换。
+ *
+ * `scope`（适用范围）**不在这里**，而在各模块的实现里：
+ * 选择器通过 getModule(type).scope 查询，避免同一件事有两个真源。
  */
 
 export type ModuleCategory = 'media' | 'text' | 'data' | 'layout' | 'advanced'
 
 export interface ModuleMeta {
   type: string
-  /** 标题与说明的 i18n key（形如 'modules.cover'） */
+  /** 标题与说明的 i18n key（形如 'modules.image'） */
   titleKey: string
   descKey: string
   icon: string
@@ -32,20 +39,13 @@ export interface ModuleMeta {
 export const MODULE_META: readonly ModuleMeta[] = [
   // —— 媒体 ——
   {
-    type: 'cover',
-    titleKey: 'modules.cover',
-    descKey: 'modules.cover',
-    icon: 'cover',
-    category: 'media',
-    priority: 'p0',
-  },
-  {
     type: 'image',
     titleKey: 'modules.image',
     descKey: 'modules.image',
     icon: 'image',
     category: 'media',
     priority: 'p0',
+    keywords: ['image', '图片', '照片', '生图', '封面', 'cover', '主图'],
   },
   {
     type: 'audio',
@@ -88,6 +88,7 @@ export const MODULE_META: readonly ModuleMeta[] = [
     icon: 'text',
     category: 'text',
     priority: 'p0',
+    keywords: ['text', '文字', '文案', '评语', '价格', '备注', 'note', '结论'],
   },
   {
     type: 'lyrics',
@@ -96,14 +97,6 @@ export const MODULE_META: readonly ModuleMeta[] = [
     icon: 'lyrics',
     category: 'text',
     priority: 'p0',
-  },
-  {
-    type: 'note',
-    titleKey: 'modules.note',
-    descKey: 'modules.note',
-    icon: 'comment',
-    category: 'text',
-    priority: 'p1',
   },
   {
     type: 'markdown',
@@ -154,14 +147,7 @@ export const MODULE_META: readonly ModuleMeta[] = [
     icon: 'score',
     category: 'data',
     priority: 'p1',
-  },
-  {
-    type: 'stars',
-    titleKey: 'modules.stars',
-    descKey: 'modules.stars',
-    icon: 'star',
-    category: 'data',
-    priority: 'p1',
+    keywords: ['score', '评分', '打分', '星级', 'stars'],
   },
   {
     type: 'tagList',
@@ -178,6 +164,15 @@ export const MODULE_META: readonly ModuleMeta[] = [
     icon: 'timeline',
     category: 'data',
     priority: 'p3',
+  },
+  {
+    type: 'audioConsole',
+    titleKey: 'modules.audioConsole',
+    descKey: 'modules.audioConsole',
+    icon: 'play',
+    category: 'data',
+    priority: 'p1',
+    keywords: ['sync', '同步', '对轨', 'solo', '独听', '静音', '音频控制台'],
   },
 
   // —— 布局 ——

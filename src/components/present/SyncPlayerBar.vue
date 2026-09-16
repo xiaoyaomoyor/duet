@@ -24,7 +24,17 @@ import {
 import { formatDuration } from '@/lib/time'
 import type { Project, Side } from '@/types/project'
 
-const props = defineProps<{ project: Project }>()
+const props = defineProps<{
+  project: Project
+  /**
+   * 作为**通用模块**内嵌在画布里（而不是作为固定控制栏）。
+   *
+   * 两者的差别只有两点：
+   *   1. 内嵌时不能带 `no-export`——它现在是用户主动放进成稿的内容，必须能导出
+   *   2. 内嵌时不再吸顶，随行滚动
+   */
+  embedded?: boolean
+}>()
 
 const { t } = useI18n()
 
@@ -195,7 +205,11 @@ function retryAttach(): void {
 </script>
 
 <template>
-  <div v-if="visible" class="syncbar no-export">
+  <div
+    v-if="visible"
+    class="syncbar"
+    :class="{ 'no-export': !embedded, 'syncbar--embedded': embedded }"
+  >
     <button
       class="syncbar__play"
       type="button"
@@ -310,6 +324,17 @@ function retryAttach(): void {
   padding: var(--sp-2) var(--sp-4);
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
+}
+
+/*
+ * 内嵌（作为通用模块）时：不再贴在页面顶部，而是一张独立的卡片。
+ * 原先的 border-bottom 是"固定控制栏"的分隔线语义，在一张卡片上会显得像没画完的边框。
+ */
+.syncbar--embedded {
+  flex-wrap: wrap;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
 }
 
 .syncbar--advanced {

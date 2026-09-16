@@ -52,6 +52,20 @@ export interface ModuleOption {
   default: unknown
 }
 
+/**
+ * 模块的适用范围。
+ *
+ *   'side'   —— 只能放进左右某一侧（绝大多数模块）
+ *   'common' —— **通用模块**：不分工具、横跨两栏，只能放进整行
+ *               （如"同一套提示词""总体评价""音频控制台"）
+ *   'both'   —— 两侧或整行都放得下（文字、分割线这类通用内容）
+ *
+ * 为什么需要它：编辑器要按放置位置过滤可选项——
+ * 在一侧里提供"音频控制台"没有意义（它要同时操纵两侧），
+ * 而在整行里提供"歌词"同样没有意义（歌词必然属于某一方）。
+ */
+export type ModuleScope = 'side' | 'common' | 'both'
+
 export interface ModuleDefinition<TData = unknown, TProps = Record<string, unknown>> {
   /** 模块类型 id，必须与 modules/meta.ts 中的登记一致 */
   type: string
@@ -63,6 +77,8 @@ export interface ModuleDefinition<TData = unknown, TProps = Record<string, unkno
     /** 模块选择器中的搜索关键词（中英混合，便于检索） */
     keywords?: string[]
   }
+  /** 适用范围；省略等同 'side' */
+  scope?: ModuleScope
   /** 内容默认值与校验 */
   schema: {
     create: () => TData

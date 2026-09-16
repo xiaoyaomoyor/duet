@@ -147,7 +147,6 @@ export default {
     text: 'Text',
     markdown: 'Markdown',
     richText: 'Rich text',
-    cover: 'Cover',
     image: 'Image',
     gallery: 'Gallery',
     audio: 'Audio',
@@ -165,8 +164,7 @@ export default {
     diff: 'Code diff',
     model3d: '3D model',
     timeline: 'Timeline',
-    note: 'Note',
-    stars: 'Stars',
+    audioConsole: 'Audio console',
   },
 
   tools: {
@@ -330,19 +328,17 @@ export default {
     },
   },
 
-  note: {
-    text: 'Note',
-    placeholder: 'One-line verdict, e.g. “cleaner tone, flatter chorus”',
+  // "Note" was merged into the text module (variant = note)
+  text: {
+    variant: 'Style',
+    variantBody: 'Body text',
+    variantNote: 'Callout (with tone)',
     tone: 'Tone',
     toneNeutral: 'Neutral',
     toneGood: 'Positive',
     toneWarn: 'Caution',
     toneBad: 'Negative',
-  },
-
-  stars: {
-    value: 'Stars',
-    max: 'Out of',
+    placeholder: 'One-line verdict, e.g. “cleaner tone, flatter chorus”',
   },
 
   score: {
@@ -351,6 +347,15 @@ export default {
     value: 'Score',
     max: 'Out of',
     showNumber: 'Show number',
+    // "Stars" was merged into the score module (style = stars)
+    displayStyle: 'Display as',
+    styleBar: 'Bar',
+    styleStars: 'Stars',
+  },
+
+  audioConsole: {
+    editorHint:
+      'Nothing to fill in here — this module *is* the console, also in the edit view. Add audio to both sides to play them in sync.',
   },
 
   tagList: {
