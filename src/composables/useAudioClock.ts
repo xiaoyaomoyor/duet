@@ -24,6 +24,8 @@ export interface AudioClockState {
 interface ManualState extends AudioClockState {
   /** 该侧的媒体元素（注册后由引擎接管） */
   element: HTMLMediaElement | null
+  /** 登记它的项目（引擎按项目分实例） */
+  projectId: string
   volume: number
   muted: boolean
   /** 偏移量（ms） */
@@ -46,6 +48,7 @@ function stateOf(sideId: string): ManualState {
       durationMs: 0,
       playing: false,
       element: null,
+      projectId: '',
       volume: 0.8,
       muted: false,
       offsetMs: 0,
@@ -161,8 +164,17 @@ export function registerSyncTrack(options: RegisterTrackOptions): void {
   const { projectId, sideId, element } = options
   const state = stateOf(sideId)
   state.element = element
+  state.projectId = projectId
   manual.set(sideId, state)
-  void projectId
+  /*
+   * 登记之后立刻让引擎接管（v0.5.0）。
+   *
+   * 为什么不等「音频控制台」来装配：频谱分析器挂在引擎上，
+   * 引擎不接管就没有真实波形数据——用户没加控制台时波形永远是静态的。
+   * 引擎的 attach 是**增量**的（见 AudioSyncEngine.attach），
+   * 因此第二个音轨登记时再调一次是安全的。
+   */
+  ensureSyncAttached(projectId)
 }
 
 /** 注销某侧的媒体元素（模块卸载时调用） */
@@ -197,8 +209,18 @@ export interface AttachResult {
 }
 
 /**
- * 尝试装配双轨同步。
- * 条件：环境支持 + 两侧都登记了媒体元素。
+ * 装配音轨到同步引擎。
+ *
+ * **单轨也接管**（v0.5.0 按实测反馈放宽）。
+ *
+ * 此前要求两侧都有媒体元素才装配，理由是"只有一侧就无所谓同步"——
+ * 那个理由本身没错，但漏掉了一件事：**频谱分析器也挂在引擎上**。
+ * 只要引擎不接管，音频模块的波形就永远是静态的，
+ * 于是"单独听一段音频"时波形一动不动（用户连续两轮反馈"波形失效"）。
+ *
+ * 放宽之后：一侧也能拿到真实的频率数据；两侧都在时，
+ * 对齐、主轨、Solo/Mute 这些同步能力自然照旧生效。
+ * 「音频控制台」的显示条件仍然是"两侧都有音频"，UI 不会因此多出来。
  */
 export function attachSync(projectId: string, sides: string[]): AttachResult {
   if (!isSyncSupported()) return { ok: false, reason: 'no-audio-context' }
@@ -213,7 +235,7 @@ export function attachSync(projectId: string, sides: string[]): AttachResult {
       track !== null,
     )
 
-  if (tracks.length < 2) return { ok: false, reason: 'no-tracks' }
+  if (tracks.length === 0) return { ok: false, reason: 'no-tracks' }
 
   const engine = getSyncEngine(projectId)
   const result = engine.attach(tracks)
@@ -222,6 +244,21 @@ export function attachSync(projectId: string, sides: string[]): AttachResult {
     engine.setMaster(null)
   }
   return result
+}
+
+/**
+ * 让引擎接管某个项目当前**所有已登记**的音轨。
+ *
+ * 音频模块在登记自己的元素之后调用它：无论用户有没有加「音频控制台」，
+ * 只要有音频就该有真实的波形数据。
+ */
+export function ensureSyncAttached(projectId: string): void {
+  const sides: string[] = []
+  for (const [sideId, state] of manual) {
+    if (state.element && state.projectId === projectId) sides.push(sideId)
+  }
+  if (sides.length === 0) return
+  attachSync(projectId, sides)
 }
 
 /** 拆掉某个项目的同步（切换项目 / 卸载时调用） */

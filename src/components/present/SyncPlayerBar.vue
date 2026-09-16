@@ -79,10 +79,14 @@ function attach(): void {
   const key = ids.join('|')
   if (key === attachedKey && attached.value) return
 
-  // 音轨变少（换素材/删模块）时先拆掉旧的，避免节点泄漏
-  detachSync(props.project.id)
-  attachedKey = ''
-
+  /*
+   * **不再先 detachSync**（v0.5.0）。
+   *
+   * `createMediaElementSource` 对同一个元素只能调用一次，而 detach 会关掉
+   * AudioContext 并断开所有 source；再装配时就会在已绑定过的元素上抛异常，
+   * 整个引擎降级成 'cross-origin'。引擎的 attach 现在自己是增量的
+   * （复用已有节点、只增删变化的音轨），所以这里直接交给它就行。
+   */
   const result = attachSync(props.project.id, ids)
   attached.value = result.ok
   degradeReason.value = result.ok ? null : (result.reason ?? null)

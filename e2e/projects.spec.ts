@@ -38,8 +38,8 @@ test.describe('M1 项目生命周期', () => {
     await expect(main.getByText('工具 A')).toBeVisible()
     await expect(main.getByText('工具 B')).toBeVisible()
 
-    // 模板预置的四行模块（M7 起「封面图」已并入「图片」模块，见构造总案 §21.11）
-    for (const moduleName of ['图片', '音频', '歌词', '进度条']) {
+    // 模板预置的模块（M7 起「封面图」并入「图片」；v0.5.0 起另有「标题」行）
+    for (const moduleName of ['标题', '图片', '音频', '歌词', '进度条']) {
       await expect(main.getByText(moduleName, { exact: true }).first()).toBeVisible()
     }
 
@@ -47,7 +47,8 @@ test.describe('M1 项目生命周期', () => {
     await expect(
       page.getByRole('complementary').getByRole('button', { name: /音乐对比/ }).first(),
     ).toBeVisible()
-    await expect(page.getByRole('complementary').getByText('4 行')).toBeVisible()
+    // v0.5.0 起模板多一行「标题」（工具名卡片变成了普通模块）
+    await expect(page.getByRole('complementary').getByText('5 行')).toBeVisible()
 
     expect(errors).toEqual([])
   })
@@ -117,18 +118,23 @@ test.describe('M1 项目生命周期', () => {
     const main = page.getByRole('main')
 
     /*
-     * M6 起工具卡片是"最终效果 + 右上角编辑按钮"：
-     * 名称不再就地编辑（那样会把成稿样式和编辑控件混在一起），
-     * 而是点编辑按钮在弹窗里改。
+     * v0.5.0：工具名卡片本身就是一个「标题」模块，因此编辑入口不再是
+     * 卡片右上角的小按钮，而是**模块卡片**右上角的"编辑模块"
+     * （编辑入口只留一个，见 modules/title/TitleEditor.vue 的说明）。
      */
     const head = main.locator('.side-head').first()
-    await head.hover()
-    await head.getByRole('button', { name: '编辑工具卡片' }).click()
+    const titleCard = main.locator('.canvas__row[data-has-title] .card').first()
+    await titleCard.hover()
+    await titleCard.getByRole('button', { name: '编辑模块' }).click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
 
-    const nameInput = dialog.locator('input[type="text"]').first()
+    /*
+     * 弹窗里第一个 text 输入是**模块标题**（ModuleEditorDialog 自带的），
+     * 工具名在「标题」模块编辑器自己的表单里，因此要限定到 .section--fields。
+     */
+    const nameInput = dialog.locator('.section--fields input[type="text"]').first()
     await nameInput.fill('可灵 1.6')
     await nameInput.blur()
     await page.keyboard.press('Escape')

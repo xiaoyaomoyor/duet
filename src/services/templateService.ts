@@ -199,7 +199,17 @@ export function instantiateTemplate(
     },
   ]
 
-  const rows = template.fields.map((entry) => createRow(entry, sideAId, sideBId))
+  /*
+   * 第一行固定是「标题」行（v0.5.0）。
+   *
+   * 工具名卡片从"画布顶部自动绘制"变成了一个普通模块：这样它能被拖动、
+   * 能被删掉、也能在任意行重新添加（用户要求"可以进行移动等操作"）。
+   * 模板把它放在第一行，与之前的位置在观感上一致。
+   */
+  const rows = [
+    createTitleRow(sideAId, sideBId),
+    ...template.fields.map((entry) => createRow(entry, sideAId, sideBId)),
+  ]
 
   const sheet: Sheet = {
     id: uuid(),
@@ -231,7 +241,14 @@ export function createBlankProject(name: string, accent = DEFAULT_ACCENT_PAIR): 
   const blank = BUILTIN_TEMPLATES.find((t) => t.id === 'blank')
   if (blank) {
     const project = instantiateTemplate(blank, { name, accent })
-    project.sheet.rows = []
+    /*
+     * 空白对比也保留「标题」行（v0.5.0）：工具名卡片现在是普通模块，
+     * 连它一起清掉的话，新建的空白对比连"这是哪两个工具"都写不了。
+     */
+    project.sheet.rows = [createTitleRow(
+      project.sheet.sides[0].id,
+      project.sheet.sides[1].id,
+    )]
     return project
   }
 
@@ -268,6 +285,25 @@ export function createRow(
   }
   if (entry.label) row.label = entry.label
   return row
+}
+
+/**
+ * 「标题」行（v0.5.0）：左右各一个 title 模块，用来显示工具名 / 版本 / LOGO。
+ *
+ * 它和别的行没有任何区别——所以能被拖动、被折叠、被删掉。
+ * 抽成函数是因为模板实例化与老工程迁移都要用它，两处必须是同一个形状。
+ */
+export function createTitleRow(sideAId: SideId, sideBId: SideId): Row {
+  const make = (): ModuleInstance => createModuleInstance({ type: 'title', titleKey: 'modules.title' })
+  return {
+    id: uuid(),
+    kind: 'paired',
+    cells: {
+      [sideAId]: { modules: [make()], hidden: false },
+      [sideBId]: { modules: [make()], hidden: false },
+    },
+    collapsed: false,
+  }
 }
 
 /** 创建一个空内容的模块实例 */

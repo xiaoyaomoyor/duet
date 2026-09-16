@@ -23,14 +23,11 @@
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import AppIcon from '@/components/common/AppIcon.vue'
 import ToolIcon from '@/components/common/ToolIcon.vue'
-import SideEditorDialog from './SideEditorDialog.vue'
 import { clampScale } from './sideScale'
 import { sideTint } from '@/lib/color'
+import { useProjectStore } from '@/stores/useProjectStore'
 import { useToolsStore } from '@/stores/useToolsStore'
-import { useResolvedTheme } from '@/composables/useResolvedTheme'
-import { mosaicDataUri } from '@/lib/mosaic'
 import type { Side } from '@/types/project'
 
 const props = defineProps<{
@@ -38,15 +35,11 @@ const props = defineProps<{
   readonly?: boolean
   /** 聚光灯「色彩弱化」：没在播放的一侧整体退到后面 */
   dimmed?: boolean
-  /** 写入侧字段 */
-  patch?: (patch: Record<string, unknown>) => void
 }>()
 
 const { t } = useI18n()
 const tools = useToolsStore()
-const theme = useResolvedTheme()
-
-const editing = ref(false)
+const project = useProjectStore()
 
 const tool = computed(() => tools.resolve(props.side.toolRef))
 const displayName = computed(() => props.side.labelOverride ?? tool.value.name)
@@ -96,7 +89,39 @@ const hasText = computed(() => showName.value || showVersion.value || showNote.v
  */
 const revealed = ref<Set<'name' | 'version' | 'icon'>>(new Set())
 
-function toggleReveal(field: 'name' | 'version' | 'icon'): void {
+/** 三个可匿名的字段，连锁模式要一起切 */
+const ANON_FIELDS = ['name', 'version', 'icon'] as const
+type AnonField = (typeof ANON_FIELDS)[number]
+
+/**
+ * 连锁匿名（v0.5.0，在对比配置里开关）。
+ *
+ * 开启后点任意一处黑框，这一侧的**全部**匿名内容一起显现 / 一起遮回去。
+ * 交付演示时很实用：讲到"这是哪家的模型"时一键全部露出来，
+ * 讲完再一键全部遮上，不必点三次。
+ */
+const chainAnonymize = computed(() => project.current?.sheet.layout.chainAnonymize === true)
+
+/** 该侧是否所有被匿名的字段都已经露出来了（连锁模式据此决定"开还是关"） */
+const allRevealed = computed(() =>
+  ANON_FIELDS.every((field) => !isAnonymized(field) || revealed.value.has(field)),
+)
+
+function isAnonymized(field: AnonField): boolean {
+  if (field === 'name') return props.side.anonymizeName === true
+  if (field === 'version') return props.side.anonymizeVersion === true
+  return props.side.anonymizeIcon === true
+}
+
+function toggleReveal(field: AnonField): void {
+  // 连锁：一次点击切换这一侧的全部匿名内容
+  if (chainAnonymize.value) {
+    revealed.value = allRevealed.value
+      ? new Set()
+      : new Set(ANON_FIELDS.filter((item) => isAnonymized(item)))
+    return
+  }
+
   const next = new Set(revealed.value)
   if (next.has(field)) next.delete(field)
   else next.add(field)
@@ -108,24 +133,6 @@ const versionHidden = computed(
   () => props.side.anonymizeVersion === true && !revealed.value.has('version'),
 )
 const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed.value.has('icon'))
-
-/**
- * 马赛克底图。
- *
- * 刻意**不带 seed**：所有工具、左右两栏共用同一张图，
- * 这样观者看到的是"两处被遮住"，而不是"两个不同的图案"。
- * 明暗两档跟着主题走，否则黑块压在深色卡片上会看不见。
- */
-const mosaic = computed(() =>
-  mosaicDataUri({
-    dark: theme.value === 'light' ? '#6b7280' : '#4b5563',
-    light: theme.value === 'light' ? '#cbd5e1' : '#94a3b8',
-  }),
-)
-
-function onPatch(patch: Record<string, unknown>): void {
-  props.patch?.(patch)
-}
 </script>
 
 <template>
@@ -135,9 +142,9 @@ function onPatch(patch: Record<string, unknown>): void {
 
     <div class="side-head__body">
       <!--
-        LOGO 的匿名：整块换成**统一的马赛克图**（所有工具共用同一张）。
-        为什么不用"模糊原图"：模糊会把品牌色与大致形状留在那里，
-        等于没遮住；而统一的马赛克还能顺带传达"这两处被有意遮住了"。
+        LOGO 的匿名：换成**纯黑块**（v0.5.0 按实测反馈，此前用一张统一的马赛克图）。
+        用户要的是"和文字一样的处理"——文字是黑框，图也应该是黑框；
+        一整块实心黑既彻底遮住了品牌，也和旁边的黑框看起来是一套东西。
       -->
       <button
         v-if="showIcon && iconHidden"
@@ -145,7 +152,6 @@ function onPatch(patch: Record<string, unknown>): void {
         type="button"
         :title="t('compare.revealIcon')"
         :aria-label="t('compare.revealIcon')"
-        :style="{ backgroundImage: `url('${mosaic}')` }"
         @click="toggleReveal('icon')"
       />
       <button
@@ -209,26 +215,13 @@ function onPatch(patch: Record<string, unknown>): void {
         <p v-if="showNote && side.note" class="side-head__note">{{ side.note }}</p>
       </div>
 
-      <!-- 编辑入口：只读态不出现 -->
-      <button
-        v-if="!readonly"
-        class="side-head__edit"
-        type="button"
-        :title="t('compare.editSideShort')"
-        :aria-label="t('compare.editSideShort')"
-        @click="editing = true"
-      >
-        <AppIcon name="edit" :size="14" />
-      </button>
+      <!--
+        编辑入口已经移走（v0.5.0）：工具名卡片现在是一个普通模块，
+        改名字/版本/图标统一走模块卡片的编辑按钮 →
+        「标题」模块的编辑器（modules/title/TitleEditor.vue）。
+        一张卡片两个编辑入口，只会让人猜哪个才是"真的"。
+      -->
     </div>
-
-    <SideEditorDialog
-      :open="editing"
-      :side="side"
-      :display-name="displayName"
-      @close="editing = false"
-      @patch="onPatch"
-    />
   </header>
 </template>
 
@@ -312,30 +305,6 @@ function onPatch(patch: Record<string, unknown>): void {
   overflow-wrap: anywhere;
 }
 
-.side-head__edit {
-  position: absolute;
-  top: var(--sp-2);
-  right: var(--sp-2);
-  display: flex;
-  padding: var(--sp-1);
-  color: var(--text-muted);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
-}
-
-.side-head:hover .side-head__edit,
-.side-head__edit:focus-visible {
-  opacity: 1;
-}
-
-.side-head__edit:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-
 /* ——————————————————————————————————————————————————————————
  * 匿名处理
  *
@@ -402,12 +371,11 @@ function onPatch(patch: Record<string, unknown>): void {
 }
 
 /*
- * LOGO 的马赛克块。尺寸与正常 LOGO 完全一致（72px），
- * 这样打码不会让左右两栏的头部高度发生变化。
+ * LOGO 的匿名块：与文字黑框同一套语言，只是它是 72×72 的方块。
  *
  * ⚠️ 宽高**必须显式写出来**：这个元素是个 `<button>`，不像 `ToolIcon`
  * 那样自带 `width/height` 属性。M9 漏了这两行，于是它塌成 0×0 ——
- * 表现就是"匿名图片没有变成马赛克"（其实渲染了，只是没有面积）。
+ * 表现就是"匿名图片没有变化"（其实渲染了，只是没有面积）。
  */
 .side-head__logo--masked {
   flex: none;
@@ -415,9 +383,7 @@ function onPatch(patch: Record<string, unknown>): void {
   height: 72px;
   padding: 0;
   cursor: pointer;
-  background-color: var(--bg-surface-2);
-  background-repeat: repeat;
-  background-size: 16px 16px;
+  background: #000;
   border: none;
   border-radius: var(--radius-sm);
 }

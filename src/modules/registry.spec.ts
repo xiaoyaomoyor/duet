@@ -31,7 +31,7 @@ describe('meta.ts 与注册表的一致性', () => {
     }
   })
 
-  it('已注册模块的数量与 M7 归纳后一致（20 个）', () => {
+  it('已注册模块的数量与 M7 归纳后一致（21 个）', () => {
     expect(registeredTypes().sort()).toEqual(
       [
         // M2：基础 P0 模块 + 图片集
@@ -58,6 +58,8 @@ describe('meta.ts 与注册表的一致性', () => {
         'timeline',
         // M7：通用模块
         'audioConsole',
+        // v0.5.0：工具名卡片模块化
+        'title',
       ].sort(),
     )
   })
@@ -108,9 +110,9 @@ describe('模块定义契约', () => {
 
   it('新建的模块默认是"空"的（否则演示视图会立刻出现空白内容）', () => {
     // 例外：这几个模块没有"未填写"状态——它们的尺寸/开关本身是内容，
-    // 或者（音频控制台）是用户主动放进去的东西，不该凭空消失。
+    // 或者（音频控制台 / 标题）是用户主动放进去的东西，不该凭空消失。
     // 见下一条用例的显式断言。
-    const alwaysVisible = new Set(['divider', 'placeholder', 'progress', 'audioConsole'])
+    const alwaysVisible = new Set(['divider', 'placeholder', 'progress', 'audioConsole', 'title'])
 
     for (const definition of allModules()) {
       if (alwaysVisible.has(definition.type)) continue
@@ -124,17 +126,30 @@ describe('模块定义契约', () => {
     }
   })
 
-  it('分割线、占位块、进度条与音频控制台是 isEmpty 的显式特例（恒为 false）', () => {
+  it('分割线、占位块、进度条、音频控制台与标题是恒为 false 的显式特例', () => {
     const divider = getModule('divider')
     const progress = getModule('progress')
     const placeholder = getModule('placeholder')
     const console_ = getModule('audioConsole')
+    const title = getModule('title')
     expect(divider?.isEmpty({ style: 'solid', label: '' }, {})).toBe(false)
     expect(progress?.isEmpty({ showTime: true, showWaveform: true }, {})).toBe(false)
     expect(placeholder?.isEmpty({ height: 48, hint: '' }, {})).toBe(false)
     // 控制台没有"内容"可言，但用户既然主动添加了它，就不该让它凭空消失；
     // 真正没准备好时（只有一侧有音轨）由组件内部说明原因。
     expect(console_?.isEmpty({}, {})).toBe(false)
+    /*
+     * 标题模块显示的是"这一侧是谁"。判成空的话，一张还没填任何内容的
+     * 对比页在演示视图里会连左右两边是谁都不显示——那就完全看不懂了。
+     */
+    expect(title?.isEmpty({}, {})).toBe(false)
+  })
+
+  it('标题模块是"侧"作用域，且不存自己的数据（身份信息在 Side 上）', () => {
+    const title = getModule('title')
+    expect(title?.scope).toBe('side')
+    // 它没有呈现选项：名称/版本/字号/匿名都在 Side 上，由模块编辑器直写
+    expect(title?.options ?? []).toHaveLength(0)
   })
 
   it('评分模块把"未评分"与"0 分"分开（0 是有效评分）', () => {

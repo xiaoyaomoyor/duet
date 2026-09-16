@@ -63,6 +63,12 @@ function togglePresent(): void {
         <AppLogo :size="22" />
         <span class="topbar__brand-zh">{{ t('app.name') }}</span>
         <span class="topbar__brand-en">{{ APP.nameEn }}</span>
+        <!--
+          版本号紧跟在 DUET 后面，小字、**不加气泡边框**（v0.5.0 按实测反馈）。
+          此前它固定在左下角，与侧栏底部的统计挤在一起；
+          而"这是哪个版本"本来就是品牌名的一种读法：对奏 Duet v0.5.0。
+        -->
+        <span class="topbar__brand-version" data-testid="app-version">v{{ APP.version }}</span>
       </RouterLink>
     </div>
 
@@ -75,7 +81,8 @@ function togglePresent(): void {
         :title="t('nav.compare')"
         :aria-label="t('nav.compare')"
       >
-        <AppIcon name="versus" :size="17" class="u-selected-icon" />
+        <!-- 「对比」用 VS. 文字标记（用户要求），见下方 .topbar__vs 的说明 -->
+        <span class="topbar__vs" aria-hidden="true">VS.</span>
       </RouterLink>
 
       <RouterLink
@@ -163,6 +170,32 @@ function togglePresent(): void {
   color: var(--text-muted);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/*
+ * 版本号：紧跟品牌名之后的小字，**没有边框也没有底色**。
+ * 用等宽字体与最弱一级的文字色，读得到但不抢戏。
+ */
+.topbar__brand-version {
+  margin-left: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-disabled);
+  letter-spacing: 0.04em;
+}
+
+/*
+ * 「对比」入口用 **VS. 文字**而不是图标（用户明确要求）。
+ *
+ * 图标库里没有"VS."这种东西，而"两把剑"表达的是对抗、不是并列对比。
+ * 直接排两个字反而最准确：它就是这一页在做的事。
+ * 字号略小、加粗、收紧字距，让它在 36px 的方框里看起来像一个标记而不是一段文字。
+ */
+.topbar__vs {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 /*

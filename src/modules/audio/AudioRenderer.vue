@@ -65,12 +65,22 @@ const media = useResolvedMedia(source)
  *   那是个**音频** blob，图片组件解不出来，结果就是"封面永远不显示"——
  *   这正是用户实测反馈里的问题。必须用派生出来的那张图片。
  */
-const coverAssetId = ref<string | undefined>(undefined)
+const embeddedCoverId = ref<string | undefined>(undefined)
+
+/**
+ * 最终用的封面（v0.5.0）：**用户上传的那张优先**。
+ *
+ * 内嵌封面是"文件自带的"，用户传的是"我想要的那张"——后者既然存在，
+ * 就该盖住前者。清空上传项即回到内嵌封面，两条信息都留着。
+ */
+const coverAssetId = computed(
+  () => (data.value as { coverAssetId?: string }).coverAssetId || embeddedCoverId.value,
+)
 
 watch(
   () => data.value.assetId,
   async (assetId) => {
-    coverAssetId.value = undefined
+    embeddedCoverId.value = undefined
     if (!assetId) return
     try {
       /*
@@ -79,10 +89,10 @@ watch(
        * 当初就没抽出封面的老资源，以及 .duet 往返后指向不存在资源的悬空引用。
        * 两者都表现为"Windows 有封面、对奏没有"，而用户无从判断原因。
        */
-      coverAssetId.value = (await repairEmbeddedCover(assetId)) ?? undefined
+      embeddedCoverId.value = (await repairEmbeddedCover(assetId)) ?? undefined
     } catch {
       // 读不到封面不算错误：模板会退回音乐图标占位
-      coverAssetId.value = undefined
+      embeddedCoverId.value = undefined
     }
   },
   { immediate: true },
@@ -315,28 +325,53 @@ watch(
 
     <div class="audio__body">
       <!--
-        封面三态：
-          有内嵌封面        → 渲染它
-          没有但开关开着    → 音乐图标占位（**必须占位**：
-                              否则左右两栏一个有一块图、一个没有，
-                              标题的起始位置就对不齐了）
-          开关关掉          → 整个不渲染，也不留空位
+        长条布局的封面：**卡片左侧那一块就是它**（v0.5.0 重做）。
+        名字压在上侧、播放键在左下、总时间在右下——三样都在封面内部，
+        这样封面的高度就正好等于右侧"波形 + 进度条"的高度，
+        整张卡片因此变得很薄（此前封面只有 56px，右侧却堆了三层）。
         正方形布局下封面已经铺成背景，这一块整块不渲染。
       -->
       <template v-if="audioProps.showCover && audioProps.layout === 'bar'">
-        <MediaImage
-          v-if="coverAssetId"
-          class="audio__cover"
-          :asset-id="coverAssetId"
-          :alt="displayName || t('media.untitled')"
-          fit="cover"
-          ratio="1/1"
-          :rounded="false"
-          silent-on-error
-        />
-        <span v-else class="audio__cover audio__cover--placeholder" aria-hidden="true">
-          <AppIcon name="music" :size="20" />
-        </span>
+        <div class="cover">
+          <MediaImage
+            v-if="coverAssetId"
+            class="cover__img"
+            :asset-id="coverAssetId"
+            :alt="displayName || t('media.untitled')"
+            fit="cover"
+            ratio="1/1"
+            :rounded="false"
+            silent-on-error
+          />
+          <span v-else class="cover__img cover__img--placeholder" aria-hidden="true">
+            <AppIcon name="music" :size="18" />
+          </span>
+
+          <span class="cover__name u-truncate">{{ displayName || t('media.untitled') }}</span>
+
+          <!--
+            底部一行：播放键在左、总时间在右（用户指定）。
+            两者同处一行而不是上下堆叠——封面很薄，堆叠会挤在一起。
+          -->
+          <span class="cover__foot">
+            <button
+              v-if="audioProps.showPlayer"
+              class="cover__play"
+              type="button"
+              :title="playing ? t('audio.pause') : t('audio.play')"
+              :aria-label="playing ? t('audio.pause') : t('audio.play')"
+              :aria-pressed="playing"
+              @click="togglePlay"
+            >
+              <AppIcon :name="playing ? 'pause' : 'play'" :size="11" />
+            </button>
+            <span v-else />
+
+            <span class="cover__total">
+              {{ durationMs > 0 ? formatDuration(durationMs) : '--:--' }}
+            </span>
+          </span>
+        </div>
       </template>
 
       <div class="audio__info">
@@ -372,7 +407,8 @@ watch(
       -->
       <div v-if="audioProps.showPlayer" class="player">
         <button
-          class="player__play"
+          v-if="audioProps.layout === 'square'"
+          class="player__play player__play--inline"
           type="button"
           :title="playing ? t('audio.pause') : t('audio.play')"
           :aria-label="playing ? t('audio.pause') : t('audio.play')"
@@ -395,7 +431,9 @@ watch(
           @input="onSeek"
         />
 
-        <span class="player__time">{{ formatDuration(currentMs) }}</span>
+        <span v-if="audioProps.layout === 'square'" class="player__time">
+          {{ formatDuration(currentMs) }}
+        </span>
       </div>
 
       <!--
@@ -447,78 +485,178 @@ watch(
   min-width: 0;
 }
 
-/* —— 长条布局：封面在左，右侧自上而下是名称 / 波形 / 播放条 —— */
-.audio--bar .audio__body {
-  flex-direction: row;
-  gap: var(--sp-3);
-  align-items: stretch;
-}
-
-/*
- * 长条布局里，名称 / 波形 / 播放条在封面的右侧竖着排。
- * 用一个额外的包裹层表达"封面的右侧"这件事——
- * body 是 flex row，封面是第一格，其余三块需要各自占一整行。
+/* —— 长条布局（v0.5.0 重做） ——
+ * 封面在左、右侧波形 + 进度条，卡片因此很薄。
+ * 封面高度 = 右侧两行的高度（由 grid 自动拉齐，不需要写死像素）。
  */
-.audio--bar .audio__body > :not(.audio__cover) {
-  flex: 1;
-  min-width: 0;
-}
-
-.audio--bar .audio__info {
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-/*
- * 为了把"名称在上、波形与播放条在下"排成右侧的一列，
- * body 在长条布局下用 grid 更直接：
- *   第一列 = 封面（跨三行），第二列 = 名称 / 波形 / 播放条
- */
-.audio--bar {
-  display: block;
-}
-
 .audio--bar .audio__body {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto;
   gap: var(--sp-2) var(--sp-3);
   align-items: center;
 }
 
-.audio--bar .audio__cover {
-  grid-row: 1 / span 3;
+/*
+ * 封面占满左列两行——于是"封面高度 = 右侧波形 + 进度条的高度"
+ * 由网格自动成立，不需要写死像素去凑。
+ */
+.audio--bar .cover {
+  grid-row: 1 / span 2;
 }
 
-.audio--bar .audio__info {
-  grid-column: 2;
-  grid-row: 1;
+/*
+ * 关掉封面时不该留一格空列：波形与播放条各占整行，
+ * 否则它们会缩在左侧那一格里（看起来像坏了）。
+ */
+.audio--bar .audio__body > .wave:first-child,
+.audio--bar .audio__body > .player:first-child {
+  grid-column: 1 / -1;
 }
 
 .audio--bar .wave {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
+  align-self: end;
 }
 
 .audio--bar .player {
   grid-column: 2;
-  grid-row: 3;
+  grid-row: 2;
+  align-self: start;
 }
 
-/* 没有封面时不该留一格空列 */
-.audio--bar .audio__body > .audio__info:first-child {
-  grid-column: 1 / -1;
+/*
+ * 长条布局下名称/时长那一块整块不渲染——名字已经印在封面里了，
+ * 再在右边重复一次就是同一句话出现两遍（而且会把网格挤出一行）。
+ */
+.audio--bar .audio__info {
+  display: none;
 }
 
-.audio--bar .audio__body > .audio__info:first-child ~ .wave,
-.audio--bar .audio__body > .audio__info:first-child ~ .player {
-  grid-column: 1 / -1;
+/*
+ * 封面块：方形、圆角，铺满卡片左侧那一格。
+ *
+ * 它同时是**内容的容器**（名字 / 播放键 / 总时间都压在它上面）：
+ * 这样"封面高度 = 右侧波形 + 进度条的高度"是自动成立的，
+ * 而不是靠调一个 magic number 去凑。
+ */
+.cover {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 68px;
+  height: 100%;
+  min-height: 52px;
+  padding: 4px;
+  overflow: hidden;
+  background: var(--accent-soft, var(--bg-surface-2));
+  border-radius: var(--radius-md);
+}
+
+.cover__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/*
+ * 没有内嵌封面时的图标：做成右上角一枚**很淡的水印**。
+ * 早先它铺满整块居中，结果与左下角的播放键叠在一起（截图核验时一眼看到）。
+ * 挪到右上角之后，名称（左上）、播放键（左下）、总时间（右下）都不碰它。
+ */
+.cover__img--placeholder {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  inset: auto 4px auto auto;
+  width: auto;
+  height: auto;
+  padding: 2px;
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+
+.cover__name,
+.cover__foot {
+  position: relative;
+  z-index: 1;
+}
+
+.cover__foot {
+  display: flex;
+  gap: var(--sp-1);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cover__name {
+  font-size: 9px;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 70%);
+}
+
+.cover__play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: #fff;
+  background: rgb(0 0 0 / 45%);
+  border: none;
+  border-radius: var(--radius-full);
+}
+
+.cover__play:hover {
+  background: rgb(0 0 0 / 70%);
+}
+
+.cover__total {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgb(255 255 255 / 85%);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 70%);
+}
+
+/* 封面上压了字，整块盖一层渐变保证可读 */
+.cover::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(to bottom, rgb(0 0 0 / 55%), rgb(0 0 0 / 15%) 45%, rgb(0 0 0 / 60%));
+}
+
+/* 没有封面图（占位态）时不加压暗，否则只剩一块黑 */
+.cover:has(.cover__img--placeholder)::after {
+  background: none;
+}
+
+.cover:has(.cover__img--placeholder) .cover__name,
+.cover:has(.cover__img--placeholder) .cover__total {
+  color: var(--text-secondary);
+  text-shadow: none;
+}
+
+.cover:has(.cover__img--placeholder) .cover__play {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
 }
 
 /* —— 正方形布局：封面铺满作背景，其余内容叠在上面 —— */
 .audio--square {
   position: relative;
   display: block;
+  /* 边长取"可用宽度的全部，但不超过 320px"：
+     整卡宽度的正方形在大屏上会变成 500px 见方，一屏放不下两个模块。 */
+  width: min(100%, 320px);
   aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: var(--radius-md);
@@ -540,7 +678,7 @@ watch(
  */
 .audio--square .audio__body {
   position: relative;
-  justify-content: flex-end;
+  justify-content: space-between;
   height: 100%;
   padding: var(--sp-3);
   background: linear-gradient(
@@ -549,6 +687,14 @@ watch(
     rgb(0 0 0 / 25%) 45%,
     rgb(0 0 0 / 70%) 100%
   );
+}
+
+/*
+ * 名称块**不要**参与伸展：基础样式里它是 flex:1（长条布局需要它填满右侧），
+ * 在正方形布局里那会把它拉成一整片空白，名称孤零零挂在顶上。
+ */
+.audio--square .audio__info {
+  flex: none;
 }
 
 /* 封面之上的一切都必须用浅色字——它们压在一张不确定的图片上 */
@@ -579,32 +725,11 @@ watch(
   display: none;
 }
 
-.audio__head {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: center;
-}
-
-.audio__cover {
-  flex: none;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
-}
-
-.audio__cover--placeholder {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-disabled);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-}
-
 .audio__info {
   display: flex;
   flex: 1;
   flex-direction: column;
+  gap: var(--sp-1);
   min-width: 0;
 }
 

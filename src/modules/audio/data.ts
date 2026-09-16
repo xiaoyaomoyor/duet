@@ -44,3 +44,14 @@ export interface AudioProps {
 }
 
 export type AudioLayout = 'bar' | 'square'
+
+/**
+ * 音频模块的数据（v0.5.0 起可以覆盖封面）。
+ *
+ * 覆盖而不是替换内嵌封面：内嵌那张是"文件自带的"，传上来的这张是
+ * "用户想要的那张"。用户既然特意传了一张，就不该被文件里的旧图盖掉；
+ * 清空这个字段即回到内嵌封面——两条信息都留着，切换是免费的。
+ */
+export interface AudioData {
+  coverAssetId?: string | undefined
+}

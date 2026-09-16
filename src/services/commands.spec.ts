@@ -325,14 +325,14 @@ describe('module/add 的次序', () => {
     }
 
     const titles = next.sheet.rows[0]?.cells[sideId]?.modules.map((module) => module.title)
-    // M7 起模板首行是「图片」（原「封面图」已并入）
-    expect(titles).toEqual(['图片', '价格', '简评', '结论'])
+    // v0.5.0 起模板首行是「标题」（工具名卡片变成了普通模块）；「图片」在第二行
+    expect(titles).toEqual(['标题', '价格', '简评', '结论'])
 
     // 删除中间一个不影响其他
     const target = next.sheet.rows[0]!.cells[sideId]!.modules[1]!
     next = applyCommand(next, { t: 'module/remove', ref: { ...ref, moduleId: target.id } })
     expect(next.sheet.rows[0]?.cells[sideId]?.modules.map((m) => m.title)).toEqual([
-      '图片',
+      '标题',
       '简评',
       '结论',
     ])

@@ -14,7 +14,6 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { VueDraggable } from 'vue-draggable-plus'
-import SideHeader from './SideHeader.vue'
 import CanvasRow from './CanvasRow.vue'
 import ModulePicker from '@/components/editor/ModulePicker.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
@@ -163,8 +162,14 @@ const backgroundVars = computed(() => {
 /** 演示视图下是否保留背景图案（默认关：成稿要的是内容本身） */
 const showBackground = computed(() => !isReadonly.value || layout.value.backgroundInPresent === true)
 
-/** 整页实心填充（相对于"图案铺在内容底下"） */
-const solidFill = computed(() => layout.value.backgroundFill === 'solid')
+/**
+ * 图案是否**充满整页**（而不只是铺在内容底下）。
+ *
+ * v0.5.0 改语义：此前这一项叫 solid，做的是"整页铺一层实心底色"，
+ * 而用户要的是"网格/点阵充满整个对比页"。现在 page 的含义是
+ * "图案一直铺到页面底部（演示时铺满整个屏幕）"。
+ */
+const pageFill = computed(() => layout.value.backgroundFill === 'page')
 
 const showRowNumbers = computed(() => layout.value.showRowNumbers === true)
 
@@ -393,28 +398,25 @@ function onDuplicateModule(ref: ModuleRef): void {
       class="canvas"
       :class="[
         backgroundClass,
-        { 'canvas--bg-hidden': !showBackground, 'canvas--bg-fill': solidFill },
+        { 'canvas--bg-hidden': !showBackground, 'canvas--bg-page': pageFill },
       ]"
       :style="[canvasStyle, backgroundVars]"
     >
-      <!-- 工具头 -->
-      <div class="canvas__heads">
-        <SideHeader
-          v-for="side in sides"
-          :key="side.id"
-          :side="side"
-          :readonly="project.ui.mode === 'present'"
-          :dimmed="dimmedSideIds.includes(side.id)"
-          :patch="(patch: Record<string, unknown>) => store.setSideField(side.id, patch)"
-        />
-      </div>
+      <!--
+        工具头**不再在这里自动绘制**（v0.5.0）。
+        工具名卡片变成了普通的「标题」模块（modules/title），
+        由模板/迁移放在第一行里——因此它能被拖动、折叠、删除，
+        也能在任意行重新添加。画布这里再画一份就会变成两个工具头。
+      -->
 
-      <!-- 行列表：编辑态可拖拽排序，展示态是普通容器（只读） -->
+      <!-- 行列表：编辑态可拖拽排序，演示态是普通容器（只读） -->
       <VueDraggable
         v-if="!isReadonly && visibleRows.length > 0"
         :model-value="rows"
         class="canvas__rows"
-        handle=".row-drag-handle"
+        handle=".row__head"
+        filter=".row__label-input, .row__tool, button, input, textarea, select, a"
+        :prevent-on-filter="false"
         :animation="200"
         ghost-class="canvas__row--ghost"
         @update:model-value="onRowsReorder"
@@ -535,19 +537,13 @@ function onDuplicateModule(ref: ModuleRef): void {
   z-index: 2;
 }
 
-.canvas__heads {
-  display: grid;
-  grid-template-columns: var(--col-a, 1fr) var(--col-b, 1fr);
-  gap: var(--canvas-gutter, 32px);
-  padding-top: var(--sp-6);
-}
-
 .canvas__rows {
   display: flex;
   flex-direction: column;
   /* 行距固定为紧凑档（v0.4.0 移除了密度选项） */
   gap: var(--sp-3);
-  margin-top: var(--sp-5);
+  /* 第一行就是「标题」行，因此顶部留白仍然需要 */
+  padding-top: var(--sp-6);
 }
 
 .canvas__row {
@@ -764,16 +760,10 @@ function onDuplicateModule(ref: ModuleRef): void {
 }
 
 /*
- * 整页实心填充：底色铺满整个对比页（而不只是内容区），
- * 用来做"整页一张视觉稿"的效果。
+ * 图案充满整页：画布至少撑满滚动容器，于是网格/点阵一路铺到页面底部，
+ * 而不是在最后一个模块下面戛然而止。
  */
-.canvas--bg-fill {
+.canvas--bg-page {
   min-height: 100%;
-  background-color: var(--bg-tint, var(--bg-surface));
-  background-blend-mode: normal;
-}
-
-.canvas--bg-fill.canvas--bg-hidden {
-  background-color: transparent;
 }
 </style>

@@ -255,12 +255,132 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    to: 6,
+    /**
+     * v5 → v6：填充形式改语义（pattern→content、solid→page）。
+     * 见 migrateLayoutFill 的说明。
+     */
+    run: (_db, tx) => {
+      const store = tx.objectStore(STORE.projects)
+      const cursorReq = store.openCursor()
+
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result
+        if (!cursor) return
+
+        const project = cursor.value as {
+          schemaVersion?: number
+          sheet?: { layout?: Record<string, unknown> }
+        }
+
+        const sheet = project.sheet
+        if (!sheet?.layout) {
+          cursor.continue()
+          return
+        }
+
+        cursor.update({
+          ...project,
+          schemaVersion: 6,
+          sheet: { ...sheet, layout: migrateLayoutFill(sheet.layout) },
+        })
+
+        cursor.continue()
+      }
+    },
+  },
+  {
+    to: 7,
+    /**
+     * v6 → v7：给老工程补一个「标题」行。
+     *
+     * v0.5.0 把工具名卡片从"画布顶部自动绘制"改成了普通模块
+     * （`title`，见 modules/title）。老工程里没有这个模块，
+     * 不补的话打开就是"两边都没有工具名"——比改动前还少东西。
+     *
+     * 只在**一个 title 模块都没有**时才插入：用户如果已经自己删掉或
+     * 移走了它，重新打开不该又冒出来一个。
+     */
+    run: (_db, tx) => {
+      const store = tx.objectStore(STORE.projects)
+      const cursorReq = store.openCursor()
+
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result
+        if (!cursor) return
+
+        const project = cursor.value as { sheet?: { rows?: unknown[] } }
+        const rows = project.sheet?.rows
+        if (!Array.isArray(rows)) {
+          cursor.continue()
+          return
+        }
+
+        cursor.update({
+          ...project,
+          schemaVersion: 7,
+          sheet: { ...project.sheet, rows: withTitleRow(rows) },
+        })
+
+        cursor.continue()
+      }
+    },
+  },
 ]
 
-/** 单个 sheet.layout 的 v4→v5 改写（导出是为了能直接单测） */
+/**
+ * 若没有任何 title 模块，就在最前面插一行「标题」行。
+ *
+ * 导出是为了能直接单测——迁移逻辑一旦写错，用户的历史工程就打不开了，
+ * 值得单独钉住。这里的行结构必须与 `templateService.createTitleRow` 一致。
+ */
+export function withTitleRow(rows: unknown[]): unknown[] {
+  const hasTitle = rows.some((row) => {
+    const cells = (row as { cells?: Record<string, { modules?: Array<{ type?: string }> }> }).cells
+    if (!cells) return false
+    return Object.values(cells).some((cell) =>
+      (cell?.modules ?? []).some((module) => module?.type === 'title'),
+    )
+  })
+  if (hasTitle) return rows
+
+  const first = rows[0] as { cells?: Record<string, unknown> } | undefined
+  const sideIds = first?.cells ? Object.keys(first.cells) : []
+  if (sideIds.length === 0) return rows
+
+  const make = (): Record<string, unknown> => ({
+    id: `migrated-title-${Math.random().toString(36).slice(2, 10)}`,
+    type: 'title',
+    title: '',
+    props: {},
+    data: {},
+    hidden: false,
+  })
+
+  const cells: Record<string, unknown> = {}
+  for (const sideId of sideIds) cells[sideId] = { modules: [make()], hidden: false }
+
+  return [{ id: `migrated-title-row-${Math.random().toString(36).slice(2, 10)}`, kind: 'paired', cells, collapsed: false }, ...rows]
+}
 export function migrateLayout(layout: Record<string, unknown>): Record<string, unknown> {
   const next = { ...layout }
   delete next.density
+  return next
+}
+
+/**
+ * 单个 sheet.layout 的 v5→v6 改写（导出是为了能直接单测）。
+ *
+ * 填充形式改了语义：旧值 `pattern`（图案铺在内容区）对应新值 `content`，
+ * 旧值 `solid`（整页铺一层实心底色）对应新值 `page`（图案充满整页）。
+ * 映射而不是直接改渲染、也不是丢弃旧值：老工程打开后应该保持它原本的观感，
+ * 用户想换成"充满整页"再自己改一次。
+ */
+export function migrateLayoutFill(layout: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...layout }
+  if (next.backgroundFill === 'pattern') next.backgroundFill = 'content'
+  else if (next.backgroundFill === 'solid') next.backgroundFill = 'page'
   return next
 }
 

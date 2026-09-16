@@ -9,7 +9,13 @@
  * 因此这里逐条锁住改写结果，而不是只断言"类型变了"。
  */
 import { describe, expect, it } from 'vitest'
-import { migrateLayout, migrateModule, migrateSideAccent } from './schema'
+import {
+  migrateLayout,
+  migrateLayoutFill,
+  migrateModule,
+  migrateSideAccent,
+  withTitleRow,
+} from './schema'
 
 describe('migrateModule：cover → image', () => {
   it('补上原封面的默认观感', () => {
@@ -204,5 +210,71 @@ describe('migrateLayout：移除 density', () => {
   it('没有 density 时是空操作（不能顺手改动别的）', () => {
     const layout = { ratio: [2, 1], gutter: 48, showAxis: false }
     expect(migrateLayout(layout)).toEqual(layout)
+  })
+})
+
+/**
+ * v5 → v6：填充形式改语义。
+ *
+ * 旧值 `pattern`（图案铺在内容区）→ 新值 `content`，
+ * 旧值 `solid`（整页铺一层实心底色）→ 新值 `page`（图案充满整页）。
+ * 必须**映射**而不是丢弃：老工程打开后应当保持它原本的观感。
+ */
+describe('migrateLayoutFill：填充形式的旧值映射', () => {
+  it('pattern → content', () => {
+    expect(migrateLayoutFill({ backgroundFill: 'pattern' }).backgroundFill).toBe('content')
+  })
+
+  it('solid → page', () => {
+    expect(migrateLayoutFill({ backgroundFill: 'solid' }).backgroundFill).toBe('page')
+  })
+
+  it('新值原样保留（幂等）', () => {
+    expect(migrateLayoutFill({ backgroundFill: 'page' }).backgroundFill).toBe('page')
+    expect(migrateLayoutFill({ backgroundFill: 'content' }).backgroundFill).toBe('content')
+  })
+
+  it('没设过就不写这个键（不能被迁移"顺手"补一个值）', () => {
+    expect('backgroundFill' in migrateLayoutFill({ gutter: 32 })).toBe(false)
+  })
+
+  it('其余字段不受影响', () => {
+    const result = migrateLayoutFill({ gutter: 48, background: 'grid', backgroundFill: 'solid' })
+    expect(result.gutter).toBe(48)
+    expect(result.background).toBe('grid')
+  })
+})
+
+/**
+ * v6 → v7：给老工程补一个「标题」行。
+ *
+ * 工具名卡片从"画布顶部自动绘制"变成了普通模块，老工程里没有它。
+ * 不补的话，用户打开历史工程会发现"两边的工具名都不见了"——
+ * 比改动之前还少东西，这是最不能被接受的一种回归。
+ */
+describe('withTitleRow：补「标题」行', () => {
+  const cell = (modules: Array<{ type: string }>) => ({ modules, hidden: false })
+
+  it('没有任何 title 模块时，在最前面插一行', () => {
+    const rows = [
+      { id: 'r1', kind: 'paired', cells: { a: cell([{ type: 'image' }]), b: cell([]) } },
+      { id: 'r2', kind: 'paired', cells: { a: cell([]), b: cell([]) } },
+    ]
+    const next = withTitleRow(rows)
+    expect(next).toHaveLength(3)
+    const head = next[0] as { cells: Record<string, { modules: Array<{ type: string }> }> }
+    expect(head.cells.a?.modules[0]?.type).toBe('title')
+    expect(head.cells.b?.modules[0]?.type).toBe('title')
+    // 原来那两行原样跟在后面
+    expect((next[1] as { id: string }).id).toBe('r1')
+  })
+
+  it('已经有 title 模块时不重复插入（用户自己放过了）', () => {
+    const rows = [{ id: 'r1', kind: 'paired', cells: { a: cell([{ type: 'title' }]), b: cell([]) } }]
+    expect(withTitleRow(rows)).toBe(rows)
+  })
+
+  it('一行都没有时不动（空工程没有可供推断两侧 id 的依据）', () => {
+    expect(withTitleRow([])).toEqual([])
   })
 })

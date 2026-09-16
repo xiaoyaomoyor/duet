@@ -10,7 +10,7 @@
  * 因此由 `scripts/check-pwa.mjs` 在 `npm run build` 之后校验，不放在这里。
  */
 import { expect, test, type Page } from '@playwright/test'
-import { addedCard, editModule, fillModuleText, renameModule } from './helpers'
+import {contentRows, addedCard, editModule, fillModuleText, renameModule } from './helpers'
 
 async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
   await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
@@ -20,12 +20,12 @@ async function createFromTemplate(page: Page, name: string | RegExp): Promise<vo
 
 /** 某一行的左格 */
 function leftCell(page: Page, rowIndex: number) {
-  return page.locator('.canvas__row').nth(rowIndex).locator('.canvas__cell').first()
+  return contentRows(page).nth(rowIndex).locator('.canvas__cell').first()
 }
 
 /** 打开某一行的模块选择器，并挑选一个模块类型 */
 async function addModule(page: Page, rowIndex: number, moduleName: string): Promise<void> {
-  const row = page.locator('.canvas__row').nth(rowIndex)
+  const row = contentRows(page).nth(rowIndex)
   await row.locator('.canvas__add-module').first().click()
   await page
     .getByRole('dialog', { name: '选择模块类型' })

@@ -94,6 +94,20 @@ const isFullRow = computed(() => props.row.kind === 'full')
 const renderSides = computed(() => (isFullRow.value ? props.sides.slice(0, 1) : props.sides))
 
 /**
+ * 这一行里有没有「标题」模块。
+ *
+ * 只看**数据**（module.type），不看 DOM：标题模块的渲染器是异步组件，
+ * 在它加载完成之前 `.title-module` 根本不存在，任何依赖 DOM 的判断
+ * 都会在首帧给出错误答案（E2E 里表现为"卡片数偶尔差一张"）。
+ * 挂在行根节点上，供测试与样式使用。
+ */
+const hasTitleModule = computed(() =>
+  Object.values(props.row.cells).some((cell) =>
+    cell.modules.some((module) => module.type === 'title'),
+  ),
+)
+
+/**
  * 演示视图下该格应渲染的模块（§7.4 三态规则的落点）。
  *
  *   空模块（isEmpty）→ 不渲染
@@ -199,6 +213,7 @@ defineExpose({ rowHasContent })
     v-if="!isReadonly || rowHasContent"
     class="row canvas__row"
     :data-row="row.id"
+    :data-has-title="hasTitleModule ? '' : undefined"
   >
     <!-- 行头：编辑态可拖拽/命名/增删 -->
     <div v-if="!isReadonly" class="row__head">
@@ -221,9 +236,11 @@ defineExpose({ rowHasContent })
       <!-- 行序号：在整行的左上角，与模块的子序号（2.1 / 2.2）形成层级 -->
       <span v-if="showNumbers" class="row__number">{{ rowNumber }}</span>
 
-      <span class="row-drag-handle row__grip" :title="t('row.moveRow')">
-        <AppIcon name="grip" :size="13" />
-      </span>
+      <!--
+        拖动手柄已移除（v0.5.0 按实测反馈）：行头和模块卡片一样，
+        **拖空白处就能拖整行**（见 CompareCanvas 里 handle=".row__head"）。
+        一个小握把既占地方，又要求用户先找到它——而这一行本来就没什么可点的。
+      -->
 
       <input
         class="row__label-input"
@@ -413,19 +430,20 @@ defineExpose({ rowHasContent })
   border-color: var(--border-subtle);
 }
 
+/*
+ * 行头就是拖动区（v0.5.0 移除了小握把）。
+ * 抓取指针落在整条行头上，用户不必再去找那个图标；
+ * 行头里的按钮与标题输入框由 filter 排除，照常可以点、可以输入。
+ */
 .row__head {
   display: flex;
   gap: var(--sp-2);
   align-items: center;
   margin-bottom: var(--sp-3);
-}
-
-.row__grip {
   cursor: grab;
-  color: var(--text-disabled);
 }
 
-.row__grip:active {
+.row__head:active {
   cursor: grabbing;
 }
 

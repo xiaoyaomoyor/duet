@@ -34,11 +34,22 @@ const toolbarVisible = ref(true)
 const isFullscreen = ref(false)
 const container = ref<HTMLElement | null>(null)
 
-/** 是否有可展示的内容（决定显示画布还是空状态引导） */
+/**
+ * 是否有可展示的内容（决定显示画布还是空状态引导）。
+ *
+ * **不计「标题」模块**（v0.5.0）：它恒不为空（它显示的是"这一侧是谁"），
+ * 如果把它算进来，那么"新建一份空白对比 → 进演示"就永远看不到
+ * "还没有可展示的内容 → 返回编辑"这条引导了——而那一刻用户最需要的
+ * 恰恰是这条引导，而不是两张写着"工具 A / 工具 B"的空卡片。
+ *
+ * 一旦真的填了内容，标题行自然一起出现（它就是普通的一行）。
+ */
 const hasContent = computed(() =>
   props.project.sheet.rows.some((row) =>
     props.project.sheet.sides.some((side) =>
-      (row.cells[side.id]?.modules ?? []).some((module) => isPresentable(module)),
+      (row.cells[side.id]?.modules ?? []).some(
+        (module) => module.type !== 'title' && isPresentable(module),
+      ),
     ),
   ),
 )
@@ -50,14 +61,46 @@ const sideColors = computed(() => [
   resolveAccent(props.project.sheet.sides[1] ?? {}, accentTheme.value) || 'var(--side-b)',
 ])
 
-const rootStyle = computed(() => ({
-  '--side-a': sideColors.value[0],
-  '--side-b': sideColors.value[1],
-  '--present-zoom': String(zoom.value),
-  '--canvas-max': `${props.project.sheet.layout.maxWidth}px`,
-}))
+const rootStyle = computed(() => {
+  const layout = props.project.sheet.layout
+  const scale = Number.isFinite(layout.backgroundScale)
+    ? Math.min(96, Math.max(8, layout.backgroundScale as number))
+    : 32
+
+  return {
+    '--side-a': sideColors.value[0],
+    '--side-b': sideColors.value[1],
+    '--present-zoom': String(zoom.value),
+    '--canvas-max': `${layout.maxWidth}px`,
+    // 背景图案的变量在演示视图里也要有，否则"充满整页"铺不出来（见 pagePattern）
+    '--bg-scale': `${scale}px`,
+    '--bg-tint': layout.backgroundTint ?? '',
+  }
+})
 
 const showAxis = computed(() => props.project.sheet.layout.showAxis)
+
+/**
+ * 背景图案是否要铺满**整个演示屏幕**（v0.5.0）。
+ *
+ * 两个条件都要满足：
+ *   1. 填充形式选了"充满整页"
+ *   2. 演示视图保留了背景图案（backgroundInPresent，默认关）
+ *
+ * 用一层绝对定位的全屏图层来画，而不是给 .present__scroll 加背景：
+ * 后者是滚动容器，背景会跟着内容一起滚（`background-attachment: local` 的
+ * 默认行为），看起来就不是"整页铺满"而是"贴在内容上的一张壁纸"。
+ */
+const pagePattern = computed(() => {
+  const layout = props.project.sheet.layout
+  if (layout.backgroundFill !== 'page') return false
+  if (layout.backgroundInPresent !== true) return false
+  return layout.background === 'grid' || layout.background === 'dots'
+})
+
+const patternClass = computed(() =>
+  props.project.sheet.layout.background === 'dots' ? 'present__pattern--dots' : 'present__pattern--grid',
+)
 
 // ————————————————————————————————————————————————————————
 // 交互
@@ -244,6 +287,18 @@ defineExpose({ zoom, hasContent })
         </button>
       </header>
 
+      <!--
+        整屏背景图案（"充满整页"）。
+        固定定位、不随内容滚动 —— 它铺的是**屏幕**，不是某一段内容。
+      -->
+      <div
+        v-if="pagePattern"
+        class="present__pattern"
+        :class="patternClass"
+        aria-hidden="true"
+        data-testid="present-pattern"
+      />
+
       <!-- 画布（只读） -->
       <div class="present__scroll u-scroll-y">
         <div v-if="showAxis" class="present__axis" aria-hidden="true" />
@@ -407,8 +462,36 @@ defineExpose({ zoom, hasContent })
   color: var(--text-secondary);
 }
 
+/*
+ * 整屏背景图案（"充满整页"，v0.5.0）。
+ *
+ * 固定定位而不是给滚动容器加背景：滚动容器的背景默认跟着内容走
+ * （background-attachment: local），那样看起来是"贴在内容上的一张壁纸"，
+ * 而不是"整页铺满的底纹"。
+ * z-index 压在内容之下、遮罩之上。
+ */
+.present__pattern {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.present__pattern--grid {
+  background-image:
+    linear-gradient(to right, var(--bg-tint, var(--border-subtle)) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--bg-tint, var(--border-subtle)) 1px, transparent 1px);
+  background-size: var(--bg-scale, 32px) var(--bg-scale, 32px);
+}
+
+.present__pattern--dots {
+  background-image: radial-gradient(var(--bg-tint, var(--border-default)) 1px, transparent 1px);
+  background-size: var(--bg-scale, 20px) var(--bg-scale, 20px);
+}
+
 .present__scroll {
   position: relative;
+  z-index: 1;
   flex: 1;
   min-height: 0;
 }

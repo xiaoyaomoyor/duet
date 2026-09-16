@@ -14,8 +14,8 @@ import { registeredTypes } from './registry'
 import '@/modules'
 
 describe('模块成熟度', () => {
-  it('图片 / 文字 / 音频 / 歌词标为可用', () => {
-    expect([...STABLE_MODULE_TYPES].sort()).toEqual(['audio', 'image', 'lyrics', 'text'])
+  it('图片 / 文字 / 音频 / 歌词 / 标题标为可用', () => {
+    expect([...STABLE_MODULE_TYPES].sort()).toEqual(['audio', 'image', 'lyrics', 'text', 'title'])
     for (const type of STABLE_MODULE_TYPES) {
       expect(moduleMaturity(type), `${type} 应当标为可用`).toBe('stable')
     }

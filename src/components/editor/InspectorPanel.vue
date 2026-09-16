@@ -255,6 +255,21 @@ const fontSizeMax = 64
         <p class="group__hint">{{ t('inspector.showNumbersHint') }}</p>
       </section>
 
+      <!-- ——————————————— 匿名 ——————————————— -->
+      <section class="group">
+        <h3 class="group__title">{{ t('inspector.groupAnonymize') }}</h3>
+        <label class="field field--switch">
+          <span class="field__label">{{ t('inspector.chainAnonymize') }}</span>
+          <input
+            type="checkbox"
+            :checked="layout.chainAnonymize === true"
+            data-testid="chain-anonymize"
+            @change="patch({ chainAnonymize: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+        <p class="group__hint">{{ t('inspector.chainAnonymizeHint') }}</p>
+      </section>
+
       <!-- ——————————————— 背景 ——————————————— -->
       <section class="group">
         <h3 class="group__title">{{ t('inspector.groupBackground') }}</h3>
@@ -280,7 +295,7 @@ const fontSizeMax = 64
           <span class="field__label">{{ t('inspector.backgroundFill') }}</span>
           <select
             class="field__select"
-            :value="layout.backgroundFill ?? 'pattern'"
+            :value="layout.backgroundFill ?? 'content'"
             @change="
               patch({
                 backgroundFill: ($event.target as HTMLSelectElement)
@@ -288,8 +303,8 @@ const fontSizeMax = 64
               })
             "
           >
-            <option value="pattern">{{ t('inspector.fillPattern') }}</option>
-            <option value="solid">{{ t('inspector.fillSolid') }}</option>
+            <option value="content">{{ t('inspector.fillPattern') }}</option>
+            <option value="page">{{ t('inspector.fillPage') }}</option>
           </select>
         </label>
 

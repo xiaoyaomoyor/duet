@@ -71,12 +71,24 @@ export class AudioSyncEngine {
   constructor(private readonly options: SyncEngineOptions = {}) {}
 
   /**
-   * 装配音轨。
-   * 失败时不会抛异常，而是返回降级原因——调用方据此提示用户。
+   * 装配音轨。失败时不会抛异常，而是返回降级原因——调用方据此提示用户。
+   *
+   * ⚠️ 这是**增量**装配，不是"推倒重来"。
+   *
+   * 原因：`createMediaElementSource` 对同一个元素**只能调用一次**，
+   * 第二次会抛异常。而 v0.5.0 起音轨是**逐个**登记的（先有左侧、再来右侧），
+   * 如果每次都先 `detach()`（关掉 AudioContext、断开所有 source）再重建，
+   * 第二次装配就会在已绑定过的元素上抛错，整个引擎降级成 'cross-origin'，
+   * 表现为"加了第二段音频之后波形反而没了"。
+   *
+   * 所以：已经建好的 source/gain/analyser **原样复用**，
+   * 只为新出现的音轨建节点、只拆掉已经消失的音轨。
    */
   attach(tracks: SyncTrack[]): { ok: true } | { ok: false; reason: SyncDegradeReason } {
-    this.detach()
-    if (tracks.length === 0) return { ok: false, reason: 'no-tracks' }
+    if (tracks.length === 0) {
+      this.detach()
+      return { ok: false, reason: 'no-tracks' }
+    }
 
     const Ctor = getAudioContextCtor()
     if (!Ctor) {
@@ -84,15 +96,25 @@ export class AudioSyncEngine {
       return { ok: false, reason: 'no-audio-context' }
     }
 
-    try {
-      this.context = new Ctor()
-    } catch {
-      this.setStatus({ supported: false, reason: 'no-audio-context' })
-      return { ok: false, reason: 'no-audio-context' }
+    if (!this.context) {
+      try {
+        this.context = new Ctor()
+      } catch {
+        this.setStatus({ supported: false, reason: 'no-audio-context' })
+        return { ok: false, reason: 'no-audio-context' }
+      }
     }
 
-    this.tracks = tracks
+    // 1. 拆掉已经不在列表里的音轨（换素材、模块被删掉）
+    const nextSideIds = new Set(tracks.map((track) => track.sideId))
+    for (const sideId of [...this.sources.keys()]) {
+      if (nextSideIds.has(sideId)) continue
+      this.disposeTrack(sideId)
+    }
+
+    // 2. 为新出现的音轨建节点（已有的直接跳过，绝不重复 createMediaElementSource）
     for (const track of tracks) {
+      if (this.sources.has(track.sideId)) continue
       try {
         const source = this.context.createMediaElementSource(track.element)
         const gain = this.context.createGain()
@@ -115,10 +137,27 @@ export class AudioSyncEngine {
       }
     }
 
+    this.tracks = tracks
     this.applyGains()
     this.setStatus({ supported: true, driftMs: 0, playing: false, corrections: 0 })
     this.setStatus({ reason: undefined })
     return { ok: true }
+  }
+
+  /** 拆掉单条音轨的节点（保留 AudioContext 与其余音轨） */
+  private disposeTrack(sideId: string): void {
+    try {
+      this.sources.get(sideId)?.disconnect()
+    } catch {
+      // 忽略：已经断开
+    }
+    this.sources.delete(sideId)
+    this.gains.delete(sideId)
+    this.analysers.delete(sideId)
+    this.volumes.delete(sideId)
+    this.muted.delete(sideId)
+    if (this.masterSideId === sideId) this.masterSideId = null
+    if (this.soloed === sideId) this.soloed = null
   }
 
   /** 拆掉所有连接（组件卸载、换素材时调用） */

@@ -7,7 +7,7 @@
  *   3. 三种导出都能产出文件，且长图**不是空白**
  */
 import { expect, test, type Page } from '@playwright/test'
-import { fillModuleText } from './helpers'
+import {contentRows, fillModuleText } from './helpers'
 
 const RED_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8Dwn4EIwDiqkL4KAcxhA/1kF5WvAAAAAElFTkSuQmCC'
@@ -82,7 +82,7 @@ test.describe('M3 演示视图', () => {
     await enterPresent(page)
 
     // 全部为空 → 演示视图一行都不渲染
-    await expect(page.locator('.canvas__row')).toHaveCount(0)
+    await expect(contentRows(page)).toHaveCount(0)
     // 并给出空状态引导，而不是白屏（限定在展示遮罩层内：
     // 画布自身也有一份同样文案的空状态，不限定会撞上 strict mode）
     await expect(page.locator('.present').getByText('还没有可展示的内容')).toBeVisible()
@@ -93,7 +93,7 @@ test.describe('M3 演示视图', () => {
     await createFromTemplate(page, /空白对比/)
 
     // 空白模板带一个文字模块：先填内容
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
+    const cell = contentRows(page).first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, '第一段结论')
     await expect(cell.locator('.module-view')).toContainText('第一段结论')
 
@@ -140,7 +140,7 @@ test.describe('M3 导出', () => {
     await createFromTemplate(page, /空白对比/)
 
     // 填一段文字，保证图上一定有内容
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
+    const cell = contentRows(page).first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, '长图导出测试内容')
     await expect(cell.locator('.module-view')).toContainText('长图导出测试内容')
 
@@ -169,7 +169,7 @@ test.describe('M3 导出', () => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
+    const cell = contentRows(page).first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, '只读页内容标记')
 
     await page.getByRole('button', { name: '导出' }).click()
@@ -216,7 +216,7 @@ test.describe('M3 导出', () => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
+    const cell = contentRows(page).first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, 'x')
 
     await page.getByRole('button', { name: '导出' }).click()
@@ -240,7 +240,7 @@ test.describe('M3 导出', () => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
+    const cell = contentRows(page).first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, '往返内容标记')
     await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })
 
@@ -277,6 +277,10 @@ test.describe('M3 导出', () => {
     const sidebar = page.getByRole('complementary')
     await expect(sidebar.getByRole('button', { name: /空白对比/ }).first()).toBeVisible()
     await sidebar.getByRole('button', { name: /空白对比/ }).first().click()
-    await expect(page.locator('.module-view').first()).toContainText('往返内容标记')
+    // 第一行现在是「标题」行，内容行从第二行起（contentRows 会跳过它）；
+    // 该行左右两格各有一个 module-view，因此还要 .first()
+    await expect(contentRows(page).first().locator('.module-view').first()).toContainText(
+      '往返内容标记',
+    )
   })
 })

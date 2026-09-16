@@ -38,6 +38,7 @@ import './timeline'
 // 布局
 import './divider'
 import './placeholder'
+import './title'
 
 // 高级
 import './iframe'

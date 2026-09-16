@@ -39,9 +39,6 @@ useGlobalShortcuts()
 /** 设置界面不显示对比标签页 */
 const showTabs = computed(() => route.meta.layout !== 'settings')
 
-/** 版本徽标文案（如 "DUET: v0.3.0"） */
-const versionLabel = computed(() => `${APP.nameEn.toUpperCase()}: v${APP.version}`)
-
 /** 路由级别的标题（供侧栏与顶栏共享的语义区域使用） */
 const sectionTitle = computed(() => (showTabs.value ? t('nav.compare') : t('nav.settings')))
 
@@ -171,13 +168,6 @@ onBeforeUnmount(() => {
     <ExportDialog :open="ui.exportOpen" @close="ui.closeExport()" />
 
     <AppToasts />
-
-    <!--
-      版本徽标：固定在窗口右下角。
-      pointer-events: none —— 它是一个标识，不该挡住底下的内容；
-      写 bug 报告时能直接念出来，不必先去设置里翻。
-    -->
-    <span class="shell__version" data-testid="app-version">{{ versionLabel }}</span>
   </div>
 </template>
 
@@ -244,32 +234,5 @@ onBeforeUnmount(() => {
 .shell__content {
   flex: 1;
   min-height: 0;
-}
-
-/*
- * 版本徽标（v0.4.5 按实测反馈从右下角挪到**左下角**）。
- *
- * 右下角那个位置在演示视图里与"快捷键提示"挤在一起（两行小字叠着），
- * 挪到左下角之后两边各占一角，互不打扰。
- *
- * 它固定在窗口上，因此一定会有内容从底下滚过，所以保留那层抬升底色 +
- * 描边：它是一件"浮在内容之上的小牌"，而不是与内容糊在一起的两段文字。
- * 侧栏底部会为它让出一行的高度（见 ProjectSidebar 的 .sidebar__foot）。
- */
-.shell__version {
-  position: fixed;
-  bottom: var(--sp-2);
-  left: var(--sp-3);
-  z-index: var(--z-sticky);
-  padding: 1px var(--sp-2);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
-  letter-spacing: 0.06em;
-  pointer-events: none;
-  user-select: none;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
 }
 </style>

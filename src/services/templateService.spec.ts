@@ -56,7 +56,8 @@ describe('instantiateTemplate', () => {
     expect(project.title).toBe('Suno vs Lyria')
     expect(project.schemaVersion).toBe(SCHEMA_VERSION)
     expect(project.sheet.sides).toHaveLength(2)
-    expect(project.sheet.rows).toHaveLength(4)
+    // v0.5.0 起模板多一行「标题」（工具名卡片变成了普通模块）
+    expect(project.sheet.rows).toHaveLength(5)
     expect(project.ui.mode).toBe('edit')
     expect(project.pinned).toBe(false)
   })
@@ -134,10 +135,16 @@ describe('instantiateTemplate', () => {
 })
 
 describe('createBlankProject', () => {
-  it('创建没有任何行的空项目', () => {
+  it('只有一行「标题」——空项目也必须能写下这是哪两个工具', () => {
     const project = createBlankProject('空白对比')
     expect(project.title).toBe('空白对比')
-    expect(project.sheet.rows).toHaveLength(0)
+    expect(project.sheet.rows).toHaveLength(1)
     expect(project.sheet.sides).toHaveLength(2)
+
+    // 那一行确实是标题行，且左右各一个
+    const row = project.sheet.rows[0]!
+    for (const side of project.sheet.sides) {
+      expect(row.cells[side.id]?.modules[0]?.type).toBe('title')
+    }
   })
 })

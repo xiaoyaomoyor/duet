@@ -6,7 +6,7 @@
  * 在 jsdom 里这些一律测不了，所以必须在这一层补齐（M1 收尾时的承诺）。
  */
 import { expect, test, type Page } from '@playwright/test'
-import { closeDialog, moduleCard, openModuleEditor, renameModule } from './helpers'
+import {contentRows, closeDialog, moduleCard, openModuleEditor, renameModule } from './helpers'
 
 // ——————————————————————————————————————————————————————————
 // 测试素材：手工构造的合法最小文件
@@ -64,7 +64,7 @@ async function createFromTemplate(page: Page, name: string | RegExp): Promise<vo
 
 /** 打开某一行的模块选择器，并挑选一个模块类型 */
 async function addModule(page: Page, rowIndex: number, moduleName: string): Promise<void> {
-  const row = page.locator('.canvas__row').nth(rowIndex)
+  const row = contentRows(page).nth(rowIndex)
   await row.locator('.canvas__add-module').first().click()
   await page.getByRole('dialog', { name: '选择模块类型' }).getByRole('button', { name: moduleName }).click()
   await expect(page.getByRole('dialog', { name: '选择模块类型' })).toBeHidden()
@@ -72,7 +72,7 @@ async function addModule(page: Page, rowIndex: number, moduleName: string): Prom
 
 /** 某一行的左格（每行有左右两格，很多断言只关心左格，必须限定作用域） */
 function leftCell(page: Page, rowIndex: number) {
-  return page.locator('.canvas__row').nth(rowIndex).locator('.canvas__cell').first()
+  return contentRows(page).nth(rowIndex).locator('.canvas__cell').first()
 }
 
 test.describe('M2 模块系统', () => {
@@ -106,8 +106,9 @@ test.describe('M2 模块系统', () => {
 
     // 刷新后内容仍在（"保持位置"会重新打开该项目）
     await page.reload()
-    await expect(page.locator('.canvas__row .canvas__cell').first().locator('.module-view__title')).toHaveText('价格')
-    await expect(page.locator('.module-view').first()).toContainText('¥99 / 月')
+    const reloaded = contentRows(page).first().locator('.canvas__cell').first()
+    await expect(reloaded.locator('.module-view__title')).toHaveText('价格')
+    await expect(reloaded.locator('.module-view')).toContainText('¥99 / 月')
 
     expect(errors).toEqual([])
   })
@@ -256,7 +257,7 @@ test.describe('M2 模块系统', () => {
     await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
 
-    const rows = page.locator('.canvas__row')
+    const rows = contentRows(page)
     await expect(rows).toHaveCount(4)
 
     const firstTitle = await rows.nth(0).locator('.module-view__title').first().textContent()
@@ -280,7 +281,7 @@ test.describe('M2 模块系统', () => {
     await createFromTemplate(page, /空白对比/)
 
     const dialog = page.getByRole('dialog', { name: '选择模块类型' })
-    await page.locator('.canvas__row').first().locator('.canvas__add-module').first().click()
+    await contentRows(page).first().locator('.canvas__add-module').first().click()
     await expect(dialog).toBeVisible()
 
     /*

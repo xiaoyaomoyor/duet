@@ -57,8 +57,14 @@ export interface ModuleMeta {
   keywords?: string[]
 }
 
-/** 已被作者实测、标为"可用"的模块类型（v0.4.5 起含歌词） */
-export const STABLE_MODULE_TYPES: readonly string[] = ['image', 'text', 'audio', 'lyrics']
+/** 已被作者实测、标为"可用"的模块类型（v0.5.0 起含标题） */
+export const STABLE_MODULE_TYPES: readonly string[] = [
+  'image',
+  'text',
+  'audio',
+  'lyrics',
+  'title',
+]
 
 /** 某个模块类型是否已实测 */
 export function moduleMaturity(type: string): ModuleMaturity {
@@ -207,6 +213,15 @@ export const MODULE_META: readonly ModuleMeta[] = [
   },
 
   // —— 布局 ——
+  {
+    type: 'title',
+    titleKey: 'modules.title',
+    descKey: 'modules.title',
+    icon: 'heading',
+    category: 'layout',
+    priority: 'p0',
+    keywords: ['title', 'header', 'tool', '标题', '工具名', '名称', 'logo'],
+  },
   {
     type: 'divider',
     titleKey: 'modules.divider',

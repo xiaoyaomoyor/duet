@@ -1,7 +1,7 @@
 {
   "name": "duet",
   "private": true,
-  "version": "0.4.5",
+  "version": "0.5.0",
   "type": "module",
   "description": "对奏 Duet — 专注内容横向对比的本地优先 Web 应用。Same prompt. Two tools. One stage.",
   "license": "AGPL-3.0-or-later",
@@ -31,8 +31,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "icons": "node scripts/generate-icons.mjs",
-    "logos": "node scripts/fetch-brand-logos.mjs",
-    "tauri": "tauri"
+    "logos": "node scripts/fetch-brand-logos.mjs"
   },
   "dependencies": {
     "@lucide/vue": "1.46.0",

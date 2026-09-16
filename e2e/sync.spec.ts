@@ -7,7 +7,7 @@
  * 动效开关是否真的关掉了动效。
  */
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { fillModuleText, importMedia } from './helpers'
+import {contentRows, fillModuleText, importMedia } from './helpers'
 
 /** 生成一段指定时长的静音 WAV（8kHz 单声道 16bit） */
 function silentWav(seconds: number): Buffer {
@@ -95,7 +95,7 @@ async function importBothTracks(page: Page): Promise<void> {
   // 先加控制台：它插在**最后一行之后**，因此不会挪动下面按索引定位的音频行
   await addAudioConsole(page)
 
-  const row = page.locator('.canvas__row').nth(1)
+  const row = contentRows(page).nth(1)
 
   await importMedia(page, row.locator('.canvas__cell').nth(0).locator('.card').first(), WAV_A)
   await importMedia(page, row.locator('.canvas__cell').nth(1).locator('.card').first(), WAV_B)
@@ -144,7 +144,7 @@ test.describe('M4 同步播放', () => {
     await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
 
-    const row = page.locator('.canvas__row').nth(1)
+    const row = contentRows(page).nth(1)
     const cell = row.locator('.canvas__cell').first()
     await importMedia(page, cell.locator('.card').first(), WAV_A)
     await waitAudioReady(row)
@@ -176,7 +176,7 @@ test.describe('M4 同步播放', () => {
   test('只有一侧有音频时不显示控制栏（没有"双轨"可言）', async ({ page }) => {    await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
 
-    const row = page.locator('.canvas__row').nth(1)
+    const row = contentRows(page).nth(1)
     await importMedia(page, row.locator('.canvas__cell').nth(0).locator('.card').first(), WAV_A)
     await waitAudioReady(row)
     await page.waitForTimeout(800)
@@ -271,7 +271,7 @@ test.describe('M4 动效开关', () => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
+    const cell = contentRows(page).first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, '动效测试')
     await expect(cell.locator('.module-view')).toContainText('动效测试')
 
@@ -290,7 +290,7 @@ test.describe('M4 动效开关', () => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
+    const cell = contentRows(page).first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, '关闭动效')
 
     await page.getByRole('link', { name: '设置' }).click()

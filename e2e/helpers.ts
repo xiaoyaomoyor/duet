@@ -28,9 +28,24 @@ export async function createFromTemplate(page: Page, name: string | RegExp): Pro
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
+/**
+ * 内容行（**排除「标题」行**）。
+ *
+ * v0.5.0 起工具名卡片是一个普通模块，模板/迁移把它放在第一行。
+ * 而本文件里所有的 rowIndex 历来指"模板字段行"（图片、音频……），
+ * 所以统一在这里把它滤掉，几十个用例就不必各自 +1。
+ *
+ * 判据用 `data-has-title` 属性而不是"行里有没有 .title-module"：
+ * 标题模块的渲染器是**异步组件**，在它加载完成前 DOM 里什么都没有，
+ * 按 DOM 判断会在首帧给出错误答案（表现为"卡片数偶尔差一张"这种偶发失败）。
+ */
+export function contentRows(page: Page): Locator {
+  return page.locator('.canvas__row:not([data-has-title])')
+}
+
 /** 某一行的左格 */
 export function leftCell(page: Page, rowIndex: number): Locator {
-  return page.locator('.canvas__row').nth(rowIndex).locator('.canvas__cell').first()
+  return contentRows(page).nth(rowIndex).locator('.canvas__cell').first()
 }
 
 /**
@@ -53,7 +68,7 @@ export function addedCard(page: Page, rowIndex = 0): Locator {
 
 /** 打开某一行的模块选择器并挑一个模块类型 */
 export async function addModule(page: Page, rowIndex: number, moduleName: string): Promise<void> {
-  const row = page.locator('.canvas__row').nth(rowIndex)
+  const row = contentRows(page).nth(rowIndex)
   await row.locator('.canvas__add-module').first().click()
   await page
     .getByRole('dialog', { name: '选择模块类型' })

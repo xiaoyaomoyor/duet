@@ -50,10 +50,15 @@ const showTitle = computed(() => props.module.title.trim().length > 0)
 
 <template>
   <section class="module-view" :style="{ '--accent': accent }">
-    <!-- 子序号：贴在模块左上角（用户要求"2.2 在模块的左上角"） -->
-    <span v-if="number" class="module-view__number">{{ number }}</span>
-
-    <h4 v-if="showTitle" class="module-view__title">{{ module.title }}</h4>
+    <!--
+      标题行：子序号在模块名**前面**（v0.5.0 按实测反馈，此前它单独占一行在标题上方）。
+      排在名字前面之后，"2.2 图片"读起来就是一个带编号的名字，
+      还省下一行高度——二十个模块并排时这一行省得很明显。
+    -->
+    <h4 v-if="showTitle || number" class="module-view__heading">
+      <span v-if="number" class="module-view__number">{{ number }}</span>
+      <span v-if="showTitle" class="module-view__title">{{ module.title }}</span>
+    </h4>
 
     <!--
       正文默认是模块渲染器；编辑视图在模块为空时会传入 #body 插槽，
@@ -87,12 +92,21 @@ const showTitle = computed(() => props.module.title.trim().length > 0)
   min-width: 0;
 }
 
+/* 标题行：序号与模块名横向排 */
+.module-view__heading {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+  min-width: 0;
+}
+
 /*
  * 子序号。刻意做得比标题更轻（更小、更淡、等宽字体）：
  * 它是"索引"而不是内容，抢戏会让对比页变吵。
  * 用等宽字体是为了让 2.1 与 2.11 的左边缘对齐。
  */
 .module-view__number {
+  flex: none;
   font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1;
