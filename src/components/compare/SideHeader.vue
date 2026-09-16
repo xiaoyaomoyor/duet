@@ -1,236 +1,220 @@
 <script setup lang="ts">
 /**
- * 对比方头部（工具名 / 图标 / 版本号 / 备注）
+ * 对比方头部（工具卡片）
  *
- * M1：全部字段可编辑（走 store 的命令层，因此可撤销、可自动保存）。
- * M2：图标可点击替换、接入工具选择器。
+ * 布局（M6 按用户实测反馈重做）：
+ *   ┌─┬────────────────────────────────┐
+ *   │█│  ┌──────┐                      │
+ *   │█│  │ LOGO │   工具名  版本        │
+ *   │█│  └──────┘   备注                │
+ *   └─┴────────────────────────────────┘
+ *
+ * 与旧版的区别：
+ *   1. 强调色条从**上侧**移到**左侧**（用户明确要求）
+ *   2. LOGO 明显放大，成为卡片左侧的主体
+ *   3. 名称字号加大并居中，版本**紧随名称之后**（不再另起一行）
+ *   4. 备注在名称的下一行
+ *   5. 卡片呈现的是**最终效果**：不再显示"版本""备注"这类占位提示——
+ *      它们是编辑态的提示语，出现在成稿里就成了噪音。
+ *      需要修改时点右上角的编辑按钮打开弹窗。
+ *
+ * 只读态（展示视图 / 导出）不渲染编辑按钮，其余完全一致，
+ * 因此"编辑视图看到的样子"确实等于成稿。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import AppIcon from '@/components/common/AppIcon.vue'
 import ToolIcon from '@/components/common/ToolIcon.vue'
-import { useProjectStore } from '@/stores/useProjectStore'
+import SideEditorDialog from './SideEditorDialog.vue'
 import { useToolsStore } from '@/stores/useToolsStore'
-import { hexToSoft } from '@/lib/color'
-import type { Side, SideId } from '@/types/project'
+import type { Side } from '@/types/project'
 
 const props = defineProps<{
   side: Side
-  sideId: SideId
   readonly?: boolean
+  /** 写入侧字段 */
+  patch?: (patch: Record<string, unknown>) => void
 }>()
 
 const { t } = useI18n()
-const project = useProjectStore()
 const tools = useToolsStore()
+
+const editing = ref(false)
 
 const tool = computed(() => tools.resolve(props.side.toolRef))
 const displayName = computed(() => props.side.labelOverride ?? tool.value.name)
 
-/** 行内编辑：名称与版本号都是"点击即改" */
-const editing = ref<'name' | 'version' | 'note' | null>(null)
-const draft = ref('')
+/** 各元素的显示开关；省略 = 显示 */
+const showIcon = computed(() => props.side.showIcon !== false)
+const showName = computed(() => props.side.showName !== false)
+const showVersion = computed(() => props.side.showVersion !== false)
+const showNote = computed(() => props.side.showNote !== false)
 
-function startEdit(field: 'name' | 'version' | 'note'): void {
-  if (props.readonly) return
-  editing.value = field
-  draft.value =
-    field === 'name'
-      ? (props.side.labelOverride ?? tool.value.name)
-      : field === 'version'
-        ? (props.side.modelVersion ?? '')
-        : (props.side.note ?? '')
-}
+/** 本侧专属图标优先于工具自带图标 */
+const iconAssetId = computed(() => props.side.iconAssetId ?? tool.value.iconAssetId)
 
-function commit(): void {
-  if (!editing.value) return
-  const value = draft.value.trim()
-
-  if (editing.value === 'name') {
-    // 与工具原名一致时不再存 labelOverride，避免无意义的覆盖
-    project.setSideField(props.sideId, { labelOverride: value && value !== tool.value.name ? value : undefined })
-  } else if (editing.value === 'version') {
-    project.setSideField(props.sideId, { modelVersion: value || undefined })
-  } else {
-    project.setSideField(props.sideId, { note: value || undefined })
-  }
-
-  editing.value = null
-}
-
-function cancel(): void {
-  editing.value = null
-}
-
-// 工具切换后若正在编辑名称，需要同步显示新名称
-watch(tool, () => {
-  if (editing.value === 'name') cancel()
+/** 版本号统一带 v 前缀（用户输入 "1.6" 也显示成 "v1.6"，避免两种写法混用） */
+const versionLabel = computed(() => {
+  const raw = (props.side.modelVersion ?? '').trim()
+  if (!raw) return ''
+  return /^v/i.test(raw) ? raw : `v${raw}`
 })
 
 const headerStyle = computed(() => ({
   '--accent': props.side.accent,
-  '--accent-soft': hexToSoft(props.side.accent, 10),
+  '--accent-soft': `color-mix(in srgb, ${props.side.accent} 10%, transparent)`,
 }))
+
+/** 三行都没内容时整块文本区不占位 */
+const hasText = computed(() => showName.value || showVersion.value || showNote.value)
+
+function onPatch(patch: Record<string, unknown>): void {
+  props.patch?.(patch)
+}
 </script>
 
 <template>
   <header class="side-head" :style="headerStyle">
-    <div class="side-head__bar" aria-hidden="true" />
+    <!-- 强调色条：左侧竖条 -->
+    <span class="side-head__bar" aria-hidden="true" />
 
     <div class="side-head__body">
       <ToolIcon
-        :name="tool.name"
+        v-if="showIcon"
+        class="side-head__logo"
+        :name="displayName"
         :color="tool.color"
-        :icon-asset-id="tool.iconAssetId"
-        :size="40"
+        :icon-asset-id="iconAssetId"
+        :logo-key="tool.builtinKey ?? tool.id"
+        :size="72"
       />
 
-      <div class="side-head__text">
-        <input
-          v-if="editing === 'name'"
-          v-model="draft"
-          class="side-head__input side-head__input--title"
-          type="text"
-          autofocus
-          @blur="commit"
-          @keydown.enter.prevent="commit"
-          @keydown.esc.prevent="cancel"
-        />
-        <button
-          v-else
-          class="side-head__name"
-          type="button"
-          :disabled="readonly"
-          :title="readonly ? undefined : t('compare.changeTool')"
-          @click="startEdit('name')"
-        >
-          {{ displayName }}
-        </button>
-
-        <input
-          v-if="editing === 'version'"
-          v-model="draft"
-          class="side-head__input side-head__input--version"
-          type="text"
-          autofocus
-          :placeholder="t('compare.versionPlaceholder')"
-          @blur="commit"
-          @keydown.enter.prevent="commit"
-          @keydown.esc.prevent="cancel"
-        />
-        <button
-          v-else
-          class="side-head__version"
-          type="button"
-          :disabled="readonly"
-          @click="startEdit('version')"
-        >
-          {{ side.modelVersion || t('compare.versionPlaceholder') }}
-        </button>
-
-        <input
-          v-if="editing === 'note'"
-          v-model="draft"
-          class="side-head__input side-head__input--note"
-          type="text"
-          autofocus
-          @blur="commit"
-          @keydown.enter.prevent="commit"
-          @keydown.esc.prevent="cancel"
-        />
-        <button
-          v-else
-          class="side-head__note"
-          type="button"
-          :disabled="readonly"
-          @click="startEdit('note')"
-        >
-          {{ side.note || t('compare.notePlaceholder') }}
-        </button>
+      <div v-if="hasText" class="side-head__text">
+        <p class="side-head__line">
+          <span v-if="showName" class="side-head__name">{{ displayName }}</span>
+          <!-- 版本紧随名称之后，而不是另起一行 -->
+          <span v-if="showVersion && versionLabel" class="side-head__version">
+            {{ versionLabel }}
+          </span>
+        </p>
+        <p v-if="showNote && side.note" class="side-head__note">{{ side.note }}</p>
       </div>
 
-      <span v-if="tool.inline" class="side-head__badge">{{ t('compare.noTool') }}</span>
+      <!-- 编辑入口：只读态不出现 -->
+      <button
+        v-if="!readonly"
+        class="side-head__edit"
+        type="button"
+        :title="t('compare.editSideShort')"
+        :aria-label="t('compare.editSideShort')"
+        @click="editing = true"
+      >
+        <AppIcon name="edit" :size="14" />
+      </button>
     </div>
+
+    <SideEditorDialog
+      :open="editing"
+      :side="side"
+      :display-name="displayName"
+      @close="editing = false"
+      @patch="onPatch"
+    />
   </header>
 </template>
 
 <style scoped>
 .side-head {
+  display: flex;
   overflow: hidden;
-  background: var(--accent-soft, var(--bg-surface));
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
 }
 
+/* 左侧强调条：占满整卡高度，颜色随本侧主题色 */
 .side-head__bar {
-  height: 2px;
+  flex: none;
+  width: 5px;
   background: var(--accent, var(--accent-500));
 }
 
 .side-head__body {
+  position: relative;
   display: flex;
-  gap: var(--sp-3);
+  flex: 1;
+  gap: var(--sp-4);
   align-items: center;
+  min-width: 0;
   padding: var(--sp-4);
+  /* 本侧主题色的极淡底，让左右两张卡片有整体区分 */
+  background: var(--accent-soft);
+}
+
+/*
+ * LOGO 用 flex:none 固定宽度，不随文本长度伸缩——
+ * 这样左右两张卡片的图标大小一致，并排看才整齐。
+ */
+.side-head__logo {
+  flex: none;
 }
 
 .side-head__text {
-  display: flex;
   flex: 1;
-  flex-direction: column;
-  gap: 2px;
   min-width: 0;
+  text-align: center;
+}
+
+.side-head__line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: baseline;
+  justify-content: center;
 }
 
 .side-head__name {
-  overflow: hidden;
-  font-size: var(--fs-lg);
-  font-weight: 600;
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
   color: var(--text-primary);
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
-.side-head__version,
+.side-head__version {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
 .side-head__note {
-  overflow: hidden;
-  font-size: var(--fs-xs);
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
   color: var(--text-muted);
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
-.side-head__name:hover:not(:disabled),
-.side-head__version:hover:not(:disabled),
-.side-head__note:hover:not(:disabled) {
-  color: var(--accent, var(--accent-500));
-}
-
-.side-head__input {
-  min-width: 0;
-  padding: 2px var(--sp-2);
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-}
-
-.side-head__input--title {
-  font-size: var(--fs-lg);
-  font-weight: 600;
-}
-
-.side-head__input--version,
-.side-head__input--note {
-  font-size: var(--fs-xs);
-}
-
-.side-head__badge {
-  flex: none;
-  padding: 1px 6px;
-  font-size: 10px;
-  color: var(--warning);
+.side-head__edit {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: flex;
+  padding: var(--sp-1);
+  color: var(--text-muted);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.side-head:hover .side-head__edit,
+.side-head__edit:focus-visible {
+  opacity: 1;
+}
+
+.side-head__edit:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 </style>

@@ -10,6 +10,7 @@
  * 因此由 `scripts/check-pwa.mjs` 在 `npm run build` 之后校验，不放在这里。
  */
 import { expect, test, type Page } from '@playwright/test'
+import { renameModule, addedCard } from './helpers'
 
 async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
   const sidebar = page.getByRole('complementary')
@@ -21,16 +22,6 @@ async function createFromTemplate(page: Page, name: string | RegExp): Promise<vo
 /** 某一行的左格 */
 function leftCell(page: Page, rowIndex: number) {
   return page.locator('.canvas__row').nth(rowIndex).locator('.canvas__cell').first()
-}
-
-/**
- * 左格里**最后一张卡片**——也就是刚添加的那个模块。
- *
- * 必须取 `.last()`：模板自带一个文字模块，格子里的预览元素不止一个，
- * 直接写 `.card__preview` 会命中多张卡片并触发 strict mode 报错。
- */
-function addedCard(page: Page, rowIndex = 0) {
-  return leftCell(page, rowIndex).locator('.card').last()
 }
 
 /** 打开某一行的模块选择器，并挑选一个模块类型 */
@@ -53,7 +44,7 @@ test.describe('M5 代码块模块', () => {
     const card = addedCard(page)
     await card.locator('.inline-editor__area').first().fill('第一行\n第二行\n第三行')
 
-    const preview = card.locator('.card__preview')
+    const preview = card.locator('.module-view')
     await expect(preview.locator('.code-block')).toBeVisible()
     // 三行 → 三个行号
     await expect(preview.locator('.code-block__line')).toHaveCount(3)
@@ -73,7 +64,7 @@ test.describe('M5 代码块模块', () => {
     const card = addedCard(page)
     await card.locator('.inline-editor__area').first().fill('<script>alert(1)</script>\n正常一行')
 
-    const preview = card.locator('.card__preview')
+    const preview = card.locator('.module-view')
     await expect(preview).toContainText('<script>alert(1)</script>')
     // 没有被真的解析成 script 元素
     await expect(preview.locator('script')).toHaveCount(0)
@@ -112,7 +103,7 @@ test.describe('M5 代码对比模块', () => {
     await areas.nth(0).fill('相同行\n左边旧\n尾行')
     await areas.nth(1).fill('相同行\n右边新\n尾行')
 
-    const preview = card.locator('.card__preview')
+    const preview = card.locator('.module-view')
     await expect(preview.locator('.diff-view')).toBeVisible()
 
     // 中间那行是"修改"：左右两侧都应带 change 底色
@@ -133,7 +124,7 @@ test.describe('M5 代码对比模块', () => {
     await areas.nth(0).fill('')
     await areas.nth(1).fill('甲\n乙')
 
-    const preview = card.locator('.card__preview')
+    const preview = card.locator('.module-view')
     await expect(preview.locator('.diff-view__row--add')).toHaveCount(2)
     await expect(preview.locator('.diff-view__cell--add')).toHaveCount(2)
     // 只填一侧时给出提示，而不是让人怀疑是不是没生效
@@ -150,7 +141,7 @@ test.describe('M5 代码对比模块', () => {
     await areas.nth(0).fill('一模一样')
     await areas.nth(1).fill('一模一样')
 
-    const preview = card.locator('.card__preview')
+    const preview = card.locator('.module-view')
     await expect(preview.locator('.diff-view__equal')).toBeVisible()
     await expect(preview.locator('.diff-view__body')).toHaveCount(0)
   })
@@ -165,7 +156,7 @@ test.describe('M5 代码对比模块', () => {
     await areas.nth(0).fill('同一行')
     await areas.nth(1).fill('同一行   ')
 
-    await expect(card.locator('.card__preview .diff-view__equal')).toBeVisible()
+    await expect(card.locator('.module-view .diff-view__equal')).toBeVisible()
   })
 })
 
@@ -195,9 +186,7 @@ test.describe('M5 设置面板：备份与恢复', () => {
 
     // 改个标题，便于恢复后识别
     const card = leftCell(page, 0).locator('.card').first()
-    await card.locator('.card__title').click()
-    await card.locator('.card__title-input').fill('备份标记')
-    await card.locator('.card__title-input').press('Enter')
+    await renameModule(page, card, '备份标记')
     await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
 
     // —— 导出备份 ——

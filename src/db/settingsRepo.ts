@@ -9,7 +9,7 @@ import { getDb } from './db'
 import { META_KEY, STORE } from './schema'
 import { clearStore, deleteOne, getAll, getOne, putOne } from './core'
 import { deepClone } from '@/lib/clone'
-import { DEFAULT_SETTINGS, type AppSettings } from '@/types'
+import { DEFAULT_SETTINGS, THEME_IDS, type AppSettings } from '@/types'
 
 const SETTINGS_KEY = 'app'
 
@@ -53,7 +53,15 @@ export function mergeSettings(stored: Partial<AppSettings> | undefined): AppSett
 
   // —— 关键字段的运行时守卫：脏数据不得让应用崩在启动阶段 ——
   if (!SUPPORTED_LANGUAGES.includes(merged.language)) merged.language = defaults.language
-  if (merged.themeId !== defaults.themeId) merged.themeId = defaults.themeId
+
+  /*
+   * 主题必须按**合法集合**校验，不能写成"与默认值不同就重置"。
+   *
+   * 那个写法在只有一个主题时勉强成立，但一旦有多个主题就会变成：
+   * 用户选了"亮"，读回设置时发现它 != 默认值，于是被重置回默认 ——
+   * 表现为"主题怎么选都选不动，一刷新就变回去"。
+   */
+  if (!THEME_IDS.includes(merged.themeId)) merged.themeId = defaults.themeId
 
   if (!isValidAccentPair(merged.defaultAccent)) merged.defaultAccent = defaults.defaultAccent
 

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * 顶栏：品牌 / 全局搜索 / 撤销重做 / 视图切换 / 导出 / 设置
+ * 顶栏：品牌 / 撤销重做 / 视图切换 / 导入导出 / 设置
  *
- * M1 可用：搜索（同时驱动侧栏列表）、撤销重做、保存状态、导入、设置。
+ * M1 可用：撤销重做、保存状态、导入、设置。
  * M3 启用：视图切换（展示视图）与导出。
- * 未启用的按钮一律**禁用并标注所属里程碑**，不提供无法兑现的交互。
+ * M6 调整（用户实测反馈）：**移除可见的全局搜索框**——
+ *   它与左侧项目列表的搜索完全重复，占着顶栏最显眼的位置却不提供额外能力。
+ *   Ctrl/Cmd + K 仍然保留，改为直接打开命令面板（能搜项目，也能执行命令）。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,7 +15,6 @@ import AppIcon from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useProjectsStore } from '@/stores/useProjectsStore'
-import { useSidebarStore } from '@/stores/useSidebarStore'
 import { useUiStore } from '@/stores/useUiStore'
 import { importDuet } from '@/services/exportService'
 import { persistProject } from '@/services/projectService'
@@ -24,12 +25,10 @@ const router = useRouter()
 const ui = useUiStore()
 const project = useProjectStore()
 const projects = useProjectsStore()
-const sidebar = useSidebarStore()
 
 /** 导出由外壳统一托管（对话框挂在 AppShell 上） */
 const emit = defineEmits<{ export: [] }>()
 
-const searchInput = ref<HTMLInputElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const importing = ref(false)
 
@@ -60,11 +59,6 @@ function togglePresent(): void {
 
 function openSettings(): void {
   void router.push({ name: 'settings' })
-}
-
-function focusSearch(): void {
-  searchInput.value?.focus()
-  searchInput.value?.select()
 }
 
 // —— 导入工程文件 ——
@@ -115,13 +109,15 @@ async function onFilePicked(event: Event): Promise<void> {
   }
 }
 
-// —— 快捷键：Ctrl/Cmd + K 聚焦搜索 ——
+// —— 快捷键：Ctrl/Cmd + K 打开命令面板 ——
 
 function onKeydown(event: KeyboardEvent): void {
   const meta = event.ctrlKey || event.metaKey
   if (meta && event.key.toLowerCase() === 'k') {
     event.preventDefault()
-    focusSearch()
+    // 可见的搜索框已经移除，Ctrl+K 改为直接打开命令面板：
+    // 它同样能搜项目，还多了执行命令的能力，是原搜索框能力的超集。
+    ui.toggleCommandPalette()
   }
 }
 
@@ -148,19 +144,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <span class="topbar__brand-zh">{{ t('app.name') }}</span>
         <span class="topbar__brand-en">{{ APP.nameEn }}</span>
       </RouterLink>
-    </div>
-
-    <div class="topbar__search">
-      <AppIcon name="search" :size="15" class="topbar__search-icon" />
-      <input
-        ref="searchInput"
-        :value="sidebar.query"
-        class="topbar__search-input"
-        type="search"
-        :placeholder="t('topbar.searchPlaceholder')"
-        :aria-label="t('topbar.searchPlaceholder')"
-        @input="sidebar.setQuery(($event.target as HTMLInputElement).value)"
-      />
     </div>
 
     <div class="topbar__group topbar__group--end">
@@ -198,7 +181,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         :aria-pressed="ui.inspectorOpen"
         @click="ui.toggleInspector()"
       >
-        <AppIcon name="settings" :size="18" />
+        <!--
+          属性面板用 options（滑杆）而不是 settings（齿轮）：
+          之前两者共用一个图标，用户反馈"属性和设置长得一个样"。
+        -->
+        <AppIcon name="options" :size="18" />
       </button>
 
       <button

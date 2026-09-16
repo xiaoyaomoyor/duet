@@ -44,17 +44,95 @@ const sides = computed(() => props.project.sheet.sides)
 const rows = computed(() => props.project.sheet.rows)
 const layout = computed(() => props.project.sheet.layout)
 
-const canvasStyle = computed(() => ({
-  '--side-a': sides.value[0]?.accent ?? 'var(--accent-500)',
-  '--side-b': sides.value[1]?.accent ?? 'var(--accent-500)',
-  '--canvas-gutter': `${layout.value.gutter}px`,
-  '--canvas-max': `${layout.value.maxWidth}px`,
-}))
+const canvasStyle = computed(() => {
+  const ratio = layout.value.ratio
+  // ratio 理论上恒为两个正数，但工程文件可能被手改过，这里兜一层
+  const a = Number.isFinite(ratio?.[0]) && ratio[0] > 0 ? ratio[0] : 1
+  const b = Number.isFinite(ratio?.[1]) && ratio[1] > 0 ? ratio[1] : 1
+
+  return {
+    '--side-a': sides.value[0]?.accent ?? 'var(--accent-500)',
+    '--side-b': sides.value[1]?.accent ?? 'var(--accent-500)',
+    '--canvas-gutter': `${layout.value.gutter}px`,
+    '--canvas-max': `${layout.value.maxWidth}px`,
+    /*
+     * 两侧宽度比。M6 之前 layout.ratio 只存在于数据模型里、
+     * 渲染时被写死成 `1fr 1fr`——所以"拖动中轴调宽度"这件事
+     * 数据上早就支持，只是从来没接到 CSS。
+     */
+    '--col-a': `${a}fr`,
+    '--col-b': `${b}fr`,
+    /** 左列占内容宽度的比例，供中轴拖拽手柄定位 */
+    '--col-frac': `${a / (a + b)}`,
+  }
+})
 
 /** 背景样式类：solid / grid / dots（§9.2 的 LayoutConfig.background） */
 const backgroundClass = computed(() => `canvas--bg-${layout.value.background}`)
 
 const densityClass = computed(() => `canvas--${layout.value.density}`)
+
+// ————————————————————————————————————————————————————————
+// 中轴拖拽：调整左右宽度比
+// ————————————————————————————————————————————————————————
+
+/** 单侧最小占比：再窄就放不下卡片内容了（约等于 200px / 1000px 版面） */
+const MIN_COLUMN_FRAC = 0.2
+const MAX_COLUMN_FRAC = 0.8
+
+const canvasEl = ref<HTMLElement | null>(null)
+const resizingColumns = ref(false)
+let resizeStartX = 0
+let resizeStartRatio: [number, number] = [1, 1]
+
+function onColumnResizeStart(event: PointerEvent): void {
+  resizeStartX = event.clientX
+  resizeStartRatio = [...layout.value.ratio] as [number, number]
+  resizingColumns.value = true
+  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'col-resize'
+}
+
+function onColumnResizeMove(event: PointerEvent): void {
+  if (!resizingColumns.value) return
+  event.preventDefault()
+
+  const width = canvasEl.value?.clientWidth ?? 0
+  if (width <= 0) return
+
+  // 把像素位移换算成占比，再写回两侧的权重
+  const delta = (event.clientX - resizeStartX) / width
+  const startSum = resizeStartRatio[0] + resizeStartRatio[1]
+  const startFrac = resizeStartRatio[0] / startSum
+  const frac = Math.min(MAX_COLUMN_FRAC, Math.max(MIN_COLUMN_FRAC, startFrac + delta))
+
+  // 用同一个总和来表达，视觉上总宽度不变（只有分配比例在动）
+  store.patchLayout({ ratio: [frac * startSum, (1 - frac) * startSum] })
+}
+
+function onColumnResizeEnd(event: PointerEvent): void {
+  if (!resizingColumns.value) return
+  resizingColumns.value = false
+  ;(event.target as HTMLElement).releasePointerCapture?.(event.pointerId)
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+}
+
+/** 双击中轴：恢复左右等宽 */
+function resetColumnRatio(): void {
+  store.patchLayout({ ratio: [1, 1] })
+}
+
+/** 键盘可达：方向键微调（拖拽对键盘用户不可用） */
+function onColumnResizeKeydown(event: KeyboardEvent): void {
+  const step = event.shiftKey ? 0.1 : 0.02
+  const [a, b] = layout.value.ratio
+  if (event.key === 'ArrowLeft') store.patchLayout({ ratio: [Math.max(MIN_COLUMN_FRAC, a - step), b + step] })
+  else if (event.key === 'ArrowRight') store.patchLayout({ ratio: [Math.min(MAX_COLUMN_FRAC, a + step), b - step] })
+  else return
+  event.preventDefault()
+}
 
 // ————————————————————————————————————————————————————————
 // 行
@@ -175,8 +253,8 @@ function onDuplicateModule(ref: ModuleRef): void {
           v-for="side in sides"
           :key="side.id"
           :side="side"
-          :side-id="side.id"
           :readonly="project.ui.mode === 'present'"
+          :patch="(patch: Record<string, unknown>) => store.setSideField(side.id, patch)"
         />
       </div>
 
@@ -199,6 +277,7 @@ function onDuplicateModule(ref: ModuleRef): void {
             @insert="insertRowAt"
             @remove="removeRow"
             @relabel="onRelabel"
+            @resize-height="store.setRowHeight"
             @open-picker="openPicker"
             @reorder-modules="onModulesReorder"
             @patch-module="onPatchModule"
@@ -226,6 +305,26 @@ function onDuplicateModule(ref: ModuleRef): void {
         {{ isReadonly ? t('compare.nothingToPresent') : t('compare.emptyRows') }}
       </p>
 
+      <!--
+        中轴拖拽：调整左右两栏宽度比。
+        只在编辑态出现——展示/导出稿不该带一个可拖的控件。
+        定位用 --col-frac 复现格子的 fr 分配，因此手柄永远压在真正的中缝上。
+      -->
+      <div
+        v-if="!isReadonly && visibleRows.length > 0"
+        class="canvas__axis-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        :aria-label="t('canvas.resizeColumns')"
+        tabindex="0"
+        @pointerdown="onColumnResizeStart"
+        @pointermove="onColumnResizeMove"
+        @pointerup="onColumnResizeEnd"
+        @pointercancel="onColumnResizeEnd"
+        @dblclick="resetColumnRatio"
+        @keydown="onColumnResizeKeydown"
+      />
+
       <div v-if="!isReadonly" class="canvas__footer">
         <button class="canvas__add-row" type="button" @click="store.addRow()">
           <AppIcon name="plus" :size="15" />
@@ -248,13 +347,42 @@ function onDuplicateModule(ref: ModuleRef): void {
 }
 
 .canvas {
+  position: relative; /* 中轴拖拽手柄的定位基准 */
   max-width: var(--canvas-max, 1440px);
   margin: 0 auto;
 }
 
+/*
+ * 中轴拖拽手柄。
+ *
+ * 定位公式复现了格子的 fr 分配：内容宽度减去中缝后按 --col-frac 切分，
+ * 再加上半个中缝就是真正的中线。这样无论比例怎么变，
+ * 手柄都精确压在视觉中缝上，而不是画布正中。
+ */
+.canvas__axis-resizer {
+  position: absolute;
+  top: var(--sp-6);
+  bottom: var(--sp-12);
+  left: calc(
+    (100% - var(--canvas-gutter, 32px)) * var(--col-frac, 0.5) +
+      var(--canvas-gutter, 32px) / 2 - 4px
+  );
+  z-index: 2;
+  width: 8px;
+  cursor: col-resize;
+  border-radius: var(--radius-full);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.canvas__axis-resizer:hover,
+.canvas__axis-resizer:focus-visible {
+  background: var(--accent-500);
+  outline: none;
+}
+
 .canvas__heads {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: var(--col-a, 1fr) var(--col-b, 1fr);
   gap: var(--canvas-gutter, 32px);
   padding-top: var(--sp-6);
 }
@@ -349,7 +477,7 @@ function onDuplicateModule(ref: ModuleRef): void {
 
 .canvas__cells {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: var(--col-a, 1fr) var(--col-b, 1fr);
   gap: var(--canvas-gutter, 32px);
   align-items: start;
 }

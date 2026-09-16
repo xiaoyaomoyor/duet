@@ -15,6 +15,7 @@ import { useResolvedMedia, assetSource } from '@/composables/useResolvedMedia'
 import { registerSyncTrack, reportAudioState, unregisterSyncTrack } from '@/composables/useAudioClock'
 import { getSyncEngine } from '@/composables/useAudioClock'
 import { onRafTick } from '@/composables/useRafTicker'
+import { getAsset } from '@/db/assetsRepo'
 import { formatDuration } from '@/lib/time'
 import type { ModuleRendererProps } from '../types'
 import type { MediaData } from '../shared/mediaData'
@@ -43,6 +44,34 @@ const source = computed(() => {
 })
 
 const media = useResolvedMedia(source)
+
+/**
+ * 内嵌封面（mp3 的 ID3 APIC）。
+ *
+ * 导入时已经把它抽出来存成一张独立的图片资源，id 记在音频资源的
+ * `derived.thumbAssetId` 上。这里响应式地把它读出来。
+ *
+ * 为什么不直接把 audio 的 assetId 传给 MediaImage：
+ *   那是个**音频** blob，图片组件解不出来，结果就是"封面永远不显示"——
+ *   这正是用户实测反馈里的问题。必须用派生出来的那张图片。
+ */
+const coverAssetId = ref<string | undefined>(undefined)
+
+watch(
+  () => data.value.assetId,
+  async (assetId) => {
+    coverAssetId.value = undefined
+    if (!assetId) return
+    try {
+      const asset = await getAsset(assetId)
+      coverAssetId.value = asset?.derived?.thumbAssetId
+    } catch {
+      // 读不到封面不算错误：模板会退回纯文字头部
+      coverAssetId.value = undefined
+    }
+  },
+  { immediate: true },
+)
 const audioEl = ref<HTMLAudioElement | null>(null)
 const playing = ref(false)
 const durationMs = ref(0)
@@ -148,10 +177,9 @@ onBeforeUnmount(() => {
   <div class="audio" :class="{ 'audio--playing': playing }">
     <div class="audio__head">
       <MediaImage
-        v-if="data.assetId || data.sourceUrl"
+        v-if="coverAssetId"
         class="audio__cover"
-        :asset-id="data.assetId"
-        :source-url="data.sourceUrl"
+        :asset-id="coverAssetId"
         :alt="data.name ?? ''"
         fit="cover"
         ratio="1/1"

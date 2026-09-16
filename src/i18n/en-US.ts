@@ -12,6 +12,7 @@ export default {
   common: {
     confirm: 'Confirm',
     cancel: 'Cancel',
+    done: 'Done',
     save: 'Save',
     delete: 'Delete',
     remove: 'Remove',
@@ -49,6 +50,7 @@ export default {
     compare: 'Compare',
     settings: 'Settings',
     toggleSidebar: 'Toggle project list',
+    resizeSidebar: 'Drag to resize the project list (double-click to reset)',
     switchToPresent: 'Enter present view',
     switchToEdit: 'Back to edit view',
     export: 'Export',
@@ -77,6 +79,7 @@ export default {
     untitled: 'Untitled comparison',
     addFirstModule: 'Add your first module below',
     nothingToPresent: 'Nothing to present yet',
+    resizeColumns: 'Drag to resize the two sides (double-click to reset)',
     nothingToPresentHint: 'Fill in some content in the edit view first',
     tabClose: 'Close tab',
     unsaved: 'Unsaved',
@@ -96,6 +99,19 @@ export default {
     changeTool: 'Change tool',
     versionPlaceholder: 'Version',
     notePlaceholder: 'Note',
+    editSide: 'Edit “{name}”',
+    editSideShort: 'Edit tool card',
+    textFields: 'Name and version',
+    name: 'Name',
+    version: 'Version',
+    note: 'Note',
+    icon: 'Icon',
+    iconHint: 'Uses the tool’s own icon by default; you can upload one that applies to this side only.',
+    visibleParts: 'Visible parts',
+    showIcon: 'Show icon',
+    showName: 'Show name',
+    showVersion: 'Show version',
+    showNote: 'Show note',
   },
 
   editor: {
@@ -169,6 +185,13 @@ export default {
     vendor: 'Vendor',
     homepage: 'Homepage',
     restoreBuiltins: 'Re-enable all',
+    disclaimerTitle: 'About tool names and icons',
+    disclaimerTrademark:
+      'Tool names and icons belong to their respective owners. They are used here for identification and description only, and imply no affiliation or endorsement.',
+    disclaimerIcons:
+      'This app ships no third-party brand icons by default — icons are generated from each brand colour and initial. You can also upload your own icon for any tool.',
+    disclaimerLocalLogos:
+      'To use real brand icons, run npm run logos locally: files go to public/brand-local/, which is never committed, so other users are unaffected.',
     deleteConfirm:
       'Delete this custom tool? Comparisons using it will show an “Unknown tool” placeholder.',
     searchPlaceholder: 'Search tools…',
@@ -192,8 +215,11 @@ export default {
     title: 'Settings',
     appearance: 'Appearance',
     theme: 'Theme',
-    themeVioletDark: 'Violet Dark',
-    themeMore: 'More themes will arrive in a later release',
+    themeHint: '“Follow system” switches automatically with your OS light/dark preference',
+    themeSystem: 'Follow system',
+    themeDark: 'Dark',
+    themeLight: 'Light',
+    themeVioletDark: 'Violet',
     reducedMotion: 'Motion',
     reducedMotionAuto: 'Follow system',
     reducedMotionAlways: 'Always off',
@@ -513,6 +539,10 @@ export default {
     importedTimed: 'Imported — {n} timed lines detected',
     importedPlain: 'Imported {n} plain lines (no timing)',
     emptyFile: 'The file is empty',
+    dropHint: 'Release to import',
+    dropNotText: '“{name}” is not a text file — lyrics accept .txt / .lrc only',
+    align: 'Alignment',
+    alignHint: 'Set the alignment under Module options in the Edit module dialog.',
   },
 
   link: {
@@ -567,6 +597,7 @@ export default {
     collapse: 'Collapse row',
     expand: 'Expand row',
     labelPlaceholder: 'Row title (optional)',
+    resizeHeight: 'Drag to resize the row height (double-click to reset)',
     empty: 'This row is still empty',
   },
 
@@ -583,6 +614,14 @@ export default {
     hiddenBadge: 'Hidden',
     options: 'Module options',
     noOptions: 'This module has no options',
+    edit: 'Edit module',
+    editTitle: 'Edit “{title}”',
+    untitled: 'Untitled module',
+    clickToFill: 'Click to fill in',
+    titleLabel: 'Module title',
+    titleHint: 'Clear the title to hide it from the finished comparison',
+    autosaveNote: 'Changes are saved immediately',
+    unknownType: 'Unknown module type “{type}” — it may come from a newer version',
   },
 
   inspector: {

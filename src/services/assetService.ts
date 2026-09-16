@@ -9,6 +9,7 @@
 
 import { getAsset, deleteAssets, listAssets, putAsset } from '@/db/assetsRepo'
 import { hashBlob } from '@/lib/hash'
+import { hasId3, parseId3Cover, readId3TagSize } from '@/lib/id3'
 import { deepClone } from '@/lib/clone'
 import {
   fileNameFromUrl,
@@ -61,10 +62,72 @@ export async function importBlob(
       const derived = stripUndefined(probed.value)
       if (Object.keys(derived).length > 0) asset.derived = derived
     }
+
+    // MP3 的内嵌封面：浏览器不会把它暴露成音频的 poster，只能自己解。
+    // 失败一律忽略——封面是锦上添花，不该因为它让导入失败。
+    if (kind === 'audio') {
+      const thumb = await extractEmbeddedCover(blob, asset)
+      if (thumb) asset.derived = { ...(asset.derived ?? {}), thumbAssetId: thumb }
+    }
   }
 
   await putAsset(asset)
   return ok(asset)
+}
+
+/**
+ * 尝试从音频里取出内嵌封面并落库为一张派生图片资源。
+ *
+ * 为什么存成独立 Asset 而不是塞进音频的 derived 里：
+ *   渲染层需要的是一个能直接给 <img> 用的素材 id，
+ *   复用已有的 assetId → blob URL 解析链路（mediaResolver）才最省事，
+ *   也让"清理未引用媒体"能正确看待它。
+ *
+ * @returns 封面资源的 id；没有封面或解析失败时返回 null
+ */
+async function extractEmbeddedCover(blob: Blob, parent: Asset): Promise<string | null> {
+  try {
+    // 只读文件开头：ID3 标签在最前面，没必要把整首歌读进内存
+    const header = await blob.slice(0, 10).arrayBuffer()
+    if (!hasId3(header)) return null
+
+    const size = readId3TagSize(header)
+    // 留一点余量：标签声明长度之外还有帧头的 10 字节
+    const probeBytes = Math.min(blob.size, size + 1024)
+    const buffer = await blob.slice(0, probeBytes).arrayBuffer()
+
+    const cover = parseId3Cover(buffer)
+    if (!cover) return null
+
+    const coverBlob = new Blob([cover.data], { type: cover.mime })
+    const hashed = await hashBlob(coverBlob)
+    if (!hashed.ok) return null
+
+    const existing = await getAsset(hashed.value)
+    if (existing) return existing.id
+
+    const thumb: Asset = {
+      id: hashed.value,
+      kind: 'image',
+      mime: cover.mime,
+      size: coverBlob.size,
+      name: `${parent.name} · 封面`,
+      createdAt: Date.now(),
+      blob: coverBlob,
+      derived: { width: 0, height: 0 },
+    }
+
+    // 顺手探测封面的真实尺寸，供渲染层按比例预留空间
+    const probed = await probeMedia(coverBlob, 'image')
+    if (probed.ok && probed.value.width && probed.value.height) {
+      thumb.derived = { width: probed.value.width, height: probed.value.height }
+    }
+
+    await putAsset(thumb)
+    return thumb.id
+  } catch {
+    return null
+  }
 }
 
 /** 批量导入文件（保持输入顺序，逐项返回结果） */

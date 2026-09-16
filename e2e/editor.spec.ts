@@ -6,6 +6,7 @@
  * 在 jsdom 里这些一律测不了，所以必须在这一层补齐（M1 收尾时的承诺）。
  */
 import { expect, test, type Page } from '@playwright/test'
+import { closeDialog, moduleCard, openModuleEditor, renameModule } from './helpers'
 
 // ——————————————————————————————————————————————————————————
 // 测试素材：手工构造的合法最小文件
@@ -87,26 +88,27 @@ test.describe('M2 模块系统', () => {
     const cell = leftCell(page, 0)
     await expect(cell.locator('.card')).toHaveCount(1)
 
-    await cell.locator('.card__title').first().click()
-    const titleInput = cell.locator('.card__title-input')
+    // 改标题与填内容都在模块编辑弹窗里完成
+    const target = moduleCard(page, 0, 0)
+    const dialog = await openModuleEditor(page, target)
+    const titleInput = dialog.locator('.dialog__title-input')
     await titleInput.fill('价格')
     await titleInput.press('Enter')
-    await expect(cell.locator('.card__title').first()).toHaveText('价格')
 
-    // 填写内容
-    const textarea = cell.locator('.card__editor textarea').first()
-    await textarea.fill('¥99 / 月')
+    await dialog.locator('textarea').first().fill('¥99 / 月')
+    await closeDialog(page)
 
-    // 预览用的是展示视图的渲染器，应立刻反映内容
-    await expect(cell.locator('.card__preview')).toContainText('¥99 / 月')
+    await expect(cell.locator('.module-view__title').first()).toHaveText('价格')
+    // 卡片正文用的就是展示视图的渲染器，因此内容立刻可见
+    await expect(cell.locator('.module-view')).toContainText('¥99 / 月')
 
     // 自动保存
     await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
 
     // 刷新后内容仍在（"保持位置"会重新打开该项目）
     await page.reload()
-    await expect(page.locator('.canvas__row .canvas__cell').first().locator('.card__title')).toHaveText('价格')
-    await expect(page.locator('.card__preview').first()).toContainText('¥99 / 月')
+    await expect(page.locator('.canvas__row .canvas__cell').first().locator('.module-view__title')).toHaveText('价格')
+    await expect(page.locator('.module-view').first()).toContainText('¥99 / 月')
 
     expect(errors).toEqual([])
   })
@@ -125,13 +127,11 @@ test.describe('M2 模块系统', () => {
     const titles = ['价格', '简评', '结论']
     for (const [index, title] of titles.entries()) {
       const card = cell.locator('.card').nth(index)
-      await card.locator('.card__title').click()
-      await card.locator('.card__title-input').fill(title)
-      await card.locator('.card__title-input').press('Enter')
+      await renameModule(page, card, title)
     }
 
     for (const [index, title] of titles.entries()) {
-      await expect(cell.locator('.card').nth(index).locator('.card__title')).toHaveText(title)
+      await expect(cell.locator('.card').nth(index).locator('.module-view__title')).toHaveText(title)
     }
   })
 
@@ -169,12 +169,15 @@ test.describe('M2 模块系统', () => {
     await createFromTemplate(page, /图片对比/)
 
     const cell = leftCell(page, 0)
-    await expect(cell.locator('.card').first().locator('.card__title')).toHaveText('封面图')
+    await expect(cell.locator('.card').first().locator('.module-view__title')).toHaveText('封面图')
 
-    await cell.locator('input[type="file"]').first().setInputFiles(PNG_FILE)
+    // 媒体选择器在模块编辑弹窗内
+    const dialog = await openModuleEditor(page, moduleCard(page, 0, 0))
+    await dialog.locator('input[type="file"]').first().setInputFiles(PNG_FILE)
+    await closeDialog(page)
 
-    // 预览里应出现真实解码的图片
-    const img = cell.locator('.card__preview img').first()
+    // 卡片正文里应出现真实解码的图片
+    const img = cell.locator('.module-view img').first()
     await expect(img).toBeVisible()
     await expect(img).toHaveJSProperty('naturalWidth', 2)
     await expect(img).toHaveJSProperty('naturalHeight', 2)
@@ -186,7 +189,7 @@ test.describe('M2 模块系统', () => {
     // 自动保存后刷新仍能显示（说明资源真的落到了 IndexedDB）
     await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
     await page.reload()
-    await expect(leftCell(page, 0).locator('.card__preview img').first()).toBeVisible()
+    await expect(leftCell(page, 0).locator('.module-view img').first()).toBeVisible()
   })
 
   test('导入 WAV：探测时长并驱动进度条联动', async ({ page }) => {
@@ -195,12 +198,14 @@ test.describe('M2 模块系统', () => {
 
     // 音乐模板第二行是音频模块
     const cell = leftCell(page, 1)
-    await expect(cell.locator('.card').first().locator('.card__title')).toHaveText('音频')
+    await expect(cell.locator('.card').first().locator('.module-view__title')).toHaveText('音频')
 
-    await cell.locator('input[type="file"]').first().setInputFiles(WAV_FILE)
+    await openModuleEditor(page, moduleCard(page, 1, 0))
+      .then((dialog) => dialog.locator('input[type="file"]').first().setInputFiles(WAV_FILE))
+    await closeDialog(page)
 
-    // 时长由导入时探测得到，展示在**渲染器**（.card__preview）里，因此要限定作用域
-    await expect(cell.locator('.card__preview').getByText(/\d{2}:\d{2}/)).toBeVisible({
+    // 时长由导入时探测得到，展示在**渲染器**（.module-view）里，因此要限定作用域
+    await expect(cell.locator('.module-view').getByText(/\d{2}:\d{2}/)).toBeVisible({
       timeout: 10_000,
     })
 
@@ -213,23 +218,26 @@ test.describe('M2 模块系统', () => {
     await createFromTemplate(page, /音乐对比/)
 
     const cell = leftCell(page, 2)
-    await expect(cell.locator('.card').first().locator('.card__title')).toHaveText('歌词')
+    await expect(cell.locator('.card').first().locator('.module-view__title')).toHaveText('歌词')
 
-    await cell.locator('input[type="file"]').first().setInputFiles({
+    // 歌词模块的导入入口在弹窗里（既支持点按钮，也支持把 .txt/.lrc 拖进来）
+    const dialog = await openModuleEditor(page, moduleCard(page, 2, 0))
+    await dialog.locator('input[type="file"]').first().setInputFiles({
       name: 'lyrics.lrc',
       mimeType: 'text/plain',
       buffer: Buffer.from('[00:01.00]第一句\n[00:03.50]第二句\n[00:06.00]第三句', 'utf8'),
     })
 
-    // 状态提示：识别到 3 行时间轴
-    await expect(cell.getByText(/含时间轴/)).toBeVisible()
-    await expect(cell.getByText('3 行')).toBeVisible()
+    // 状态提示：识别到 3 行时间轴（这些属于编辑器，因此断言限定在弹窗内）
+    await expect(dialog.getByText(/含时间轴/)).toBeVisible()
+    await expect(dialog.getByText('3 行')).toBeVisible()
 
     // 有时间轴时才出现同步开关
-    await expect(cell.getByText('与音频同步（按时间轴高亮）')).toBeVisible()
+    await expect(dialog.getByText('与音频同步（按时间轴高亮）')).toBeVisible()
+    await closeDialog(page)
 
-    // 预览里出现歌词行
-    await expect(cell.locator('.card__preview')).toContainText('第一句')
+    // 卡片正文（= 展示视图的呈现）里出现歌词行
+    await expect(cell.locator('.module-view')).toContainText('第一句')
   })
 
   test('插入行与删除行都走命令层，可一步撤销', async ({ page }) => {
@@ -239,8 +247,8 @@ test.describe('M2 模块系统', () => {
     const rows = page.locator('.canvas__row')
     await expect(rows).toHaveCount(4)
 
-    const firstTitle = await rows.nth(0).locator('.card__title').first().textContent()
-    const secondTitle = await rows.nth(1).locator('.card__title').first().textContent()
+    const firstTitle = await rows.nth(0).locator('.module-view__title').first().textContent()
+    const secondTitle = await rows.nth(1).locator('.module-view__title').first().textContent()
 
     // "在上方插入行"会让行数 +1；新行是**空行**（没有模块，等待用户填写），
     // 且插入点就是被点击行的索引。
@@ -251,8 +259,8 @@ test.describe('M2 模块系统', () => {
     // 单条命令 = 一步撤销：撤销后行数与内容都回到原样
     await page.getByRole('button', { name: '撤销' }).click()
     await expect(rows).toHaveCount(4)
-    await expect(rows.nth(0).locator('.card__title').first()).toHaveText(firstTitle ?? '')
-    await expect(rows.nth(1).locator('.card__title').first()).toHaveText(secondTitle ?? '')
+    await expect(rows.nth(0).locator('.module-view__title').first()).toHaveText(firstTitle ?? '')
+    await expect(rows.nth(1).locator('.module-view__title').first()).toHaveText(secondTitle ?? '')
   })
 
   test('属性面板可调整布局参数并持久化', async ({ page }) => {

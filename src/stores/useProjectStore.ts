@@ -30,7 +30,15 @@ import { useSettingsStore } from './useSettingsStore'
 import { useHistoryStore } from './useHistoryStore'
 import { useProjectsStore } from './useProjectsStore'
 import type { Command, NewModuleInput } from '@/types/commands'
-import type { CellRef, ModuleInstance, ModuleRef, Project, Row, SideId } from '@/types/project'
+import type {
+  CellRef,
+  LayoutConfig,
+  ModuleInstance,
+  ModuleRef,
+  Project,
+  Row,
+  SideId,
+} from '@/types/project'
 
 /** 标签页同时打开数量的软上限（超出时自动关闭最久未使用的） */
 export const MAX_OPEN_TABS = 12
@@ -361,6 +369,30 @@ export const useProjectStore = defineStore('project', () => {
     dispatch({ t: 'row/patch', rowId, patch: { label } }, { label: '修改行标题', coalesceKey: `row-label:${rowId}` })
   }
 
+  /**
+   * 调整行高（用户拖动行间分界线）。
+   *
+   * 用 coalesceKey 合并同一次拖拽产生的连续命令：
+   * 一次拖拽会触发几十次 patch，不合并就会把撤销栈塞满，
+   * 用户按一次撤销只退回一个像素——那比不能撤销更糟。
+   *
+   * @param height 目标最小高度；传 `undefined` 表示恢复默认（双击手柄）
+   */
+  function setRowHeight(rowId: string, height: number | undefined): void {
+    dispatch(
+      { t: 'row/setHeight', rowId, height },
+      { label: '调整行高', coalesceKey: `row-height:${rowId}` },
+    )
+  }
+
+  /** 调整左右宽度比（用户拖动中轴） */
+  function patchLayout(patch: Partial<LayoutConfig>): void {
+    dispatch(
+      { t: 'layout/patch', patch },
+      { label: '调整布局', coalesceKey: 'layout' },
+    )
+  }
+
   function addModule(ref: CellRef, input: NewModuleInput, at?: number): Result<Project, string> {
     const module = createModule(input)
     const command: Command =
@@ -529,6 +561,8 @@ export const useProjectStore = defineStore('project', () => {
     // helpers
     setSideField,
     setRowLabel,
+    setRowHeight,
+    patchLayout,
     addModule,
     addModuleAt,
     removeModule,

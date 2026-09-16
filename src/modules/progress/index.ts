@@ -20,7 +20,7 @@ const definition: ModuleDefinition<ProgressData> = {
   type: 'progress',
   meta: {
     titleKey: 'modules.progress',
-    icon: 'music',
+    icon: 'progress',
     category: 'data',
     keywords: ['progress', '进度', '时间轴', 'timeline', 'seek'],
   },

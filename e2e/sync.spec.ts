@@ -7,6 +7,7 @@
  * 动效开关是否真的关掉了动效。
  */
 import { expect, test, type Page } from '@playwright/test'
+import { fillModuleText } from './helpers'
 
 /** 生成一段指定时长的静音 WAV（8kHz 单声道 16bit） */
 function silentWav(seconds: number): Buffer {
@@ -42,11 +43,27 @@ async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
-/** 音乐模板第二行是音频模块；给左右两格各导入一段音频 */
+/**
+ * 音乐模板第二行是音频模块；给左右两格各导入一段音频。
+ *
+ * M6 起媒体选择器位于**模块编辑弹窗**内，所以每侧都要：
+ * 打开对应卡片的编辑弹窗 → 选文件 → 关掉弹窗。
+ */
 async function importBothTracks(page: Page): Promise<void> {
   const row = page.locator('.canvas__row').nth(1)
-  await row.locator('.canvas__cell').nth(0).locator('input[type="file"]').first().setInputFiles(WAV_A)
-  await row.locator('.canvas__cell').nth(1).locator('input[type="file"]').first().setInputFiles(WAV_B)
+
+  for (const [index, file] of [WAV_A, WAV_B].entries()) {
+    const target = row.locator('.canvas__cell').nth(index).locator('.card').first()
+    await target.hover()
+    await target.getByRole('button', { name: '编辑模块' }).click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.locator('input[type="file"]').first().setInputFiles(file)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+  }
+
   // 等两侧都完成元数据探测（时长 > 0 才会出现控制栏）
   await expect(row.locator('audio').first()).toBeVisible({ timeout: 10_000 })
   await page.waitForTimeout(1200)
@@ -139,8 +156,8 @@ test.describe('M4 动效开关', () => {
     await createFromTemplate(page, /空白对比/)
 
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    await cell.locator('.card__editor textarea').first().fill('动效测试')
-    await expect(cell.locator('.card__preview')).toContainText('动效测试')
+    await fillModuleText(page, cell, '动效测试')
+    await expect(cell.locator('.module-view')).toContainText('动效测试')
 
     // 设置：动效始终开启
     await page.getByRole('button', { name: '设置' }).click()
@@ -158,7 +175,7 @@ test.describe('M4 动效开关', () => {
     await createFromTemplate(page, /空白对比/)
 
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    await cell.locator('.card__editor textarea').first().fill('关闭动效')
+    await fillModuleText(page, cell, '关闭动效')
 
     await page.getByRole('button', { name: '设置' }).click()
     await page.getByRole('button', { name: '外观', exact: true }).click()

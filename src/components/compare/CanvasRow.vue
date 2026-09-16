@@ -11,12 +11,12 @@
  * 展示态规则（§7.4）由本组件落实：
  *   空模块不渲染、手动隐藏的不渲染、整行都没有可见模块时整行跳过。
  */
-import { computed, provide } from 'vue'
+import { computed, provide, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { VueDraggable } from 'vue-draggable-plus'
 import ModuleCard from '@/components/editor/ModuleCard.vue'
+import ModuleView from '@/components/compare/ModuleView.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
-import { getModule } from '@/modules/registry'
 import { isPresentable } from '@/modules/visibility'
 import { hexToSoft } from '@/lib/color'
 import type { CellRef, ModuleInstance, ModuleRef, Row, Side, SideId } from '@/types/project'
@@ -45,6 +45,8 @@ const emit = defineEmits<{
   remove: [row: Row]
   /** 行标题变化（与模块无关，单独一个事件，避免复用 patchModule 造成语义混乱） */
   relabel: [rowId: string, label: string]
+  /** 行高变化；undefined 表示恢复默认（双击手柄） */
+  resizeHeight: [rowId: string, height: number | undefined]
   openPicker: [row: Row, sideId: SideId]
   reorderModules: [ref: CellRef, next: ModuleInstance[]]
   patchModule: [ref: ModuleRef, patch: { title?: string; hidden?: boolean }]
@@ -57,6 +59,59 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const isReadonly = computed(() => props.readonly === true)
+
+// ——————————————————————————————————————————————————————————
+// 行高拖拽
+// ——————————————————————————————————————————————————————————
+
+/** 行内容区默认最小高度（与 tokens 的密度设置无关，取一个够看的基线） */
+const DEFAULT_ROW_HEIGHT = 96
+const MIN_ROW_HEIGHT = 60
+const MAX_ROW_HEIGHT = 2000
+
+const cellsEl = ref<HTMLElement | null>(null)
+const resizing = ref(false)
+let startY = 0
+let startHeight = 0
+
+function onHeightResizeStart(event: PointerEvent): void {
+  startY = event.clientY
+  // 以当前实际渲染高度为起点，而不是 row.height——
+  // 内容比 height 高时两者不同，用后者会让第一次拖动"跳"一下
+  startHeight = cellsEl.value?.offsetHeight ?? props.row.height ?? DEFAULT_ROW_HEIGHT
+  resizing.value = true
+  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'row-resize'
+}
+
+function onHeightResizeMove(event: PointerEvent): void {
+  if (!resizing.value) return
+  event.preventDefault()
+
+  const next = Math.round(
+    Math.min(MAX_ROW_HEIGHT, Math.max(MIN_ROW_HEIGHT, startHeight + (event.clientY - startY))),
+  )
+  emit('resizeHeight', props.row.id, next)
+}
+
+function onHeightResizeEnd(event: PointerEvent): void {
+  if (!resizing.value) return
+  resizing.value = false
+  ;(event.target as HTMLElement).releasePointerCapture?.(event.pointerId)
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+}
+
+/** 键盘可达：上下方向键微调 */
+function onHeightResizeKeydown(event: KeyboardEvent): void {
+  const step = event.shiftKey ? 40 : 12
+  const current = props.row.height ?? cellsEl.value?.offsetHeight ?? DEFAULT_ROW_HEIGHT
+  if (event.key === 'ArrowUp') emit('resizeHeight', props.row.id, Math.max(MIN_ROW_HEIGHT, current - step))
+  else if (event.key === 'ArrowDown') emit('resizeHeight', props.row.id, Math.min(MAX_ROW_HEIGHT, current + step))
+  else return
+  event.preventDefault()
+}
 
 function modulesOf(sideId: SideId): ModuleInstance[] {
   return props.row.cells[sideId]?.modules ?? []
@@ -143,7 +198,31 @@ defineExpose({ rowHasContent })
     <!-- 行标题：展示态是静态胶囊 -->
     <div v-if="isReadonly && row.label" class="row__label">{{ row.label }}</div>
 
-    <div class="row__cells canvas__cells">
+    <!--
+      行高拖拽手柄：贴在行内容区的下边缘。
+      语义是**最小高度**而不是固定高度（见 Row.height 的说明），
+      内容更高时行仍然会长高，所以这里只写 min-height。
+    -->
+    <div
+      v-if="!isReadonly"
+      class="row__height-handle"
+      role="separator"
+      aria-orientation="horizontal"
+      :aria-label="t('row.resizeHeight')"
+      tabindex="0"
+      @pointerdown="onHeightResizeStart"
+      @pointermove="onHeightResizeMove"
+      @pointerup="onHeightResizeEnd"
+      @pointercancel="onHeightResizeEnd"
+      @dblclick="emit('resizeHeight', row.id, undefined)"
+      @keydown="onHeightResizeKeydown"
+    />
+
+    <div
+      ref="cellsEl"
+      class="row__cells canvas__cells"
+      :style="row.height ? { minHeight: `${row.height}px` } : undefined"
+    >
       <div
         v-for="side in sides"
         :key="side.id"
@@ -163,12 +242,15 @@ defineExpose({ rowHasContent })
             class="row__module anim-enter-up"
             :style="{ animationDelay: `${Math.min(index, 6) * 60}ms` }"
           >
-            <component
-              :is="getModule(module.type)?.renderer"
+            <!--
+              与编辑视图共用 ModuleView：这样"编辑视图看到的样子 == 成稿的样子"
+              是结构上的保证，而不是靠两边各自维护同一套模板。
+            -->
+            <ModuleView
               :module="module"
               :side-id="side.id"
               :accent="side.accent"
-              :readonly="true"
+              readonly
             />
           </div>
         </template>
@@ -304,10 +386,29 @@ defineExpose({ rowHasContent })
 
 /* §7.5：左右两格由同一网格行承载，因此天然顶部对齐 */
 .row__cells {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: var(--col-a, 1fr) var(--col-b, 1fr);
   gap: var(--canvas-gutter, 32px);
   align-items: start;
+}
+
+/*
+ * 行高拖拽手柄：横跨整行、贴在下边缘。
+ * 平时完全透明，鼠标进入行时淡淡显形——常驻会把版面切得很碎。
+ */
+.row__height-handle {
+  height: 8px;
+  margin: 0 calc(var(--sp-2) * -1);
+  cursor: row-resize;
+  border-radius: var(--radius-full);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.row__height-handle:hover,
+.row__height-handle:focus-visible {
+  background: var(--accent-500);
+  outline: none;
 }
 
 .row__cell {

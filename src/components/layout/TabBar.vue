@@ -2,8 +2,11 @@
 /**
  * 标签栏：显示当前打开的对比项目
  *
- * 行为：点击切换、中键/叉号关闭、"＋"新建。
+ * 行为：点击切换、中键/叉号关闭。
  * 关闭标签**不会**删除项目（删除只在侧栏右键菜单中）。
+ *
+ * M6：移除了此处的"＋ 新建"按钮——左侧项目列表已有同样入口（且更靠近项目本身），
+ * 顶栏再放一个是重复的（用户实测反馈）。
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -26,11 +29,6 @@ async function activate(id: string): Promise<void> {
 
 async function close(id: string): Promise<void> {
   await store.closeTab(id)
-}
-
-async function createNew(): Promise<void> {
-  const result = await store.create({ templateId: 'blank', name: t('compare.untitled') })
-  if (result.ok) ui.notify(t('toast.projectCreated', { title: result.value.title }), 'success')
 }
 </script>
 
@@ -64,16 +62,6 @@ async function createNew(): Promise<void> {
         </span>
       </button>
     </div>
-
-    <button
-      class="tabbar__add"
-      type="button"
-      :title="t('sidebar.newProject')"
-      :aria-label="t('sidebar.newProject')"
-      @click="createNew"
-    >
-      <AppIcon name="plus" :size="15" />
-    </button>
   </nav>
 </template>
 

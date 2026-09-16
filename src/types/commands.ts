@@ -34,6 +34,17 @@ export type Command =
   | { t: 'row/remove'; rowId: string }
   | { t: 'row/move'; rowId: string; to: number }
   | { t: 'row/patch'; rowId: string; patch: Partial<Omit<Row, 'id' | 'cells'>> }
+  /**
+   * 设置行高。
+   *
+   * 单独一条命令而不是复用 row/patch 的原因：
+   *   `height` 是可选字段，而 `exactOptionalPropertyTypes` 下
+   *   "把字段设成 undefined" 与 "字段不存在" 是两种不同的类型，
+   *   `Partial<Omit<Row, …>>` 表达不了"删除这个字段"。
+   *   恢复默认行高本来也是一个独立的用户动作（双击手柄），
+   *   给它自己的命令语义更清楚，撤销栈里也是一步。
+   */
+  | { t: 'row/setHeight'; rowId: string; height: number | undefined }
   | { t: 'row/toggleCollapsed'; rowId: string }
   // —— 格 ——
   | { t: 'cell/patch'; ref: CellRef; patch: Partial<Pick<CellPatchTarget, 'hidden' | 'background'>> }
@@ -66,6 +77,7 @@ export const COMMAND_TYPES = [
   'row/remove',
   'row/move',
   'row/patch',
+  'row/setHeight',
   'row/toggleCollapsed',
   'cell/patch',
   'module/add',

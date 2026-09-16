@@ -118,7 +118,13 @@ function onSaved(name: string): void {
 
     <ul v-else class="tool-list">
       <li v-for="tool in customList" :key="tool.id" class="tool-row">
-        <ToolIcon :name="tool.name" :color="tool.color" :icon-asset-id="tool.iconAssetId" :size="26" />
+        <ToolIcon
+          :name="tool.name"
+          :color="tool.color"
+          :icon-asset-id="tool.iconAssetId"
+          :logo-key="tool.builtinKey ?? tool.id"
+          :size="26"
+        />
         <span class="tool-row__text">
           <span class="tool-row__name">{{ tool.name }}</span>
           <span class="tool-row__meta">
@@ -157,7 +163,13 @@ function onSaved(name: string): void {
 
     <ul class="tool-grid">
       <li v-for="tool in builtinList" :key="tool.id" class="chip" :class="{ 'chip--off': tool.disabled }">
-        <ToolIcon :name="tool.name" :color="tool.color" :icon-asset-id="tool.iconAssetId" :size="20" />
+        <ToolIcon
+          :name="tool.name"
+          :color="tool.color"
+          :icon-asset-id="tool.iconAssetId"
+          :logo-key="tool.builtinKey ?? tool.id"
+          :size="20"
+        />
         <span class="chip__name u-truncate">{{ tool.name }}</span>
         <button
           class="chip__toggle"
@@ -170,6 +182,21 @@ function onSaved(name: string): void {
         </button>
       </li>
     </ul>
+  </section>
+
+  <!--
+    免责声明（用户要求：想用真实品牌 LOGO，但要明确规避版权风险）。
+    放在工具库底部而不是藏在"关于"里——用户正是在这一屏看到工具图标，
+    提示只有出现在这里才起作用。
+  -->
+  <section class="disclaimer">
+    <h4 class="disclaimer__title">
+      <AppIcon name="info" :size="14" />
+      {{ t('tools.disclaimerTitle') }}
+    </h4>
+    <p class="disclaimer__text">{{ t('tools.disclaimerTrademark') }}</p>
+    <p class="disclaimer__text">{{ t('tools.disclaimerIcons') }}</p>
+    <p class="disclaimer__text disclaimer__text--local">{{ t('tools.disclaimerLocalLogos') }}</p>
   </section>
 
   <ToolForm
@@ -199,6 +226,37 @@ function onSaved(name: string): void {
 .panel__summary {
   margin-bottom: var(--sp-5);
   font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+/* 免责声明：视觉上刻意"安静"，但必须清晰可读（用 --text-secondary 而非更弱的色） */
+.disclaimer {
+  margin-top: var(--sp-8);
+  padding: var(--sp-4);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.disclaimer__title {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.disclaimer__text {
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-secondary);
+}
+
+.disclaimer__text--local {
+  margin-bottom: 0;
   color: var(--text-muted);
 }
 

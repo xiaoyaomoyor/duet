@@ -4,7 +4,7 @@
  * 重点覆盖「脏数据不得让应用崩在启动阶段」这条底线。
  */
 import { beforeEach, describe, expect, it } from 'vitest'
-import { DEFAULT_SETTINGS } from '@/types'
+import { DEFAULT_SETTINGS, THEME_IDS } from '@/types'
 import {
   clearSettings,
   loadSettings,
@@ -58,9 +58,19 @@ describe('mergeSettings', () => {
     expect(merged.language).toBe('zh-CN')
   })
 
-  it('未知主题回退到紫夜', () => {
+  it('未知主题回退到默认主题', () => {
     const merged = mergeSettings({ themeId: 'neon-light' as never })
-    expect(merged.themeId).toBe('violet-dark')
+    expect(merged.themeId).toBe(DEFAULT_SETTINGS.themeId)
+  })
+
+  it('每一个合法主题都能被原样读回（回归：曾经"非默认即重置"导致主题选不动）', () => {
+    // 这条是真实缺陷的回归用例。曾经的守卫写成
+    //   if (merged.themeId !== defaults.themeId) merged.themeId = defaults.themeId
+    // 在只有一个主题时看不出问题；一旦有多个主题，用户选的任何非默认主题
+    // 都会在下次读回设置时被打回默认，表现为"主题怎么选都选不动"。
+    for (const themeId of THEME_IDS) {
+      expect(mergeSettings({ themeId }).themeId, `主题 ${themeId} 被重置了`).toBe(themeId)
+    }
   })
 
   it('非法配色对回退到默认（而非留下长度不对的数组）', () => {

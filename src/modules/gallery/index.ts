@@ -18,7 +18,7 @@ const definition: ModuleDefinition<GalleryData> = {
   type: 'gallery',
   meta: {
     titleKey: 'modules.gallery',
-    icon: 'image',
+    icon: 'gallery',
     category: 'media',
     keywords: ['gallery', '图片集', '多图', '四宫格', 'grid'],
   },

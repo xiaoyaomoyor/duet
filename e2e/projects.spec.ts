@@ -110,23 +110,36 @@ test.describe('M1 项目生命周期', () => {
     await expect(page.getByRole('complementary').getByText('共 1 个项目')).toBeVisible()
   })
 
-  test('编辑工具头字段触发自动保存', async ({ page }) => {
+  test('编辑工具卡片字段触发自动保存', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
     const main = page.getByRole('main')
-    await main.getByRole('button', { name: '工具 A' }).click()
 
-    const input = main.locator('.side-head__input--title')
-    await input.fill('可灵 1.6')
-    await input.press('Enter')
+    /*
+     * M6 起工具卡片是"最终效果 + 右上角编辑按钮"：
+     * 名称不再就地编辑（那样会把成稿样式和编辑控件混在一起），
+     * 而是点编辑按钮在弹窗里改。
+     */
+    const head = main.locator('.side-head').first()
+    await head.hover()
+    await head.getByRole('button', { name: '编辑工具卡片' }).click()
 
-    await expect(main.getByRole('button', { name: '可灵 1.6' })).toBeVisible()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+
+    const nameInput = dialog.locator('input[type="text"]').first()
+    await nameInput.fill('可灵 1.6')
+    await nameInput.blur()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+
+    await expect(head).toContainText('可灵 1.6')
     // 保存指示最终回到"已保存"
     await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
 
     await page.reload()
-    await expect(main.getByRole('button', { name: '可灵 1.6' })).toBeVisible()
+    await expect(page.getByRole('main').locator('.side-head').first()).toContainText('可灵 1.6')
   })
 })
 

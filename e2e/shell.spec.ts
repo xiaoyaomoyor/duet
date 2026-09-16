@@ -8,7 +8,7 @@ import { expect, test } from '@playwright/test'
  */
 
 test.describe('应用外壳（M0）', () => {
-  test('冷启动渲染紫夜主题且无控制台错误', async ({ page }) => {
+  test('冷启动按系统偏好落到具体主题，且无控制台错误', async ({ page }) => {
     const errors: string[] = []
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text())
@@ -21,9 +21,17 @@ test.describe('应用外壳（M0）', () => {
     await expect(page.getByText('对奏', { exact: true })).toBeVisible()
     await expect(page.getByText('Duet', { exact: true })).toBeVisible()
 
-    // 主题已落到 <html>，且底色确实是深紫而非默认白
+    /*
+     * 主题默认是"跟随系统"，而 <html data-theme> 上落的永远是**解析后**的
+     * 具体主题（CSS 不认识"系统"这个概念）。
+     * Playwright 默认报告 prefers-color-scheme: light，因此这里应该是 light。
+     * 关键断言是"它是具体主题之一、而不是 system 本身"。
+     */
     const html = page.locator('html')
-    await expect(html).toHaveAttribute('data-theme', 'violet-dark')
+    const resolved = await html.getAttribute('data-theme')
+    expect(['dark', 'light', 'violet-dark']).toContain(resolved)
+    expect(resolved).toBe('light')
+
     await expect(html).toHaveAttribute('data-platform', 'web')
     await expect(html).toHaveAttribute('lang', 'zh-CN')
 
@@ -31,7 +39,6 @@ test.describe('应用外壳（M0）', () => {
       () => getComputedStyle(document.body).backgroundColor,
     )
     expect(background).not.toBe('rgba(0, 0, 0, 0)')
-    expect(background).not.toBe('rgb(255, 255, 255)')
 
     // 空状态与模板卡片
     // 注意：侧栏与主区各有一组模板卡片，断言必须限定在 <main> 内，否则会撞上 strict mode

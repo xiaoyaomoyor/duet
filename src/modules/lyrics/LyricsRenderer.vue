@@ -32,6 +32,18 @@ const data = computed<LyricsData>(() => {
 const parsed = computed(() => parseLrc(data.value.text))
 const timed = computed(() => parsed.value.timed && data.value.syncWithAudio)
 
+/**
+ * 对齐方式（由模块编辑弹窗里的"呈现选项"设置）。
+ *
+ * 用属性选择器 + CSS 实现，而不是给每个 <p> 绑 style：
+ * 前者在一屏几十行时不会产生几十个内联样式对象，
+ * 也让"改对齐"只影响一个类，重排更便宜。
+ */
+const align = computed<'left' | 'center' | 'right'>(() => {
+  const value = props.module.props?.align
+  return value === 'left' || value === 'right' ? value : 'center'
+})
+
 /** 统一成"行"结构，供两种模式共用渲染 */
 const lines = computed<Array<{ key: string; text: string; timeMs: number }>>(() =>
   timed.value
@@ -74,7 +86,11 @@ watch(activeIndex, async (index) => {
 </script>
 
 <template>
-  <div class="lyrics" :style="{ maxHeight: `${data.maxHeight}px` }">
+  <div
+    class="lyrics"
+    :style="{ maxHeight: `${data.maxHeight}px` }"
+    :data-align="align"
+  >
     <div ref="scroller" class="lyrics__scroll u-scroll-y" :style="{ maxHeight: `${data.maxHeight}px` }">
       <p
         v-for="(line, index) in lines"
@@ -114,6 +130,19 @@ watch(activeIndex, async (index) => {
   transition:
     color var(--dur-base) var(--ease-out),
     transform var(--dur-base) var(--ease-out);
+}
+
+/* —— 对齐（默认居中） —— */
+.lyrics[data-align='center'] .lyrics__line {
+  text-align: center;
+}
+
+.lyrics[data-align='left'] .lyrics__line {
+  text-align: left;
+}
+
+.lyrics[data-align='right'] .lyrics__line {
+  text-align: right;
 }
 
 .lyrics__line--active {

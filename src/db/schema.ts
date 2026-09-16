@@ -38,23 +38,75 @@ export interface Migration {
  * 历史迁移清单。
  *
  * v1 为首个版本，无需迁移。
- * 示例（v1 → v2：sheet → sheets[]）：
- *   {
- *     to: 2,
- *     run: (_db, tx) => {
- *       const store = tx.objectStore(STORE.projects)
- *       const cursorReq = store.openCursor()
- *       cursorReq.onsuccess = () => {
- *         const cursor = cursorReq.result
- *         if (!cursor) return
- *         const project = cursor.value
- *         store.put({ ...project, sheets: [project.sheet], schemaVersion: 2 })
- *         cursor.continue()
- *       }
- *     },
- *   }
  */
-export const MIGRATIONS: Migration[] = []
+export const MIGRATIONS: Migration[] = [
+  {
+    to: 2,
+    /**
+     * v1 → v2：补上行高与工具卡片显示开关的默认值。
+     *
+     * 严格说这两个字段都是可选的，不补也能跑；之所以仍然遍历一遍，
+     * 是为了让落库的数据**显式**带上新字段——否则"缺字段"与
+     * "用户明确关掉了显示"在数据上无法区分，将来排查会很痛苦。
+     *
+     * 这里同时兜底修复 layout.ratio：手改过的文件可能缺它，
+     * 缺了会让画布按 undefined 算宽度而塌成 0。
+     */
+    run: (_db, tx) => {
+      const store = tx.objectStore(STORE.projects)
+      const cursorReq = store.openCursor()
+
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result
+        if (!cursor) return
+
+        const project = cursor.value as {
+          schemaVersion?: number
+          sheet?: {
+            layout?: { ratio?: unknown }
+            sides?: Array<Record<string, unknown>>
+          }
+        }
+
+        const sheet = project.sheet
+        if (!sheet) {
+          // 结构已经坏掉的记录不在这里修——交给导入校验去报告
+          cursor.continue()
+          return
+        }
+
+        const ratio = sheet.layout?.ratio
+        const validRatio =
+          Array.isArray(ratio) &&
+          ratio.length === 2 &&
+          ratio.every((n) => typeof n === 'number' && Number.isFinite(n) && n > 0)
+
+        const sides = (sheet.sides ?? []).map((side) => ({
+          showIcon: true,
+          showName: true,
+          showVersion: true,
+          showNote: true,
+          ...side,
+        }))
+
+        cursor.update({
+          ...project,
+          schemaVersion: 2,
+          sheet: {
+            ...sheet,
+            sides,
+            layout: {
+              ...sheet.layout,
+              ratio: validRatio ? ratio : [1, 1],
+            },
+          },
+        })
+
+        cursor.continue()
+      }
+    },
+  },
+]
 
 /** 建表：仅在新库或版本升级时执行 */
 function createStores(db: IDBDatabase): void {

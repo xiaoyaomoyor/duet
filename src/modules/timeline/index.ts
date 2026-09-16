@@ -59,7 +59,7 @@ const definition: ModuleDefinition<TimelineData> = {
   type: 'timeline',
   meta: {
     titleKey: 'modules.timeline',
-    icon: 'star',
+    icon: 'timeline',
     category: 'data',
     keywords: ['timeline', '时间线', '过程', '耗时'],
   },

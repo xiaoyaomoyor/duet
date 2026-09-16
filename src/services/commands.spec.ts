@@ -33,6 +33,8 @@ describe('applyCommand 的不可变性', () => {
       { t: 'layout/patch', patch: { gutter: 64 } },
       { t: 'side/patch', sideId: project.sheet.sides[0]!.id, patch: { accent: '#ff0000' } },
       { t: 'row/toggleCollapsed', rowId: firstRowId(project) },
+      { t: 'row/setHeight', rowId: firstRowId(project), height: 320 },
+      { t: 'row/setHeight', rowId: firstRowId(project), height: undefined },
     ]
 
     for (const command of commands) applyCommand(project, command)
@@ -286,5 +288,56 @@ describe('module/add 的次序', () => {
       '简评',
       '结论',
     ])
+  })
+})
+
+describe('row/setHeight（行高拖拽）', () => {
+  it('设置行高只影响目标行', () => {
+    const project = makeProject()
+    const target = firstRowId(project)
+    const other = project.sheet.rows[1]?.id
+
+    const next = applyCommand(project, { t: 'row/setHeight', rowId: target, height: 420 })
+
+    expect(next.sheet.rows.find((row) => row.id === target)?.height).toBe(420)
+    if (other) expect(next.sheet.rows.find((row) => row.id === other)?.height).toBeUndefined()
+  })
+
+  it('传 undefined 是"恢复默认"：字段被删掉，而不是留下一个 undefined 键', () => {
+    const project = makeProject()
+    const target = firstRowId(project)
+
+    const sized = applyCommand(project, { t: 'row/setHeight', rowId: target, height: 300 })
+    const reset = applyCommand(sized, { t: 'row/setHeight', rowId: target, height: undefined })
+
+    const row = reset.sheet.rows.find((item) => item.id === target)
+    expect(row?.height).toBeUndefined()
+    /*
+     * 关键断言：JSON 里不能出现 "height":null 或留下空键。
+     * 留着 undefined 键的话，导出的工程文件会带着一个看着像坏数据的字段，
+     * 而且下一次 validateRow 也会因为它存在而多做一次判断。
+     */
+    expect(JSON.stringify(row)).not.toContain('height')
+  })
+
+  it('行不存在时明确失败而不是静默成功', () => {
+    const project = makeProject()
+    // 当前实现是"找不到就原样返回"，与 row/patch 一致——
+    // 这里把行为固定下来，避免将来无意改变
+    const next = applyCommand(project, { t: 'row/setHeight', rowId: '不存在', height: 100 })
+    expect(next.sheet.rows.map((row) => row.height)).toEqual(
+      project.sheet.rows.map((row) => row.height),
+    )
+  })
+
+  it('行高是可逆的（撤销依赖命令层的纯函数性）', () => {
+    const project = makeProject()
+    const target = firstRowId(project)
+
+    const before = JSON.stringify(project)
+    const after = applyCommand(project, { t: 'row/setHeight', rowId: target, height: 260 })
+    const back = applyCommand(after, { t: 'row/setHeight', rowId: target, height: undefined })
+
+    expect(JSON.stringify(back)).toBe(before)
   })
 })

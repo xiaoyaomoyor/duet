@@ -26,21 +26,32 @@ import type { ModuleInstance } from '@/types/project'
  *   现在先过一遍 schema.isData：形状不对就当作"不可展示"，
  *   而不是把异常抛到渲染函数里。
  */
-export function isPresentable(module: ModuleInstance): boolean {
-  if (module.hidden) return false
-
+/**
+ * 该模块是否**没有内容**（不考虑用户手动隐藏）。
+ *
+ * 与 `isPresentable` 分开的原因：编辑视图需要区分"空"和"被隐藏"这两种状态——
+ *   空     → 卡片退化成"点击填写"的虚线框
+ *   有内容但被隐藏 → 内容照常显示（置灰 + 角标），否则用户会以为内容丢了
+ * 两者共用同一套 isEmpty 防御逻辑，不会漂移。
+ */
+export function isModuleEmpty(module: ModuleInstance): boolean {
   const definition = getModule(module.type)
-  if (!definition) return false
+  if (!definition) return true
 
-  // 形状不对（残缺/损坏）时不展示，避免 isEmpty 内部崩掉
-  if (!definition.schema.isData(module.data)) return false
+  // 形状不对（残缺/损坏）时当作空，避免 isEmpty 内部崩掉
+  if (!definition.schema.isData(module.data)) return true
 
   try {
-    return !definition.isEmpty(module.data, module.props)
+    return definition.isEmpty(module.data, module.props)
   } catch {
     // 模块自身的判定出错也不该拖垮整页
-    return false
+    return true
   }
+}
+
+export function isPresentable(module: ModuleInstance): boolean {
+  if (module.hidden) return false
+  return !isModuleEmpty(module)
 }
 
 /** 一组模块中是否有可见的（用于整行/整格跳过判定） */

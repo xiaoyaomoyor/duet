@@ -31,9 +31,11 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "icons": "node scripts/generate-icons.mjs",
+    "logos": "node scripts/fetch-brand-logos.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
+    "@lucide/vue": "1.46.0",
     "html-to-image": "latest",
     "pinia": "latest",
     "vue": "latest",

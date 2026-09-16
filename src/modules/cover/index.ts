@@ -17,7 +17,7 @@ const definition: ModuleDefinition<MediaData, CoverProps> = {
   type: 'cover',
   meta: {
     titleKey: 'modules.cover',
-    icon: 'image',
+    icon: 'cover',
     category: 'media',
     keywords: ['cover', '封面', '主图', 'poster'],
   },

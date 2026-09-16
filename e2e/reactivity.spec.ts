@@ -1,11 +1,13 @@
 /**
  * 输入焦点与模块内容响应性（回归用例）
  *
- * 这两条断言各自锁死一个 M2 期间踩过的坑，都必须长期保留：
+ * 这三条断言各自锁死一个踩过的坑，都必须长期保留：
  *
  * 1. **输入时焦点必须稳定**
  *    曾经为了强制刷新界面，把"内容指纹"并进模块卡片的 :key，
  *    结果每敲一个字就重建卡片 → 输入框失焦 → 只能输入一个字符。
+ *    M6 把编辑器搬进了弹窗，这条约束**同样成立**：
+ *    弹窗若被内容指纹重建，输入框一样会失焦。
  *
  * 2. **导入媒体后编辑视图必须立刻显示**
  *    模块的 editor / renderer 曾在 setup 时用
@@ -13,7 +15,8 @@
  *    子组件仍指向旧对象，表现为"数据已保存、界面不变、刷新后才正常"。
  *    正确写法是用 computed 读取（见 CoverRenderer 的注释）。
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { addedCard, createFromTemplate, moduleCard, openModuleEditor } from './helpers'
 
 const RED_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8Dwn4EIwDiqkL4KAcxhA/1kF5WvAAAAAElFTkSuQmCC'
@@ -24,24 +27,18 @@ const PNG_FILE = {
   buffer: Buffer.from(RED_PNG_BASE64, 'base64'),
 }
 
-async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
-  const sidebar = page.getByRole('complementary')
-  await sidebar.getByRole('button', { name: '新建对比' }).click()
-  await sidebar.getByRole('button', { name }).click()
-  await expect(page.locator('.canvas')).toBeVisible()
-}
-
 test.describe('M2 回归：焦点稳定性与内容响应性', () => {
   test('逐字符输入时焦点保持在同一个输入框', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
-    const textarea = page.locator('.canvas__cell').first().locator('.card__editor textarea').first()
+    const dialog = await openModuleEditor(page, addedCard(page, 0))
+    const textarea = dialog.locator('textarea').first()
     await textarea.click()
     await textarea.pressSequentially('价格对比', { delay: 50 })
 
     const state = await page.evaluate(() => {
-      const el = document.querySelector('.card__editor textarea') as HTMLTextAreaElement | null
+      const el = document.querySelector('[role="dialog"] textarea') as HTMLTextAreaElement | null
       return { isActive: document.activeElement === el, value: el?.value ?? '' }
     })
 
@@ -53,11 +50,13 @@ test.describe('M2 回归：焦点稳定性与内容响应性', () => {
     await page.goto('/')
     await createFromTemplate(page, /图片对比/)
 
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    await cell.locator('input[type="file"]').first().setInputFiles(PNG_FILE)
+    // 媒体选择器现在位于模块编辑弹窗内
+    const target = moduleCard(page, 0, 0)
+    const dialog = await openModuleEditor(page, target)
+    await dialog.locator('input[type="file"]').first().setInputFiles(PNG_FILE)
 
-    // 关键：不刷新页面，直接断言预览出现
-    const img = cell.locator('.card__preview img').first()
+    // 关键：不刷新页面，直接断言卡片正文出现图片
+    const img = target.locator('.module-view img').first()
     await expect(img).toBeVisible({ timeout: 5000 })
     await expect(img).toHaveJSProperty('naturalWidth', 2)
   })
@@ -66,11 +65,12 @@ test.describe('M2 回归：焦点稳定性与内容响应性', () => {
     await page.goto('/')
     await createFromTemplate(page, /图片对比/)
 
-    const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    const input = cell.locator('input[type="file"]').first()
+    const target = moduleCard(page, 0, 0)
+    const dialog = await openModuleEditor(page, target)
+    const input = dialog.locator('input[type="file"]').first()
 
     await input.setInputFiles(PNG_FILE)
-    const firstSrc = await cell.locator('.card__preview img').first().getAttribute('src')
+    const firstSrc = await target.locator('.module-view img').first().getAttribute('src')
     expect(firstSrc?.startsWith('blob:')).toBe(true)
 
     // 换一张不同内容的图片（改用 1×1 透明 PNG），src 必须变化
@@ -84,7 +84,7 @@ test.describe('M2 回归：焦点稳定性与内容响应性', () => {
     })
 
     await expect
-      .poll(async () => cell.locator('.card__preview img').first().getAttribute('src'), {
+      .poll(async () => target.locator('.module-view img').first().getAttribute('src'), {
         timeout: 5000,
       })
       .not.toBe(firstSrc)

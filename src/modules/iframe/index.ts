@@ -20,7 +20,7 @@ const definition: ModuleDefinition<IframeData> = {
   type: 'iframe',
   meta: {
     titleKey: 'modules.iframe',
-    icon: 'link',
+    icon: 'iframe',
     category: 'advanced',
     keywords: ['iframe', '嵌入', '网页', 'embed'],
   },

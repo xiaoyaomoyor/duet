@@ -37,7 +37,7 @@ function readScore(data: unknown): ScoreData {
 
 const definition: ModuleDefinition<ScoreData> = {
   type: 'score',
-  meta: { titleKey: 'modules.score', icon: 'star', category: 'data' },
+  meta: { titleKey: 'modules.score', icon: 'score', category: 'data' },
   schema: {
     create: (): ScoreData => ({ score: null, max: 10, label: '', showNumber: true }),
     isData: (value): value is ScoreData => typeof value === 'object' && value !== null,

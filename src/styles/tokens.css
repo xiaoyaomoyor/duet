@@ -4,7 +4,23 @@
  * 纪律（docs/01-施工总案.md §11.1）：
  *   1. 本项目**唯一**允许出现颜色字面量的文件就是本文件。
  *   2. 组件中一律使用 var(--xxx)，禁止硬编码色值。
- *   3. 任何修改都必须重跑 `npm run check:contrast`，对比度不达标即 CI 失败。
+ *   3. 任何修改都必须重跑 `npm run check:contrast`——
+ *      该脚本会**解析本文件**并逐个主题校验对比度，不达标即失败。
+ *
+ * 结构（M6 起）：
+ *   ① 基础块：所有**非颜色** token（圆角/间距/字体/动效/层级/尺寸）
+ *      + 默认主题（紫夜）的颜色。默认主题必须同时挂在 `:root` 上，
+ *      否则 JS 尚未执行（首屏、禁用脚本）时页面会没有颜色。
+ *   ② 各主题块：**只覆盖颜色**，结构性 token 一律继承基础块。
+ *      新增主题 = 加一个 `:root[data-theme='x']` 块，
+ *      `check:contrast` 会自动开始校验它，脚本无需改动。
+ *   ③ 动效降级块。
+ *
+ * 文字层级（四级，全部满足 WCAG AA —— 含弹窗等"抬升背景"）：
+ *   --text-primary   正文/标题
+ *   --text-secondary 次要正文
+ *   --text-muted     说明、标签、元信息
+ *   --text-disabled  最弱一级：占位符、空状态、禁用态
  */
 
 :root,
@@ -24,16 +40,16 @@
   /* —— 描边 —— */
   --border-subtle: #241b3d; /* 纯装饰性分隔，不承载交互语义 */
   --border-default: #2f2450;
-  --border-strong: #6b57b5; /* 表单/按钮描边，3.24:1，满足 WCAG 1.4.11 */
+  --border-strong: #7460c4; /* 表单/按钮描边，满足 WCAG 1.4.11 的 3:1 */
 
-  /* —— 文字（括号内为与 --bg-surface #150F26 的实测对比度） —— */
-  --text-primary: #f3effb; /* 16.44:1  AAA */
-  --text-secondary: #c4b9e0; /* 10.07:1  AAA */
-  --text-muted: #8c82aa; /*  5.22:1  AA   */
-  --text-disabled: #7c7499; /*  4.27:1  仅禁用态，不承载信息 */
+  /* —— 文字（四级，逐级递减且全部 >= 4.5:1，含 --bg-elevated） —— */
+  --text-primary: #f3effb; /* 16.44:1 on surface */
+  --text-secondary: #c4b9e0; /* 10.07:1 */
+  --text-muted: #a398c0; /*  6.92:1 —— M6 提亮，原先 5.22 在弹窗上只有 4.49 */
+  --text-disabled: #9089ab; /*  5.63:1 —— 占位符/空状态也用它，必须可读 */
   --text-inverse: #150f26;
 
-  /* —— 主色（品牌紫） —— */
+  /* —— 主色 —— */
   --accent-100: #ede9fe;
   --accent-300: #c4b5fd;
   --accent-500: #a78bfa; /* 6.84:1 */
@@ -71,6 +87,10 @@
   --shadow-md: 0 6px 20px rgb(0 0 0 / 45%);
   --shadow-lg: 0 16px 48px rgb(0 0 0 / 55%);
   --shadow-pop: 0 12px 40px rgb(0 0 0 / 60%), 0 0 0 1px var(--border-default);
+
+  /* ============================================================
+   * 以下为结构性 token：所有主题共用，主题块不重复声明
+   * ============================================================ */
 
   /* —— 圆角 —— */
   --radius-xs: 4px;
@@ -132,6 +152,129 @@
   --size-sidebar: 260px;
   --size-sidebar-collapsed: 48px;
   --size-content-max: 1440px;
+}
+
+/* ————————————————————————————————————————————————————————————
+ * 暗（中性黑）：不带色相的中性灰阶，适合长时间阅读与录屏
+ * ———————————————————————————————————————————————————————————— */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg-void: #000;
+  --bg-base: #0a0a0b;
+  --bg-surface: #141416;
+  --bg-surface-2: #1c1c1f;
+  --bg-elevated: #26262a;
+  --bg-hover: #232327;
+  --bg-active: #2b2b30;
+  --bg-overlay: rgb(0 0 0 / 72%);
+
+  --border-subtle: #232326;
+  --border-default: #313136;
+  --border-strong: #6f6f7a;
+
+  --text-primary: #f4f4f5;
+  --text-secondary: #c9c9cf;
+  --text-muted: #a6a6ae;
+  --text-disabled: #94949c;
+  --text-inverse: #141416;
+
+  --accent-100: #dbeafe;
+  --accent-300: #93c5fd;
+  --accent-500: #60a5fa;
+  --accent-600: #3b82f6;
+  --accent-700: #2563eb;
+  --accent-900: #1e3a8a;
+  --accent-fg: #0a0a0b;
+  --accent-soft: rgb(96 165 250 / 14%);
+  --accent-ring: rgb(96 165 250 / 40%);
+
+  --side-a: #93b4f5;
+  --side-a-soft: rgb(147 180 245 / 12%);
+  --side-b: #f0a868;
+  --side-b-soft: rgb(240 168 104 / 12%);
+
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+  --success-soft: rgb(74 222 128 / 14%);
+  --warning-soft: rgb(251 191 36 / 14%);
+  --danger-soft: rgb(248 113 113 / 14%);
+
+  --grad-brand: linear-gradient(135deg, #60a5fa 0%, #818cf8 55%, #a78bfa 100%);
+  --grad-axis: linear-gradient(180deg, transparent, rgb(160 160 172 / 45%), transparent);
+  --glow-accent: 0 0 24px rgb(96 165 250 / 30%);
+  --glow-side-a: 0 0 20px rgb(147 180 245 / 26%);
+  --glow-side-b: 0 0 20px rgb(240 168 104 / 26%);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 45%);
+  --shadow-md: 0 6px 20px rgb(0 0 0 / 50%);
+  --shadow-lg: 0 16px 48px rgb(0 0 0 / 60%);
+  --shadow-pop: 0 12px 40px rgb(0 0 0 / 65%), 0 0 0 1px var(--border-default);
+}
+
+/* ————————————————————————————————————————————————————————————
+ * 亮：白底，适合打印预览、明亮环境与投屏
+ *
+ * 注意这里的阴影比暗色主题**更淡但有更大的扩散**：
+ * 亮色下的黑阴影特别显脏，靠柔和的大范围阴影表达层级才自然。
+ * ———————————————————————————————————————————————————————————— */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-void: #e9e9ee;
+  --bg-base: #fafafa;
+  --bg-surface: #fff;
+  --bg-surface-2: #f4f4f6;
+  --bg-elevated: #fff;
+  --bg-hover: #f1f1f4;
+  --bg-active: #e7e7ec;
+  --bg-overlay: rgb(24 24 27 / 45%);
+
+  --border-subtle: #ececef;
+  --border-default: #d9d9df;
+  --border-strong: #8b8b96;
+
+  --text-primary: #18181b;
+  --text-secondary: #3f3f46;
+  --text-muted: #52525b;
+  --text-disabled: #63636d;
+  --text-inverse: #fff;
+
+  --accent-100: #ede9fe;
+  --accent-300: #c4b5fd;
+  --accent-500: #6d28d9; /* 白底上 7.4:1，比浅紫更可读 */
+  --accent-600: #5b21b6;
+  --accent-700: #4c1d95;
+  --accent-900: #2e1065;
+  --accent-fg: #fff;
+  --accent-soft: rgb(109 40 217 / 10%);
+  --accent-ring: rgb(109 40 217 / 35%);
+
+  --side-a: #6d28d9;
+  --side-a-soft: rgb(109 40 217 / 10%);
+  --side-b: #0e7490;
+  --side-b-soft: rgb(14 116 144 / 10%);
+
+  --success: #15803d;
+  --warning: #8f5a06; /* 白底 5.78:1、内嵌面板 5.26:1；原先的 #a16207 只有 4.48 */
+  --danger: #b91c1c;
+  --info: #1d4ed8;
+  --success-soft: rgb(21 128 61 / 10%);
+  --warning-soft: rgb(161 98 7 / 12%);
+  --danger-soft: rgb(185 28 28 / 10%);
+
+  --grad-brand: linear-gradient(135deg, #6d28d9 0%, #4f46e5 55%, #0e7490 100%);
+  --grad-axis: linear-gradient(180deg, transparent, rgb(109 40 217 / 45%), transparent);
+  --glow-accent: 0 0 20px rgb(109 40 217 / 18%);
+  --glow-side-a: 0 0 16px rgb(109 40 217 / 16%);
+  --glow-side-b: 0 0 16px rgb(14 116 144 / 16%);
+
+  --shadow-sm: 0 1px 2px rgb(24 24 27 / 6%);
+  --shadow-md: 0 6px 20px rgb(24 24 27 / 8%);
+  --shadow-lg: 0 16px 48px rgb(24 24 27 / 12%);
+  --shadow-pop: 0 12px 40px rgb(24 24 27 / 16%), 0 0 0 1px var(--border-default);
 }
 
 /* 动效降级：跟随系统「减少动态效果」设置，或在应用内显式关闭（§12.1） */

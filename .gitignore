@@ -18,6 +18,12 @@ playwright/.cache/
 src-tauri/target/
 src-tauri/gen/
 
+# —— 本地品牌 LOGO（第三方商标，刻意不入库） ——
+# 由 scripts/fetch-brand-logos.mjs 生成。
+# 提交他人商标等于再分发，风险远大于本机自用；
+# 其他用户克隆时没有这个目录，界面会自动回退到生成的几何图标。
+public/brand-local/
+
 # —— 编辑器与系统 ——
 .vscode/*
 !.vscode/extensions.json

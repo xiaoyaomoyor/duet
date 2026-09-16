@@ -15,7 +15,7 @@ const definition: ModuleDefinition<MarkdownData> = {
   type: 'markdown',
   meta: {
     titleKey: 'modules.markdown',
-    icon: 'text',
+    icon: 'markdown',
     category: 'text',
     keywords: ['markdown', 'md', '文档', '说明'],
   },

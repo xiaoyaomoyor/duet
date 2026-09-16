@@ -7,6 +7,7 @@
  *   3. 三种导出都能产出文件，且长图**不是空白**
  */
 import { expect, test, type Page } from '@playwright/test'
+import { fillModuleText } from './helpers'
 
 const RED_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8Dwn4EIwDiqkL4KAcxhA/1kF5WvAAAAAElFTkSuQmCC'
@@ -94,14 +95,14 @@ test.describe('M3 展示视图', () => {
 
     // 空白模板带一个文字模块：先填内容
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    await cell.locator('.card__editor textarea').first().fill('第一段结论')
-    await expect(cell.locator('.card__preview')).toContainText('第一段结论')
+    await fillModuleText(page, cell, '第一段结论')
+    await expect(cell.locator('.module-view')).toContainText('第一段结论')
 
     // 再添加一个模块并隐藏它
     await cell.locator('.canvas__add-module').first().click()
     await page.getByRole('dialog', { name: '选择模块类型' }).getByRole('button', { name: '文字' }).click()
     const secondCard = cell.locator('.card').nth(1)
-    await secondCard.locator('.card__editor textarea').first().fill('这段不该出现')
+    await fillModuleText(page, secondCard, '这段不该出现')
     await secondCard.locator('[aria-label="在展示视图隐藏"]').click()
 
     await enterPresent(page)
@@ -141,8 +142,8 @@ test.describe('M3 导出', () => {
 
     // 填一段文字，保证图上一定有内容
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    await cell.locator('.card__editor textarea').first().fill('长图导出测试内容')
-    await expect(cell.locator('.card__preview')).toContainText('长图导出测试内容')
+    await fillModuleText(page, cell, '长图导出测试内容')
+    await expect(cell.locator('.module-view')).toContainText('长图导出测试内容')
 
     await page.getByRole('button', { name: '导出' }).click()
     const downloadPromise = page.waitForEvent('download')
@@ -170,7 +171,7 @@ test.describe('M3 导出', () => {
     await createFromTemplate(page, /空白对比/)
 
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    await cell.locator('.card__editor textarea').first().fill('只读页内容标记')
+    await fillModuleText(page, cell, '只读页内容标记')
 
     await page.getByRole('button', { name: '导出' }).click()
     const downloadPromise = page.waitForEvent('download')
@@ -191,6 +192,9 @@ test.describe('M3 导出', () => {
     expect(html).toContain('只读页内容标记')
     // 只读页不应包含编辑器痕迹（注意别误判 <style> 里的 CSS 规则名）
     expect(html).not.toContain('card__editor')
+    // M6 起编辑器搬进了模块编辑弹窗；弹窗是 Teleport 到 body 的，
+    // 一旦被误序列化进导出文件，就会留下一个永远打不开的空壳
+    expect(html).not.toContain('card__actions')
     expect(html).not.toContain('<textarea')
     expect(html).not.toContain('<input')
     // 应内联样式（否则打开后是裸 HTML）
@@ -202,7 +206,7 @@ test.describe('M3 导出', () => {
     await createFromTemplate(page, /空白对比/)
 
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    await cell.locator('.card__editor textarea').first().fill('x')
+    await fillModuleText(page, cell, 'x')
 
     await page.getByRole('button', { name: '导出' }).click()
     const downloadPromise = page.waitForEvent('download')
@@ -226,7 +230,7 @@ test.describe('M3 导出', () => {
     await createFromTemplate(page, /空白对比/)
 
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
-    await cell.locator('.card__editor textarea').first().fill('往返内容标记')
+    await fillModuleText(page, cell, '往返内容标记')
     await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
 
     await page.getByRole('button', { name: '导出' }).click()
@@ -262,6 +266,6 @@ test.describe('M3 导出', () => {
     const sidebar = page.getByRole('complementary')
     await expect(sidebar.getByRole('button', { name: /空白对比/ }).first()).toBeVisible()
     await sidebar.getByRole('button', { name: /空白对比/ }).first().click()
-    await expect(page.locator('.card__preview').first()).toContainText('往返内容标记')
+    await expect(page.locator('.module-view').first()).toContainText('往返内容标记')
   })
 })

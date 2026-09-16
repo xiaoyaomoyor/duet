@@ -17,7 +17,7 @@ const definition: ModuleDefinition<KeyValueData, KeyValueProps> = {
   type: 'keyValue',
   meta: {
     titleKey: 'modules.keyValue',
-    icon: 'text',
+    icon: 'table',
     category: 'data',
     keywords: ['keyvalue', '参数', '规格', '表格', 'spec', '指标'],
   },

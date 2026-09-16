@@ -18,7 +18,7 @@ const definition: ModuleDefinition<RichTextData> = {
   type: 'richText',
   meta: {
     titleKey: 'modules.richText',
-    icon: 'text',
+    icon: 'richText',
     category: 'text',
     keywords: ['rich', 'richtext', '富文本', '加粗', '排版'],
   },

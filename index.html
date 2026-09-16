@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="violet-dark">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
 
     <title>对奏 Duet · 让两个工具，同台演奏同一道题</title>
     <meta
@@ -18,12 +18,44 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23150F26'/%3E%3Cpath d='M12 4.5v15' stroke='%236B57B5' stroke-width='1.2'/%3E%3Crect x='4' y='8.4' width='3.4' height='7.2' rx='1.1' fill='%23A78BFA'/%3E%3Crect x='8.6' y='10.2' width='2.4' height='3.6' rx='0.9' fill='%237C5CE0'/%3E%3Crect x='16.6' y='8.4' width='3.4' height='7.2' rx='1.1' fill='%2322D3EE'/%3E%3Crect x='13' y='10.2' width='2.4' height='3.6' rx='0.9' fill='%231B93AC'/%3E%3C/svg%3E"
     />
 
-    <!-- 主题色：移动端浏览器地址栏与 PWA 一致 -->
     <meta name="theme-color" content="#0b0714" />
 
     <script>
-      // 首帧防闪白：在 CSS 加载前先把底色铺上
-      document.documentElement.style.backgroundColor = '#0b0714'
+      /*
+       * 首帧主题判定（刻意内联、刻意放在 CSS 之前）。
+       *
+       * 为什么不能等 Vue 起来再做：主题是"底色"，晚一帧就是一次白/黑闪烁，
+       * 而闪烁在亮色系统上尤其刺眼。这段脚本必须在样式表生效前同步跑完。
+       *
+       * 规则与 src/lib/theme.ts 的 resolveTheme 保持一致：
+       *   默认跟随系统；用户在设置里选了具体主题则以设置为准。
+       * 设置存在 IndexedDB 里（异步，这里读不到），所以用 localStorage 做一份
+       * **仅用于首帧**的镜像——它是缓存而不是真源，读不到就退回跟随系统。
+       */
+      ;(function () {
+        var THEMES = { dark: '#0a0a0b', light: '#fafafa', 'violet-dark': '#0b0714' }
+
+        var stored = null
+        try {
+          stored = window.localStorage.getItem('duet:theme')
+        } catch (error) {
+          /* 隐私模式下 localStorage 可能抛异常，忽略即可 */
+        }
+
+        var resolved
+        if (stored === 'dark' || stored === 'light' || stored === 'violet-dark') {
+          resolved = stored
+        } else {
+          var prefersDark =
+            !window.matchMedia || window.matchMedia('(prefers-color-scheme: dark)').matches
+          resolved = prefersDark ? 'dark' : 'light'
+        }
+
+        var root = document.documentElement
+        root.dataset.theme = resolved
+        root.style.colorScheme = resolved === 'light' ? 'light' : 'dark'
+        root.style.backgroundColor = THEMES[resolved]
+      })()
     </script>
   </head>
   <body>

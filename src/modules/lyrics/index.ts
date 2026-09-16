@@ -18,11 +18,16 @@ import type { ModuleDefinition } from '@/modules/types'
 import { isBlankText } from '../shared/guards'
 import type { LyricsData } from './data'
 
-const definition: ModuleDefinition<LyricsData> = {
+/** 呈现选项：对齐方式（走通用 options 机制，自动出现在模块编辑弹窗里） */
+export interface LyricsProps {
+  align: 'left' | 'center' | 'right'
+}
+
+const definition: ModuleDefinition<LyricsData, LyricsProps> = {
   type: 'lyrics',
   meta: {
     titleKey: 'modules.lyrics',
-    icon: 'music',
+    icon: 'lyrics',
     category: 'text',
     keywords: ['lyrics', '歌词', 'lrc', '字幕'],
   },
@@ -33,6 +38,20 @@ const definition: ModuleDefinition<LyricsData> = {
       return typeof (value as LyricsData).text === 'string'
     },
   },
+  defaultProps: { align: 'center' },
+  options: [
+    {
+      key: 'align',
+      labelKey: 'lyrics.align',
+      type: 'select',
+      default: 'center',
+      values: [
+        { value: 'left', labelKey: 'moduleOption.alignLeft' },
+        { value: 'center', labelKey: 'moduleOption.alignCenter' },
+        { value: 'right', labelKey: 'moduleOption.alignRight' },
+      ],
+    },
+  ],
   editor: defineAsyncComponent(() => import('./LyricsEditor.vue')),
   renderer: defineAsyncComponent(() => import('./LyricsRenderer.vue')),
   isEmpty: (data) => isBlankText(data?.text ?? ''),

@@ -39,6 +39,16 @@ export function validateSide(value: unknown, path: string): Result<Side, string>
     return err(`${path}.toolRef.toolId：缺失或非法`)
   }
 
+  // —— v2 可选字段 ——
+  if (value.iconAssetId !== undefined && !isNonEmptyString(value.iconAssetId)) {
+    return err(`${path}.iconAssetId：存在时必须是资源 id`)
+  }
+  for (const key of ['showIcon', 'showName', 'showVersion', 'showNote'] as const) {
+    if (value[key] !== undefined && typeof value[key] !== 'boolean') {
+      return err(`${path}.${key}：存在时必须是布尔值`)
+    }
+  }
+
   return ok(value as unknown as Side)
 }
 
@@ -76,6 +86,14 @@ export function validateRow(value: unknown, path: string): Result<Row, string> {
     return err(`${path}.kind：只能是 paired 或 full`)
   }
   if (!isPlainObject(value.cells)) return err(`${path}.cells：必须是对象`)
+
+  // v2：行高是可选的，但一旦存在就必须是"能当高度用"的数
+  // （0、负数、NaN 都会让画布塌掉或撑爆，必须在这里拦下）
+  if (value.height !== undefined) {
+    if (typeof value.height !== 'number' || !Number.isFinite(value.height) || value.height <= 0) {
+      return err(`${path}.height：存在时必须是正数`)
+    }
+  }
 
   for (const [sideId, cell] of Object.entries(value.cells)) {
     const result = validateCell(cell, `${path}.cells["${sideId}"]`)

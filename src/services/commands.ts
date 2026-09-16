@@ -77,6 +77,20 @@ export function applyCommandResult(project: Project, command: Command): Result<P
       return ok(withRows(project, rows))
     }
 
+    case 'row/setHeight': {
+      const rows = project.sheet.rows.map((row) => {
+        if (row.id !== command.rowId) return row
+        // 传 undefined 表示"恢复默认"：删掉字段而不是留一个 undefined，
+        // 否则导出的 JSON 里会带着一个空键，看着像坏数据
+        if (command.height === undefined) {
+          const { height: _removed, ...rest } = row
+          return rest as Row
+        }
+        return { ...row, height: command.height }
+      })
+      return ok(withRows(project, rows))
+    }
+
     case 'row/toggleCollapsed': {
       const rows = project.sheet.rows.map((row) =>
         row.id === command.rowId ? { ...row, collapsed: !row.collapsed } : row,

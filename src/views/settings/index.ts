@@ -2,6 +2,10 @@
  * 设置面板注册表（§9.3）
  *
  * 新增一个设置分组 = 在这里加一行；SettingsView 不做任何修改。
+ *
+ * 图标选型（M6 调整）：每个分组的图标要与它**装的内容**对得上。
+ * 之前外观/语言/行为分别复用 image / text / settings，
+ * 一列排下来几乎分不清哪个是哪个——这是用户反馈里明确提到的问题。
  */
 
 import type { Component } from 'vue'
@@ -31,18 +35,18 @@ export interface PanelDefinition {
 }
 
 export const SETTINGS_PANELS: readonly PanelDefinition[] = [
-  { id: 'appearance', icon: 'image', titleKey: 'settings.appearance', component: AppearancePanel },
-  { id: 'language', icon: 'text', titleKey: 'settings.language', component: LanguagePanel },
-  { id: 'behavior', icon: 'settings', titleKey: 'settings.behavior', component: BehaviorPanel },
+  { id: 'appearance', icon: 'palette', titleKey: 'settings.appearance', component: AppearancePanel },
+  { id: 'language', icon: 'languages', titleKey: 'settings.language', component: LanguagePanel },
+  { id: 'behavior', icon: 'behavior', titleKey: 'settings.behavior', component: BehaviorPanel },
   {
     id: 'compare',
-    icon: 'divider',
+    icon: 'compare',
     titleKey: 'settings.compareDefaults',
     component: CompareDefaultsPanel,
   },
-  { id: 'tools', icon: 'cube', titleKey: 'settings.tools', component: ToolsPanel },
-  { id: 'storage', icon: 'export', titleKey: 'settings.storage', component: StoragePanel },
-  { id: 'about', icon: 'comment', titleKey: 'settings.about', component: AboutPanel },
+  { id: 'tools', icon: 'tools', titleKey: 'settings.tools', component: ToolsPanel },
+  { id: 'storage', icon: 'storage', titleKey: 'settings.storage', component: StoragePanel },
+  { id: 'about', icon: 'info', titleKey: 'settings.about', component: AboutPanel },
 ]
 
 export const DEFAULT_PANEL_ID: PanelId = 'appearance'

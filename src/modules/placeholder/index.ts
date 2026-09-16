@@ -26,7 +26,7 @@ function readPlaceholder(data: unknown): PlaceholderData {
 
 const definition: ModuleDefinition<PlaceholderData> = {
   type: 'placeholder',
-  meta: { titleKey: 'modules.placeholder', icon: 'divider', category: 'layout' },
+  meta: { titleKey: 'modules.placeholder', icon: 'placeholder', category: 'layout' },
   schema: {
     create: (): PlaceholderData => ({ height: 48, hint: '' }),
     isData: (value): value is PlaceholderData => typeof value === 'object' && value !== null,

@@ -4,8 +4,15 @@
  * 纪律：本目录只放类型与常量，禁止出现任何副作用代码。
  */
 
-/** 数据结构版本号。任何破坏性变更必须 +1 并在 db/schema.ts 补迁移。 */
-export const SCHEMA_VERSION = 1
+/**
+ * 数据结构版本号。任何破坏性变更必须 +1 并在 db/schema.ts 补迁移。
+ *
+ * v2（M6）：新增行高（`Row.height`）与工具卡片显示开关（`Side.show*` / `Side.iconAssetId`）。
+ *   这些字段都是可选的，v1 代码读到也不会崩——但 v1 代码**保存时会丢掉它们**
+ *   （命令层按已知字段重建对象）。所以这里必须升版本，
+ *   让 v1 应用在导入 v2 文件时明确拒绝，而不是静默吃掉用户的布局设置。
+ */
+export const SCHEMA_VERSION = 2
 
 // ——————————————————————————————————————————————————————————
 // 工具（生产源）
@@ -109,6 +116,23 @@ export interface Side {
   modelVersion?: string
   /** 一句话备注 */
   note?: string
+  /**
+   * 本侧专用的图标，覆盖工具自带的图标。
+   *
+   * 为什么不直接改工具库里的图标：同一个工具可能被两个对比页用出不同含义，
+   * 而且内置工具是共享的、不该被单页修改。放在 Side 上，
+   * 生命周期跟着对比页走，导出/分享时也自然带上。
+   */
+  iconAssetId?: string
+  /**
+   * 工具卡片上各元素的显示开关。
+   * 统一约定：**省略或 true = 显示**，只有显式 false 才隐藏。
+   * 这样旧数据（没有这些字段）天然是全显示的，无需迁移。
+   */
+  showIcon?: boolean
+  showName?: boolean
+  showVersion?: boolean
+  showNote?: boolean
 }
 
 export interface ModuleInstance {
@@ -139,6 +163,13 @@ export interface Row {
   label?: string
   cells: Record<SideId, Cell>
   collapsed: boolean
+  /**
+   * 行内容区的最小高度（px）。由用户拖动行间分界线设定。
+   *
+   * 语义是**最小高度**而不是固定高度：内容比它高时行仍然会长高，
+   * 否则用户会看到被裁掉的内容，那比不能调高度更糟。
+   */
+  height?: number
 }
 
 export interface LayoutConfig {
@@ -185,7 +216,27 @@ export interface Project {
 // 应用设置
 // ——————————————————————————————————————————————————————————
 
-export type ThemeId = 'violet-dark'
+/**
+ * 主题 id。
+ *
+ * `system` 不是一个"配色"，而是一个**解析规则**：按 `prefers-color-scheme`
+ * 落到 `dark` 或 `light`。这样做的理由是用户对"跟随系统"的期待是
+ * "白天白、晚上黑"，而不是"选了一个叫系统的颜色"。
+ * 实际写入 `<html data-theme>` 的永远是解析后的具体主题。
+ */
+export type ThemeId = 'system' | 'dark' | 'light' | 'violet-dark'
+
+/** 会真正应用到 <html data-theme> 的主题（system 会被解析成其中之一） */
+export type ResolvedThemeId = Exclude<ThemeId, 'system'>
+
+/**
+ * 全部合法主题 id。
+ *
+ * 刻意的运行时白名单：它出现在这里（而不是只在类型里）是为了让
+ * "从 IndexedDB 读回来的脏数据"能被校验——类型在运行时不存在，
+ * 而设置是用户可以直接改数据库的。
+ */
+export const THEME_IDS: readonly ThemeId[] = ['system', 'dark', 'light', 'violet-dark']
 export type LanguageCode = 'zh-CN' | 'en-US'
 
 export interface AccentPreset {
@@ -216,7 +267,8 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  themeId: 'violet-dark',
+  // 默认跟随系统：新用户第一次打开时，界面亮度就已经符合他的系统偏好
+  themeId: 'system',
   language: 'zh-CN',
   restoreLastPosition: true,
   defaultAccent: ['#a78bfa', '#22d3ee'],

@@ -12,6 +12,7 @@ export default {
   common: {
     confirm: '确定',
     cancel: '取消',
+    done: '完成',
     save: '保存',
     delete: '删除',
     remove: '移除',
@@ -49,6 +50,7 @@ export default {
     compare: '对比',
     settings: '设置',
     toggleSidebar: '折叠 / 展开项目列表',
+    resizeSidebar: '拖拽调整项目列表宽度（双击恢复默认）',
     switchToPresent: '进入展示视图',
     switchToEdit: '返回编辑视图',
     export: '导出',
@@ -78,6 +80,7 @@ export default {
     addFirstModule: '从下方添加第一个模块',
     nothingToPresent: '还没有可展示的内容',
     nothingToPresentHint: '请先在编辑视图填写内容',
+    resizeColumns: '拖拽调整左右宽度（双击恢复等宽）',
     tabClose: '关闭标签',
     unsaved: '未保存',
     saved: '已保存',
@@ -96,6 +99,19 @@ export default {
     changeTool: '更换工具',
     versionPlaceholder: '版本',
     notePlaceholder: '备注',
+    editSide: '编辑「{name}」',
+    editSideShort: '编辑工具卡片',
+    textFields: '名称与版本',
+    name: '名称',
+    version: '版本',
+    note: '备注',
+    icon: '图标',
+    iconHint: '默认使用工具自带的图标；也可以上传一张，只作用于本侧。',
+    visibleParts: '显示内容',
+    showIcon: '显示图标',
+    showName: '显示名称',
+    showVersion: '显示版本',
+    showNote: '显示备注',
   },
 
   editor: {
@@ -169,6 +185,13 @@ export default {
     vendor: '厂商',
     homepage: '主页',
     restoreBuiltins: '全部恢复启用',
+    disclaimerTitle: '关于工具名称与图标',
+    disclaimerTrademark:
+      '工具库中的名称与图标归各自所有者所有，此处仅用于标识与说明目的，不代表任何形式的官方关联或背书。',
+    disclaimerIcons:
+      '本应用默认不内置第三方品牌图标，图标是按品牌色与名称首字自动生成的；你也可以为任意工具上传自己的图标。',
+    disclaimerLocalLogos:
+      '若你希望使用真实品牌图标，可在本机运行 npm run logos 自行拉取：文件写入 public/brand-local/，该目录不会提交到仓库，因此不影响其他使用者。',
     deleteConfirm: '删除这个自定义工具？已使用它的对比页会显示为「未知工具」。',
     searchPlaceholder: '搜索工具…',
     noCustom: '还没有自定义工具',
@@ -191,8 +214,11 @@ export default {
     title: '设置',
     appearance: '外观',
     theme: '主题',
-    themeVioletDark: '紫夜（暗色）',
-    themeMore: '更多主题将在后续版本加入',
+    themeHint: '「跟随系统」会随系统的深浅色偏好自动切换',
+    themeSystem: '跟随系统',
+    themeDark: '暗',
+    themeLight: '亮',
+    themeVioletDark: '紫夜',
     reducedMotion: '动效强度',
     reducedMotionAuto: '跟随系统',
     reducedMotionAlways: '始终关闭',
@@ -508,6 +534,10 @@ export default {
     importedTimed: '已导入，识别到 {n} 行时间轴',
     importedPlain: '已导入 {n} 行纯文本（无时间轴）',
     emptyFile: '文件内容为空',
+    dropHint: '松手即可导入',
+    dropNotText: '「{name}」不是文本文件，歌词只接受 .txt / .lrc',
+    align: '对齐方式',
+    alignHint: '对齐方式在「模块编辑」弹窗的「模块选项」里设置。',
   },
 
   link: {
@@ -563,6 +593,7 @@ export default {
     expand: '展开该行',
     labelPlaceholder: '行标题（可选）',
     empty: '这一行还没有内容',
+    resizeHeight: '拖拽调整行高（双击恢复默认）',
   },
 
   module: {
@@ -578,6 +609,14 @@ export default {
     hiddenBadge: '已隐藏',
     options: '模块选项',
     noOptions: '该模块没有可调选项',
+    edit: '编辑模块',
+    editTitle: '编辑「{title}」',
+    untitled: '未命名模块',
+    clickToFill: '点击填写',
+    titleLabel: '模块标题',
+    titleHint: '清空标题即不在成稿中显示它',
+    autosaveNote: '改动会立即保存',
+    unknownType: '未知模块类型「{type}」，可能来自更新版本',
   },
 
   inspector: {
