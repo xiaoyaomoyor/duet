@@ -147,6 +147,20 @@ export interface Side {
   showVersion?: boolean
   showNote?: boolean
   /**
+   * 匿名处理（v0.3.5）：把工具名 / 版本号 / LOGO 遮住，用于分享未公开的对比。
+   *
+   * 与上面四个"显示开关"的区别：那几个是**不显示**（内容消失），
+   * 这几个是**打码**（内容还在，只是被黑框/马赛克盖住）。
+   * 观感上刻意不同，因为语义不同：一个是"我没放这个信息"，
+   * 另一个是"这里有信息，但我暂时不给你看"。
+   *
+   * 持久化在工程里：这样导出的长图、只读 HTML 里同样是打码的。
+   * 交付演示时点一下黑框可以临时显现（那次点击不写数据）。
+   */
+  anonymizeName?: boolean
+  anonymizeVersion?: boolean
+  anonymizeIcon?: boolean
+  /**
    * 名称 / 版本的字号倍率（1 = 默认）。
    *
    * 为什么用倍率而不是像素：工具名长度差异极大（"MJ" 与
@@ -332,6 +346,30 @@ export interface AppSettings {
   /** 外链媒体默认处理策略 */
   mediaImportMode: 'ask' | 'mirror' | 'link'
   maxMirrorSizeMB: number
+  /**
+   * 停用的工具（v0.3.5 起统一为一个列表）。
+   *
+   * 内置工具记 `builtinKey`（如 `deepseek`），自定义工具记工具 id。
+   * 此前只有一个 `disabledBuiltinTools`，自定义工具根本没有"停用"这个概念；
+   * 用户要求两者在界面上完全同等对待，数据层也就没有必要分两份。
+   */
+  disabledTools: string[]
+  /**
+   * 被用户删除的内置工具（按 builtinKey 记）。
+   *
+   * 内置工具来自代码里的种子表，删不掉，只能"屏蔽"。
+   * 这跟"停用"是两件事：停用是"暂时别出现在选择器里"（可一键恢复），
+   * 删除是"我不要这个工具了"（要去工具库里找回来才重新出现）。
+   */
+  removedBuiltinTools: string[]
+  /**
+   * 内置工具的本地改写（按 builtinKey 记）。
+   *
+   * 为什么需要它：内置工具不落库（随版本更新），所以"改一个内置工具"
+   * 不能像自定义工具那样直接写一行，只能记下"相对于种子的差异"，
+   * 渲染时叠加。只存改过的字段，没改的继续跟着版本走。
+   */
+  builtinToolOverrides: Record<string, BuiltinToolOverride>
   sidebarWidth: number
   /**
    * 对比配置面板宽度（px）。
@@ -344,10 +382,7 @@ export interface AppSettings {
   editorShowEmptyModules: boolean
   exportScale: 1 | 2
   reducedMotion: 'auto' | 'always' | 'never'
-  /** 已停用的内置工具 id */
-  disabledBuiltinTools: string[]
 }
-
 export const DEFAULT_SETTINGS: AppSettings = {
   // 默认跟随系统：新用户第一次打开时，界面亮度就已经符合他的系统偏好
   themeId: 'system',
@@ -369,12 +404,32 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorShowEmptyModules: true,
   exportScale: 2,
   reducedMotion: 'auto',
-  disabledBuiltinTools: [],
+  disabledTools: [],
+  removedBuiltinTools: [],
+  builtinToolOverrides: {},
 }
 
 // ——————————————————————————————————————————————————————————
 // 便捷类型
 // ——————————————————————————————————————————————————————————
+
+/**
+ * 内置工具的本地改写（只存"改过的字段"）。
+ *
+ * 全部可选：没改的字段继续跟着内置种子表走，
+ * 因此应用升级时内置工具的厂商、分类、主页这些仍会更新，
+ * 只有用户明确改过的那几项被固定下来。
+ */
+export interface BuiltinToolOverride {
+  name?: string
+  vendor?: string
+  category?: ToolCategory
+  color?: string
+  homepage?: string
+  aliases?: string[]
+  /** 覆盖图标；显式 null 表示"清掉图标"，与"没改过"区分开 */
+  iconAssetId?: string | null
+}
 
 /** 模块在文档树中的定位坐标 */
 export interface ModuleRef {

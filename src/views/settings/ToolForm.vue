@@ -23,7 +23,18 @@ const props = defineProps<{
   tool?: DisplayTool | null
 }>()
 
-const emit = defineEmits<{ close: []; saved: [name: string] }>()
+const emit = defineEmits<{
+  close: []
+  saved: [name: string]
+  /**
+   * 请求删除。
+   *
+   * 删除本身不在这个窗口里做（要弹二次确认，而确认框属于外层），
+   * 因此只把意图抛出去——这样"内置工具也能删"这件事与自定义工具
+   * 走的是**同一条**确认流程，不会出现两套。
+   */
+  requestDelete: [tool: DisplayTool]
+}>()
 
 const { t } = useI18n()
 const tools = useToolsStore()
@@ -38,7 +49,18 @@ const iconAssetId = ref<string | undefined>(undefined)
 const uploading = ref(false)
 const error = ref<string | null>(null)
 
-const isEdit = computed(() => Boolean(props.tool?.id && tools.customTools.some((item) => item.id === props.tool?.id)))
+/** 编辑模式：传入的工具有效即可（内置与自定义都算） */
+const isEdit = computed(() => Boolean(props.tool?.id))
+
+/**
+ * 是否在改一个**内置**工具。
+ *
+ * 内置工具不落库，所以"保存"写的是设置里的一份**本地改写**
+ * （见 AppSettings.builtinToolOverrides）——只有改过的字段被固定下来，
+ * 其余继续跟着应用版本更新。这一点必须在界面上说清楚，
+ * 否则用户会以为内置工具被永久改写了。
+ */
+const isBuiltin = computed(() => props.tool?.builtin === true)
 
 watch(
   () => props.open,
@@ -94,6 +116,24 @@ async function save(): Promise<void> {
   }
 
   const target = props.tool
+
+  if (isBuiltin.value && target?.builtinKey) {
+    // 内置工具：只写"相对于内置种子表的差异"
+    await tools.overrideBuiltin(target.builtinKey, {
+      name: trimmed,
+      category: category.value,
+      color: color.value,
+      aliases: payload.aliases,
+      vendor: payload.vendor,
+      homepage: payload.homepage,
+      // null = 明确清掉图标；undefined 的语义是"没改过"，不能混用
+      iconAssetId: iconAssetId.value ?? null,
+    })
+    emit('saved', trimmed)
+    emit('close')
+    return
+  }
+
   const okResult =
     isEdit.value && target
       ? await tools.update(target.id, {
@@ -111,6 +151,14 @@ async function save(): Promise<void> {
   }
 
   emit('saved', trimmed)
+  emit('close')
+}
+
+/** 把当前编辑的内置工具恢复成出厂状态 */
+async function resetBuiltin(): Promise<void> {
+  const target = props.tool
+  if (!target?.builtinKey) return
+  await tools.resetBuiltinOverride(target.builtinKey)
   emit('close')
 }
 
@@ -205,7 +253,37 @@ const previewName = computed(() => name.value.trim() || t('tools.newTool'))
 
         <p v-if="error" class="form__error">{{ error }}</p>
 
+        <!--
+          内置工具的说明与"恢复出厂"。
+          内置工具不落库，这里改的是设置里的一份差异，因此必须讲清楚，
+          否则用户会以为改动写进了工具本身、下次更新就没了（或者反之）。
+        -->
+        <div v-if="isBuiltin" class="form__builtin">
+          <p class="form__note">
+            <AppIcon name="info" :size="12" />
+            {{ t('tools.builtinOverrideNote') }}
+          </p>
+          <button
+            v-if="props.tool?.overridden"
+            class="form__link"
+            type="button"
+            @click="resetBuiltin"
+          >
+            {{ t('tools.resetBuiltin') }}
+          </button>
+        </div>
+
         <footer class="form__foot">
+          <!-- 删除入口放在编辑窗口里（用户要求），内置与自定义走同一条确认流程 -->
+          <button
+            v-if="isEdit && props.tool"
+            class="form__link form__link--danger"
+            type="button"
+            @click="emit('requestDelete', props.tool)"
+          >
+            {{ isBuiltin ? t('tools.removeBuiltin') : t('common.delete') }}
+          </button>
+          <span class="form__spacer" />
           <button class="btn" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
           <button class="btn btn--primary" type="button" @click="save">{{ t('common.save') }}</button>
         </footer>
@@ -356,8 +434,49 @@ const previewName = computed(() => name.value.trim() || t('tools.newTool'))
 .form__foot {
   display: flex;
   gap: var(--sp-2);
+  align-items: center;
   justify-content: flex-end;
   margin-top: var(--sp-5);
+}
+
+/* 把"取消 / 保存"推到右边，删除留在左边——破坏性操作不该挨着主按钮 */
+.form__spacer {
+  flex: 1;
+}
+
+.form__link {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
+.form__link:hover {
+  color: var(--text-primary);
+}
+
+.form__link--danger {
+  color: var(--danger);
+}
+
+.form__builtin {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-3);
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.form__note {
+  display: flex;
+  flex: 1;
+  gap: var(--sp-2);
+  align-items: center;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-muted);
 }
 
 .btn {

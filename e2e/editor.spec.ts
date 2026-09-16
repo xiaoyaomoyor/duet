@@ -209,13 +209,20 @@ test.describe('M2 模块系统', () => {
       .then((dialog) => dialog.locator('input[type="file"]').first().setInputFiles(WAV_FILE))
     await closeDialog(page)
 
-    // 时长由导入时探测得到，展示在**渲染器**（.module-view）里，因此要限定作用域
-    await expect(cell.locator('.module-view').getByText(/\d{2}:\d{2}/)).toBeVisible({
+    /*
+     * 时长由导入时探测得到，展示在**渲染器**（.module-view）里，因此要限定作用域。
+     * M9 起音频模块自带了播放条（也有一个 mm:ss 时间），所以这里必须
+     * 进一步限定到**模块标题行之外的那一条**——直接按文本找会命中两个元素、
+     * 触发 strict mode。
+     */
+    await expect(cell.locator('.module-view').getByText(/\d{2}:\d{2}/).first()).toBeVisible({
       timeout: 10_000,
     })
 
-    // 渲染器出现可播放的音频元素（编辑器预览里也有一个 audio，需限定为第一个）
-    await expect(cell.locator('audio').first()).toBeVisible()
+    // 渲染器里出现了真正的音频元素（编辑器预览里也有一个 audio，需限定为第一个）；
+    // M9 起它被 display:none 隐藏（原生控件由自研播放条取代），所以判据是"挂上了"而非"看得见"
+    await expect(cell.locator('audio').first()).toBeAttached()
+    await expect(cell.locator('.player')).toBeVisible()
   })
 
   test('导入 .lrc 歌词：识别时间轴并开启同步开关', async ({ page }) => {

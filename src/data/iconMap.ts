@@ -52,6 +52,10 @@ import {
   Music,
   Palette,
   PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Pause,
   Pencil,
   Play,
@@ -125,6 +129,16 @@ export const ICONS: Record<string, LucideIcon> = {
   // 之前两者用了同一个图标，用户反映"属性和设置长得一个样"。
   options: SlidersHorizontal,
   sidebar: PanelLeft,
+  /*
+   * 侧栏开 / 合各一个图标（M9 用户实测："图标在展开与折叠的状态应该不同，做出区分"）。
+   * 同一个 ☰ 在两种状态下长得一模一样，用户没有任何线索知道当前是开还是合、
+   * 点下去会往哪个方向变。左侧栏用 PanelLeft*、右侧的对比配置用 PanelRight*，
+   * 方向与它们所在的边一致。
+   */
+  sidebarCollapse: PanelLeftClose,
+  sidebarExpand: PanelLeftOpen,
+  configCollapse: PanelRightClose,
+  configExpand: PanelRightOpen,
   present: Presentation,
   lock: Lock,
   // 全屏切换：进/出用两个图标，避免"同一个图标表示相反动作"

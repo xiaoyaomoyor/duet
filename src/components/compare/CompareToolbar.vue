@@ -79,7 +79,11 @@ function togglePresent(): void {
         :aria-pressed="ui.inspectorOpen"
         @click="ui.toggleInspector()"
       >
-        <AppIcon name="options" :size="15" />
+        <!--
+          开 / 合各一个图标：与侧栏折叠同一套做法（用户实测反馈"图标应该能区分状态"）。
+          方向朝右，因为对比配置在右边。
+        -->
+        <AppIcon :name="ui.inspectorOpen ? 'configCollapse' : 'configExpand'" :size="15" />
       </button>
 
       <button

@@ -52,6 +52,25 @@ const toggles = computed(() => [
   { key: 'showNote' as const, labelKey: 'compare.showNote', value: props.side.showNote !== false },
 ])
 
+/** 匿名开关：省略 = 不匿名（与上面那组相反，因为"默认遮住"没有道理） */
+const anonymizeToggles = computed(() => [
+  {
+    key: 'anonymizeName' as const,
+    labelKey: 'compare.anonymizeName',
+    value: props.side.anonymizeName === true,
+  },
+  {
+    key: 'anonymizeVersion' as const,
+    labelKey: 'compare.anonymizeVersion',
+    value: props.side.anonymizeVersion === true,
+  },
+  {
+    key: 'anonymizeIcon' as const,
+    labelKey: 'compare.anonymizeIcon',
+    value: props.side.anonymizeIcon === true,
+  },
+])
+
 function onSelectTool(toolRef: ToolRef): void {
   // 换工具时清掉名称覆盖：否则会留下上一个工具的名字，很困惑
   emit('patch', { toolRef, labelOverride: undefined })
@@ -251,6 +270,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <section class="section">
             <h3 class="section__title">{{ t('compare.visibleParts') }}</h3>
             <label v-for="item in toggles" :key="item.key" class="toggle">
+              <input
+                type="checkbox"
+                :checked="item.value"
+                @change="onToggle(item.key, ($event.target as HTMLInputElement).checked)"
+              />
+              <span>{{ t(item.labelKey) }}</span>
+            </label>
+          </section>
+
+          <!--
+            匿名处理（v0.3.5）。
+            与上面那组"显示内容"刻意分开成两节：语义不同——
+            那边是"不显示"（信息消失），这边是"打码"（信息还在，只是被盖住）。
+            混在一起用户会以为勾了就是不显示。
+          -->
+          <section class="section">
+            <h3 class="section__title">{{ t('compare.anonymize') }}</h3>
+            <p class="section__hint">{{ t('compare.anonymizeHint') }}</p>
+            <label v-for="item in anonymizeToggles" :key="item.key" class="toggle">
               <input
                 type="checkbox"
                 :checked="item.value"

@@ -19,12 +19,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import AppIcon from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
-import { useUiStore } from '@/stores/useUiStore'
 import { APP } from '@/app.config'
 
 const { t } = useI18n()
 const route = useRoute()
-const ui = useUiStore()
 
 /**
  * 当前页面。
@@ -40,17 +38,11 @@ const activePage = computed<'compare' | 'settings'>(() =>
 <template>
   <header class="topbar">
     <div class="topbar__group">
-      <button
-        class="topbar__icon-btn"
-        type="button"
-        :title="t('nav.toggleSidebar')"
-        :aria-label="t('nav.toggleSidebar')"
-        :aria-pressed="ui.sidebarCollapsed"
-        @click="ui.toggleSidebar()"
-      >
-        <AppIcon name="sidebar" :size="18" />
-      </button>
-
+      <!--
+        侧栏的折叠开关**不在这里**（M9 按实测反馈挪到了侧栏自己的标题栏里，
+        紧挨着「项目列表」的 ＋）。此前顶栏一个 ☰、折叠后的窄条里又一个，
+        同一件事有两个入口，而且那个 ☰ 折叠之后还赖着不走。
+      -->
       <!--
         品牌：中文名与英文名**紧挨着**排。
         M6 之前英文名被包在一个描边胶囊里，看上去像一个可点击的标签/按钮，

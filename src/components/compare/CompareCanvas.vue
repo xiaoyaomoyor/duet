@@ -414,6 +414,7 @@ function onDuplicateModule(ref: ModuleRef): void {
             :dimmed-side-ids="dimmedSideIds"
             @insert="insertRowAt"
             @add-common="openCommonPicker"
+            @toggle-collapse="store.toggleRowCollapsed"
             @remove="removeRow"
             @relabel="onRelabel"
             @resize-height="store.setRowHeight"

@@ -51,6 +51,8 @@ export default {
     settings: '设置',
     pages: '页面',
     toggleSidebar: '折叠 / 展开项目列表',
+    collapseSidebar: '折叠项目列表',
+    expandSidebar: '展开项目列表',
     resizeSidebar: '拖拽调整项目列表宽度（双击恢复默认）',
     switchToPresent: '进入展示视图',
     switchToEdit: '返回编辑视图',
@@ -112,6 +114,17 @@ export default {
     showName: '显示名称',
     showVersion: '显示版本',
     showNote: '显示备注',
+    anonymize: '匿名处理',
+    anonymizeHint: '遮住之后导出与只读页同样是打码的；演示时点一下黑框可以临时显现。',
+    anonymizeName: '遮住工具名称',
+    anonymizeVersion: '遮住版本号',
+    anonymizeIcon: '遮住 LOGO（换成马赛克）',
+    revealName: '临时显示名称',
+    hideName: '重新遮住名称',
+    revealVersion: '临时显示版本号',
+    hideVersion: '重新遮住版本号',
+    revealIcon: '临时显示 LOGO',
+    hideIcon: '重新遮住 LOGO',
     nameSize: '名称字号',
     versionSize: '版本字号',
   },
@@ -184,7 +197,7 @@ export default {
     aliases: '别名',
     vendor: '厂商',
     homepage: '主页',
-    restoreBuiltins: '全部恢复启用',
+    restoreBuiltins: '恢复内置工具',
     disclaimerTitle: '关于工具名称与图标',
     disclaimerTrademark:
       '工具库中的名称与图标归各自所有者所有，此处仅用于标识与说明目的，不代表任何形式的官方关联或背书。',
@@ -192,7 +205,18 @@ export default {
       '本应用默认不内置第三方品牌图标，图标是按品牌色与名称首字自动生成的；你也可以为任意工具上传自己的图标。',
     disclaimerLocalLogos:
       '若你希望使用真实品牌图标，可在本机运行 npm run logos 自行拉取：文件写入 public/brand-local/，该目录不会提交到仓库，因此不影响其他使用者。',
+    logosMissing:
+      '检测到本地品牌图标目录为空——当前显示的都是按品牌色生成的几何图标。在本机运行一次 npm run logos 即可拉取真实图标。',
+    logosUnknown: '正在读取本地品牌图标清单…',
     deleteConfirm: '删除这个自定义工具？已使用它的对比页会显示为「未知工具」。',
+    removeBuiltin: '从工具库移除',
+    removeBuiltinConfirm:
+      '把这个内置工具从你的工具库里移除？已使用它的对比页仍然正常显示；之后可以在工具库右上角一键恢复。',
+    builtinOverrideNote:
+      '内置工具不写进数据库，这里保存的是你的本地改写（只固定你改过的字段，其余仍随版本更新）。',
+    resetBuiltin: '恢复出厂设置',
+    overridden: '已被本地改写',
+    chipHint: '点名字编辑、点对勾停用；内置与自定义工具的操作完全一致',
     searchPlaceholder: '搜索工具…',
     noCustom: '还没有自定义工具',
     countSummary: '内置 {builtin} 个 · 自定义 {custom} 个 · 停用 {disabled} 个',
@@ -305,6 +329,14 @@ export default {
     importDone: '已导入 {n} 个项目',
     importWarnings: '导入时有 {n} 条提示',
     missingAssets: '有 {n} 个媒体未能随文件带来',
+  },
+
+  audio: {
+    // 音频模块自带的播放条（M9）。刻意**不**复用 sync.play（"同步播放"）：
+    // 那一句描述的是「音频控制台」同时操纵两侧，而这里只管这一个模块。
+    play: '播放',
+    pause: '暂停',
+    seek: '播放位置',
   },
 
   sync: {
@@ -527,6 +559,7 @@ export default {
     showWaveform: '显示波形',
     reportClock: '上报播放进度（供歌词与进度条联动）',
     showCover: '显示封面（取自音频内嵌图片，没有则用音乐图标占位）',
+    showPlayer: '显示播放条（关闭后由「音频控制台」控制播放）',
     loop: '循环播放',
     muted: '默认静音',
     controls: '显示播放控件',
@@ -603,6 +636,7 @@ export default {
     moveRow: '拖拽调整行顺序',
     collapse: '折叠该行',
     expand: '展开该行',
+    toggleCollapse: '折叠 / 展开该行',
     labelPlaceholder: '行标题（可选）',
     empty: '这一行还没有内容',
     resizeHeight: '拖拽调整行高（双击恢复默认）',

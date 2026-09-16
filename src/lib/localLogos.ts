@@ -34,6 +34,14 @@ let pending: Promise<Record<string, LocalLogoEntry>> | null = null
  *
  * 失败（文件不存在、JSON 坏了、离线）一律当作"没有本地 LOGO"，
  * 不抛异常、不打扰用户——这只是锦上添花的能力。
+ *
+ * ⚠️ `cache: 'no-store'` 不是随手加的（M9 实测反馈"完全看不到 DeepSeek/Gemini 的图标"）：
+ *   用户在这个应用上已经用了很久，而 `public/brand-local/` 是后来才跑脚本生成的。
+ *   在那之前浏览器很可能已经把 manifest.json 的 **404 响应**按启发式规则缓存了下来，
+ *   于是即使文件已经存在，这里也永远拿到 404 → 全部退回程序化图标。
+ *   而自动化测试每次都是全新的浏览器上下文（没有缓存），所以**测试永远是绿的**——
+ *   这正是"我这边好好的、用户那边看不到"的典型来源。
+ *   显式要求不走缓存，这一整类问题就消失了。
  */
 export function loadLocalLogos(): Promise<Record<string, LocalLogoEntry>> {
   if (cache) return Promise.resolve(cache)
@@ -42,11 +50,19 @@ export function loadLocalLogos(): Promise<Record<string, LocalLogoEntry>> {
   pending = (async () => {
     try {
       // 相对路径：应用可能跑在子路径下（GitHub Pages / file:// / Tauri）
-      const response = await fetch(new URL('brand-local/manifest.json', document.baseURI).href)
-      if (!response.ok) return {}
+      const url = new URL('brand-local/manifest.json', document.baseURI).href
+      const response = await fetch(url, { cache: 'no-store' })
+      if (!response.ok) {
+        warnOnce(`本地品牌 LOGO 清单不可用（HTTP ${response.status}）`)
+        return {}
+      }
 
       const parsed = (await response.json()) as Partial<LocalLogoManifest>
-      return parsed.icons ?? {}
+      const icons = parsed.icons ?? {}
+      if (Object.keys(icons).length === 0) {
+        warnOnce('本地品牌 LOGO 清单是空的，将全部使用程序化图标')
+      }
+      return icons
     } catch {
       return {}
     } finally {
@@ -58,6 +74,27 @@ export function loadLocalLogos(): Promise<Record<string, LocalLogoEntry>> {
   })
 
   return pending
+}
+
+/**
+ * 本地 LOGO 是否可用（供设置页显示诊断信息）。
+ *
+ * 为什么值得暴露：这个能力依赖"用户自己跑过一次 npm run logos"，
+ * 而它失败时**界面上一片安静**——用户只会看到一堆字母方块，
+ * 完全无法判断是"这些品牌没有图标"还是"我的本地目录是空的"。
+ * 这两者的处理方式完全不同，所以必须在界面上能区分。
+ */
+export function localLogosStatus(): 'unknown' | 'empty' | 'ready' {
+  if (!cache) return 'unknown'
+  return Object.keys(cache).length > 0 ? 'ready' : 'empty'
+}
+
+/** 只告警一次：几十个图标每个都打一行会把控制台刷满 */
+let warned = false
+function warnOnce(message: string): void {
+  if (warned || !import.meta.env.DEV) return
+  warned = true
+  console.warn(`[duet/logos] ${message}。运行 \`npm run logos\` 可拉取真实品牌图标到 public/brand-local/。`)
 }
 
 /**
@@ -79,4 +116,5 @@ export function localLogoUrl(key: string | undefined): string | null {
 export function __resetLocalLogosForTests(): void {
   cache = null
   pending = null
+  warned = false
 }

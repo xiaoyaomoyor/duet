@@ -6,7 +6,7 @@
  * **接线是否正确**——控制栏该出现时出现、该降级时说明原因、
  * 动效开关是否真的关掉了动效。
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { fillModuleText, importMedia } from './helpers'
 
 /** 生成一段指定时长的静音 WAV（8kHz 单声道 16bit） */
@@ -62,6 +62,30 @@ async function addAudioConsole(page: Page): Promise<void> {
 }
 
 /**
+ * 等某一行的音频真正就绪（元数据到位）。
+ *
+ * 为什么不再用 `toBeVisible()`：M9 起音频元素是 `display:none` 的
+ * （原生控件被自研播放条取代），但它仍然是真正发声的那个元素。
+ * "可见"因此不再是"就绪"的正确判据——判据应该是 `readyState >= 1`，
+ * 那也正是同步引擎需要的条件（durationMs > 0）。
+ */
+async function waitAudioReady(row: Locator): Promise<void> {
+  const audio = row.locator('audio').first()
+  await expect(audio).toBeAttached({ timeout: 10_000 })
+  await audio.evaluate(
+    (el) =>
+      new Promise<void>((resolve) => {
+        const element = el as HTMLAudioElement
+        if (element.readyState >= 1) {
+          resolve()
+          return
+        }
+        element.addEventListener('loadedmetadata', () => resolve(), { once: true })
+      }),
+  )
+}
+
+/**
  * 音乐模板第二行是音频模块；给左右两格各导入一段音频。
  *
  * 走共享的 importMedia：它会等导入真正完成再关弹窗
@@ -77,7 +101,7 @@ async function importBothTracks(page: Page): Promise<void> {
   await importMedia(page, row.locator('.canvas__cell').nth(1).locator('.card').first(), WAV_B)
 
   // 等两侧都完成元数据探测（时长 > 0 才会出现控制栏）
-  await expect(row.locator('audio').first()).toBeVisible({ timeout: 10_000 })
+  await waitAudioReady(row)
   await page.waitForTimeout(1200)
 }
 
@@ -113,7 +137,7 @@ test.describe('M4 同步播放', () => {
 
     const row = page.locator('.canvas__row').nth(1)
     await importMedia(page, row.locator('.canvas__cell').nth(0).locator('.card').first(), WAV_A)
-    await expect(row.locator('audio').first()).toBeVisible({ timeout: 10_000 })
+    await waitAudioReady(row)
     await page.waitForTimeout(800)
 
     await expect(page.locator('.syncbar')).toHaveCount(0)

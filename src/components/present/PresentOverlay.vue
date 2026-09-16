@@ -442,13 +442,22 @@ defineExpose({ zoom, hasContent })
   font-size: var(--fs-sm);
 }
 
+/*
+ * 快捷键提示（M9 按实测反馈挪到右下角）。
+ *
+ * 原先居中放在底部，正好压在成稿的下缘——而对比页往往是"上下两栏内容撑满"，
+ * 居中的那一行会盖住内容。挪到右下角之后它与版本号同一侧、都在视觉死角里。
+ *
+ * 显隐跟随工具栏：工具栏收起时它也该收起（全屏演示时两样都不该出现）。
+ */
 .present__hotkeys {
   position: fixed;
-  bottom: var(--sp-4);
-  left: 50%;
+  right: var(--sp-3);
+  /* 让开右下角那枚版本徽标（它在展示视图里同样可见），两者上下叠放 */
+  bottom: calc(var(--sp-2) + 16px);
   font-size: 10px;
   color: var(--text-disabled);
-  transform: translateX(-50%);
+  text-align: right;
   opacity: 0.7;
   transition: opacity var(--dur-slow) var(--ease-out);
 }

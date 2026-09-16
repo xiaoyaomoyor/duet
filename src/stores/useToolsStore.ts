@@ -7,7 +7,7 @@
 
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import type { Tool, ToolCategory, ToolRef } from '@/types/project'
+import type { BuiltinToolOverride, Tool, ToolCategory, ToolRef } from '@/types/project'
 import {
   builtinTools,
   createCustomTool,
@@ -33,17 +33,38 @@ export const useToolsStore = defineStore('tools', () => {
   const lastError = ref<string | null>(null)
   const query = ref('')
 
-  /** 内置工具（含停用状态） */
-  const builtins = computed(() => builtinTools(settings.settings.disabledBuiltinTools))
+  /** 内置工具（含停用 / 改写 / 删除状态） */
+  const builtins = computed(() =>
+    builtinTools(
+      settings.settings.disabledTools,
+      settings.settings.builtinToolOverrides,
+      settings.settings.removedBuiltinTools,
+    ),
+  )
 
-  /** 全部可用工具（不含停用的内置工具） */
+  /** 全部可用工具（不含停用的） */
   const available = computed<DisplayTool[]>(() => [
     ...builtins.value.filter((tool) => !tool.disabled).map(toDisplayTool),
-    ...customTools.value.map(toDisplayTool),
+    ...customTools.value.filter((tool) => !isDisabled(tool.id)).map(toDisplayTool),
   ])
 
   /** 设置页展示用：全部内置工具（含停用） */
   const allBuiltins = computed(() => builtins.value.map(toDisplayTool))
+
+  /** 设置页展示用：全部自定义工具（含停用） */
+  const allCustom = computed(() =>
+    customTools.value.map((tool) =>
+      toDisplayTool({ ...tool, disabled: isDisabled(tool.id) } as Tool & { disabled: boolean }),
+    ),
+  )
+
+  /**
+   * 设置页的统一列表：内置与自定义混在一起按分类展示。
+   *
+   * 用户的要求是"整合自定义工具与内置工具"——两者在**界面上**应当完全同等，
+   * 因此这里合成一个列表，而不是像以前那样分成上下两块、能力还不一样。
+   */
+  const allTools = computed<DisplayTool[]>(() => [...allBuiltins.value, ...allCustom.value])
 
   const searchResults = computed(() => searchTools(available.value, query.value))
 
@@ -57,9 +78,13 @@ export const useToolsStore = defineStore('tools', () => {
 
   const customCount = computed(() => customTools.value.length)
   const builtinCount = computed(() => builtins.value.length)
-  const disabledCount = computed(
-    () => settings.settings.disabledBuiltinTools.length,
-  )
+  /** 被删掉的内置工具数量（用于"恢复内置工具"按钮） */
+  const removedCount = computed(() => settings.settings.removedBuiltinTools.length)
+  const disabledCount = computed(() => settings.settings.disabledTools.length)
+
+  function isDisabled(id: string): boolean {
+    return settings.settings.disabledTools.includes(id)
+  }
 
   async function load(): Promise<void> {
     loading.value = true
@@ -119,19 +144,58 @@ export const useToolsStore = defineStore('tools', () => {
   }
 
   // ————————————————————————————————————————————————————————
-  // 内置工具偏好
+  // 工具偏好（内置与自定义同等对待）
   // ————————————————————————————————————————————————————————
 
-  /** 停用 / 启用某个内置工具（按 builtinKey 记录） */
-  async function setBuiltinDisabled(builtinKey: string, disabled: boolean): Promise<void> {
-    const current = new Set(settings.settings.disabledBuiltinTools)
-    if (disabled) current.add(builtinKey)
-    else current.delete(builtinKey)
-    await settings.patch({ disabledBuiltinTools: Array.from(current) })
+  /**
+   * 停用 / 启用任意工具。
+   *
+   * 内置传 builtinKey、自定义传工具 id——数据层就是同一个列表
+   * （见 AppSettings.disabledTools 的说明），因此这里只有一份实现。
+   */
+  async function setDisabled(key: string, disabled: boolean): Promise<void> {
+    if (!key) return
+    const current = new Set(settings.settings.disabledTools)
+    if (disabled) current.add(key)
+    else current.delete(key)
+    await settings.patch({ disabledTools: Array.from(current) })
   }
 
+  /** 删除内置工具（屏蔽掉，可在同一处恢复） */
+  async function removeBuiltin(builtinKey: string): Promise<void> {
+    const removed = new Set(settings.settings.removedBuiltinTools)
+    removed.add(builtinKey)
+    // 顺手从"停用"里摘掉：一个工具不该同时是"已删除"和"已停用"
+    const disabled = settings.settings.disabledTools.filter((key) => key !== builtinKey)
+    await settings.patch({ removedBuiltinTools: Array.from(removed), disabledTools: disabled })
+  }
+
+  /** 改写内置工具的若干字段（只记差异，未改的继续跟着内置种子表走） */
+  async function overrideBuiltin(
+    builtinKey: string,
+    patch: BuiltinToolOverride,
+  ): Promise<void> {
+    const next = { ...settings.settings.builtinToolOverrides }
+    next[builtinKey] = { ...(next[builtinKey] ?? {}), ...patch }
+    await settings.patch({ builtinToolOverrides: next })
+  }
+
+  /** 把某个内置工具恢复成出厂状态（清掉改写） */
+  async function resetBuiltinOverride(builtinKey: string): Promise<void> {
+    const next = { ...settings.settings.builtinToolOverrides }
+    delete next[builtinKey]
+    await settings.patch({ builtinToolOverrides: next })
+  }
+
+  /** 恢复全部内置工具（取消所有删除与改写） */
   async function restoreBuiltins(): Promise<void> {
-    await settings.patch({ disabledBuiltinTools: [] })
+    await settings.patch({
+      removedBuiltinTools: [],
+      builtinToolOverrides: {},
+      disabledTools: settings.settings.disabledTools.filter(
+        (key) => !settings.settings.removedBuiltinTools.includes(key),
+      ),
+    })
   }
 
   function setQuery(value: string): void {
@@ -149,19 +213,26 @@ export const useToolsStore = defineStore('tools', () => {
     query,
     builtins,
     allBuiltins,
+    allCustom,
+    allTools,
     available,
     searchResults,
     grouped,
     customCount,
     builtinCount,
+    removedCount,
     disabledCount,
+    isDisabled,
     load,
     resolve,
     byId,
     create,
     update,
     remove,
-    setBuiltinDisabled,
+    setDisabled,
+    removeBuiltin,
+    overrideBuiltin,
+    resetBuiltinOverride,
     restoreBuiltins,
     setQuery,
     categoryLabelKey,

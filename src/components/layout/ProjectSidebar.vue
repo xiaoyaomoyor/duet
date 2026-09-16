@@ -146,17 +146,23 @@ function rowCount(projectId: string): number {
       <button
         class="sidebar__icon-btn"
         type="button"
-        :title="t('nav.toggleSidebar')"
-        :aria-label="t('nav.toggleSidebar')"
+        :title="t('nav.expandSidebar')"
+        :aria-label="t('nav.expandSidebar')"
+        :aria-expanded="false"
         @click="ui.toggleSidebar()"
       >
-        <AppIcon name="sidebar" :size="18" />
+        <!-- 展开态用"向右推开"的图标：与折叠时那个方向相反，一眼能看出点下去会往哪边变 -->
+        <AppIcon name="sidebarExpand" :size="18" />
       </button>
     </div>
 
     <template v-else>
       <div class="sidebar__head">
         <span class="sidebar__title">{{ t('sidebar.projects') }}</span>
+        <!--
+          新建按钮与折叠开关并排（M9 按实测反馈把顶栏那个 ☰ 挪到了这里）。
+          这样"展开 / 折叠"只有这一个入口，折叠之后也不会同时出现两个同类图标。
+        -->
         <button
           class="sidebar__icon-btn"
           type="button"
@@ -165,6 +171,16 @@ function rowCount(projectId: string): number {
           @click="startNew"
         >
           <AppIcon name="plus" :size="16" />
+        </button>
+        <button
+          class="sidebar__icon-btn"
+          type="button"
+          :title="t('nav.collapseSidebar')"
+          :aria-label="t('nav.collapseSidebar')"
+          :aria-expanded="true"
+          @click="ui.toggleSidebar()"
+        >
+          <AppIcon name="sidebarCollapse" :size="16" />
         </button>
       </div>
 
@@ -316,12 +332,13 @@ function rowCount(projectId: string): number {
 
 .sidebar__head {
   display: flex;
+  gap: var(--sp-1);
   align-items: center;
-  justify-content: space-between;
   padding: var(--sp-3) var(--sp-3) var(--sp-2);
 }
 
 .sidebar__title {
+  flex: 1;
   font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text-muted);

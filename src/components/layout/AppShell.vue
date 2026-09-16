@@ -248,19 +248,27 @@ onBeforeUnmount(() => {
 
 /*
  * 版本徽标。
- * 用 --text-disabled 这一级最弱的文字：它永远在场，但不该抢任何东西的注意力。
- * z-index 低于 toast：提示冒出来时要压在它上面。
+ *
+ * 固定在右下角，因此**一定会**有内容从它底下滚过——实测截图里就能看到
+ * 模块卡片的"点击填写"与它叠在一起。所以这里给它一层抬升底色 +
+ * 一圈描边：它就成了"浮在内容之上的一枚小牌"，而不是两段文字糊在一起。
+ * （顶栏那个"DUET"去掉气泡是另一件事——那是品牌名的一半，
+ *   这个则是一个报 bug 时要念出来的标识，可读性优先。）
  */
 .shell__version {
   position: fixed;
   right: var(--sp-3);
   bottom: var(--sp-2);
   z-index: var(--z-sticky);
+  padding: 1px var(--sp-2);
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--text-disabled);
+  color: var(--text-muted);
   letter-spacing: 0.06em;
   pointer-events: none;
   user-select: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
 }
 </style>

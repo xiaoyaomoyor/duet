@@ -9,7 +9,7 @@
  *   3. 新增工具 = 在此追加一行，无需改动任何其他代码。
  */
 
-import type { Tool, ToolCategory } from '@/types'
+import type { BuiltinToolOverride, Tool, ToolCategory } from '@/types'
 
 export interface BuiltinToolSeed {
   /** 稳定键，用于版本升级时与用户数据对齐 */
@@ -114,29 +114,54 @@ export function toolCategoryLabelKey(category: ToolCategory): string {
  */
 export interface ResolvedTool extends Tool {
   disabled: boolean
+  /** 是否被用户改写过（设置页用来显示一个"已自定义"的提示） */
+  overridden?: boolean
 }
 
 /**
  * 把内置种子物化为运行时工具对象。
  *
  * id 使用稳定键（`builtin:<key>`），保证工程文件里的引用在应用版本升级后依然有效。
+ *
+ * v0.3.5 起支持三件用户偏好，全部**不改动种子表本身**：
+ *   - `overrides`：用户改过的字段（只覆盖改过的那几项，其余继续跟着版本走）
+ *   - `removed`  ：用户删掉的内置工具（从列表里消失，但 id 仍然可解析——
+ *                  否则引用了它的旧对比页会变成"未知工具"）
+ *   - `disabled` ：用户停用的（仍然出现在设置里，只是不出现在选择器中）
  */
-export function resolveBuiltinTools(disabledKeys: readonly string[] = []): ResolvedTool[] {
+export function resolveBuiltinTools(
+  disabledKeys: readonly string[] = [],
+  overrides: Record<string, BuiltinToolOverride> = {},
+  removedKeys: readonly string[] = [],
+): ResolvedTool[] {
   const disabled = new Set(disabledKeys)
-  return BUILTIN_TOOL_SEEDS.map((seed) => {
+  const removed = new Set(removedKeys)
+
+  return BUILTIN_TOOL_SEEDS.filter((seed) => !removed.has(seed.key)).map((seed) => {
+    const override = overrides[seed.key]
+
     const tool: ResolvedTool = {
       id: `builtin:${seed.key}`,
       kind: 'builtin',
-      name: seed.name,
-      vendor: seed.vendor,
-      category: seed.category,
-      color: seed.color,
-      aliases: seed.aliases,
+      name: override?.name ?? seed.name,
+      vendor: override?.vendor ?? seed.vendor,
+      category: override?.category ?? seed.category,
+      color: override?.color ?? seed.color,
+      aliases: override?.aliases ?? seed.aliases,
       builtinKey: seed.key,
       createdAt: 0,
       disabled: disabled.has(seed.key),
+      overridden: override !== undefined,
     }
-    if (seed.homepage !== undefined) tool.homepage = seed.homepage
+
+    const homepage = override?.homepage ?? seed.homepage
+    if (homepage !== undefined) tool.homepage = homepage
+
+    // iconAssetId 用 null 显式表示"清掉图标"，与"没改过"区分开
+    if (override && override.iconAssetId !== undefined) {
+      if (override.iconAssetId !== null) tool.iconAssetId = override.iconAssetId
+    }
+
     return tool
   })
 }

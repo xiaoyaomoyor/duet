@@ -48,6 +48,8 @@ const emit = defineEmits<{
   insert: [index: number]
   /** 在指定位置新建一个通用模块行（横跨两栏） */
   addCommon: [index: number]
+  /** 折叠 / 展开该行（只有编辑视图会发；展示视图是本地临时覆盖） */
+  toggleCollapse: [rowId: string]
   remove: [row: Row]
   /** 行标题变化（与模块无关，单独一个事件，避免复用 patchModule 造成语义混乱） */
   relabel: [rowId: string, label: string]
@@ -175,6 +177,37 @@ function isDimmed(sideId: SideId): boolean {
   return props.dimmedSideIds?.includes(sideId) === true
 }
 
+// ——————————————————————————————————————————————————————————
+// 折叠
+// ——————————————————————————————————————————————————————————
+
+/**
+ * 展示视图里的临时折叠覆盖。
+ *
+ * 编辑视图的折叠是**数据**（`row.collapsed`，走命令层、可撤销、会保存）；
+ * 展示视图的折叠是**演示动作**，不该反过来改掉这份对比，
+ * 所以只记在组件本地的集合里，离开展示视图自然失效。
+ */
+const localCollapsed = ref<Set<string>>(new Set())
+
+const isCollapsed = computed(() => {
+  if (isReadonly.value) {
+    return localCollapsed.value.has(props.row.id) ? !props.row.collapsed : props.row.collapsed
+  }
+  return props.row.collapsed
+})
+
+function toggleCollapse(): void {
+  if (isReadonly.value) {
+    const next = new Set(localCollapsed.value)
+    if (next.has(props.row.id)) next.delete(props.row.id)
+    else next.add(props.row.id)
+    localCollapsed.value = next
+    return
+  }
+  emit('toggleCollapse', props.row.id)
+}
+
 function cellStyle(side: Side): Record<string, string> {
   /*
    * 通用行不属于任何一侧，因此不套用某一边的主题色（否则会误导"这是左边的"）。
@@ -210,6 +243,22 @@ defineExpose({ rowHasContent })
   >
     <!-- 行头：编辑态可拖拽/命名/增删 -->
     <div v-if="!isReadonly" class="row__head">
+      <!--
+        折叠开关：在序号的**左边**（用户指定）。
+        放这里而不是右侧工具区，是因为"这一行整体收起来"作用于整行，
+        应该紧挨着行号这个"行的标识"，而不是混在增删按钮里。
+      -->
+      <button
+        class="row__tool row__collapse"
+        type="button"
+        :title="isCollapsed ? t('row.expand') : t('row.collapse')"
+        :aria-label="isCollapsed ? t('row.expand') : t('row.collapse')"
+        :aria-expanded="!isCollapsed"
+        @click="toggleCollapse"
+      >
+        <AppIcon :name="isCollapsed ? 'chevron-right' : 'chevron-down'" :size="13" />
+      </button>
+
       <!-- 行序号：在整行的左上角，与模块的子序号（2.1 / 2.2）形成层级 -->
       <span v-if="showNumbers" class="row__number">{{ rowNumber }}</span>
 
@@ -262,8 +311,24 @@ defineExpose({ rowHasContent })
       </div>
     </div>
 
-    <!-- 行标题：展示态是静态胶囊；序号在展示态同样保留（它是内容的一部分） -->
-    <div v-if="isReadonly && (row.label || showNumbers)" class="row__label-row">
+    <!-- 行标题行：展示态下承载折叠开关、序号与标题 -->
+    <div v-if="isReadonly" class="row__label-row">
+      <!--
+        展示视图里也能折叠 / 展开（用户要求）。
+        但这里**不写工程数据**：演示时随手收几行是"讲给别人看"的动作，
+        不该反过来改掉这份对比本身——所以只是本次会话内的临时覆盖。
+        编辑视图里的折叠才是持久的、可撤销的。
+      -->
+      <button
+        class="row__tool row__collapse no-export"
+        type="button"
+        :title="isCollapsed ? t('row.expand') : t('row.collapse')"
+        :aria-label="isCollapsed ? t('row.expand') : t('row.collapse')"
+        :aria-expanded="!isCollapsed"
+        @click="toggleCollapse"
+      >
+        <AppIcon :name="isCollapsed ? 'chevron-right' : 'chevron-down'" :size="13" />
+      </button>
       <span v-if="showNumbers" class="row__number">{{ rowNumber }}</span>
       <span v-if="row.label" class="row__label">{{ row.label }}</span>
     </div>
@@ -288,7 +353,13 @@ defineExpose({ rowHasContent })
       @keydown="onHeightResizeKeydown"
     />
 
+    <!--
+      折叠之后**只剩标题那一行**（用户要求）：
+      内容区整块 v-show 收起——用 v-show 而不是 v-if，
+      因为音频/视频元素一旦被销毁重挂，播放状态与同步登记都会丢。
+    -->
     <div
+      v-show="!isCollapsed"
       ref="cellsEl"
       class="row__cells canvas__cells"
       :class="{ 'row__cells--full': isFullRow }"
@@ -423,6 +494,36 @@ defineExpose({ rowHasContent })
   gap: var(--sp-2);
   align-items: center;
   margin-bottom: var(--sp-2);
+}
+
+/*
+ * 折叠开关。
+ * 展示态下它必须够"轻"：成稿里出现一个突兀的控件会很吵，
+ * 但用户又要求能在演示时随手收几行，所以保留可见、只压低调门。
+ */
+.row__collapse {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  border-radius: var(--radius-xs);
+}
+
+.row__collapse:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.row__label-row .row__collapse {
+  opacity: 0.55;
+}
+
+.row__label-row:hover .row__collapse,
+.row__label-row .row__collapse:focus-visible {
+  opacity: 1;
 }
 
 /*

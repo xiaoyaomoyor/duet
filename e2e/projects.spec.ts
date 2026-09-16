@@ -153,7 +153,9 @@ test.describe('M1 设置面板', () => {
       ['语言', '简体中文'],
       ['行为', '保持位置'],
       ['对比默认值', '默认对比配色'],
-      ['工具库', '内置工具'],
+      // M9 起内置与自定义工具合并成一个气泡列表，原来的「内置工具」小标题没有了，
+      // 因此改判列表上方的操作提示（它同时也是这一屏的用法说明）
+      ['工具库', /点名字编辑/],
       ['数据与存储', '存储用量'],
       ['关于', 'AGPL-3.0-or-later'],
     ]
@@ -190,16 +192,54 @@ test.describe('M1 设置面板', () => {
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible()
   })
 
-  test('工具库可停用内置工具，且统计随之更新', async ({ page }) => {
+  test('工具库可停用工具，且统计随之更新（内置与自定义同等对待）', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '工具库', exact: true }).click()
 
     await expect(page.getByText(/内置 \d+ 个 · 自定义 0 个 · 停用 0 个/)).toBeVisible()
 
-    // 停用第一个内置工具
+    // 停用第一个工具
     await page.locator('.chip__toggle').first().click()
     await expect(page.getByText(/停用 1 个/)).toBeVisible()
+  })
+
+  /**
+   * M9：内置工具也能像自定义工具一样编辑与删除（用户要求"整合"）。
+   *
+   * 这两件事在数据层是"本地改写"与"从工具库移除"（内置工具来自代码，
+   * 删不掉，只能屏蔽），因此必须验证它们**真的落到设置里**、
+   * 而且删除之后还能一键恢复。
+   */
+  test('内置工具可以编辑与移除，并且能恢复', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('link', { name: '设置' }).click()
+    await page.getByRole('button', { name: '工具库', exact: true }).click()
+
+    const chip = page.locator('.chip').first()
+    const name = (await chip.locator('.chip__name').textContent())?.trim() ?? ''
+    expect(name.length).toBeGreaterThan(0)
+
+    // —— 编辑：点名字打开同一个编辑窗口，改名后出现在气泡上 ——
+    await chip.locator('.chip__name').click()
+    const form = page.getByRole('dialog')
+    await expect(form).toBeVisible()
+    await form.locator('input[type="text"]').first().fill('测试改名工具')
+    await form.getByRole('button', { name: '保存' }).click()
+    await expect(page.locator('.chip__name', { hasText: '测试改名工具' })).toBeVisible()
+
+    // —— 删除：编辑窗口里的删除入口 → 二次确认 → 从列表消失 ——
+    await page.locator('.chip', { hasText: '测试改名工具' }).locator('.chip__name').click()
+    await page.getByRole('dialog').getByRole('button', { name: '从工具库移除' }).click()
+    const confirm = page.getByRole('alertdialog')
+    await expect(confirm).toBeVisible()
+    await confirm.getByRole('button', { name: '从工具库移除' }).click()
+
+    await expect(page.locator('.chip__name', { hasText: '测试改名工具' })).toHaveCount(0)
+
+    // —— 恢复：一键把内置工具全部还原 ——
+    await page.getByRole('button', { name: '恢复内置工具' }).click()
+    await expect(page.locator('.chip__name', { hasText: name }).first()).toBeVisible()
   })
 
   test('存储面板展示用量与统计', async ({ page }) => {

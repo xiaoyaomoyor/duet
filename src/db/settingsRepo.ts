@@ -51,6 +51,19 @@ export function mergeSettings(stored: Partial<AppSettings> | undefined): AppSett
 
   const merged = Object.assign(deepClone(DEFAULT_SETTINGS), stored)
 
+  /*
+   * v0.3.5 把 `disabledBuiltinTools` 改名为 `disabledTools`（自定义工具也能停用了）。
+   * 旧记录里的那一份必须接过来，否则用户此前停用过的内置工具会全部悄悄复活。
+   */
+  const legacy = stored as Partial<AppSettings> & { disabledBuiltinTools?: unknown }
+  if (Array.isArray(legacy.disabledBuiltinTools) && legacy.disabledBuiltinTools.length > 0) {
+    const union = new Set([
+      ...(Array.isArray(merged.disabledTools) ? merged.disabledTools : []),
+      ...legacy.disabledBuiltinTools.filter((item): item is string => typeof item === 'string'),
+    ])
+    merged.disabledTools = Array.from(union)
+  }
+
   // —— 关键字段的运行时守卫：脏数据不得让应用崩在启动阶段 ——
   if (!SUPPORTED_LANGUAGES.includes(merged.language)) merged.language = defaults.language
 
@@ -84,7 +97,15 @@ export function mergeSettings(stored: Partial<AppSettings> | undefined): AppSett
   merged.restoreLastPosition = merged.restoreLastPosition === true
   merged.editorShowEmptyModules = merged.editorShowEmptyModules !== false
 
-  if (!Array.isArray(merged.disabledBuiltinTools)) merged.disabledBuiltinTools = []
+  if (!Array.isArray(merged.disabledTools)) merged.disabledTools = []
+  if (!Array.isArray(merged.removedBuiltinTools)) merged.removedBuiltinTools = []
+  if (
+    typeof merged.builtinToolOverrides !== 'object' ||
+    merged.builtinToolOverrides === null ||
+    Array.isArray(merged.builtinToolOverrides)
+  ) {
+    merged.builtinToolOverrides = {}
+  }
 
   return merged
 }

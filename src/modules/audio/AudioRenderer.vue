@@ -36,6 +36,7 @@ const audioProps = computed<AudioProps>(() => ({
   showWaveform: props.module.props.showWaveform !== false,
   reportClock: props.module.props.reportClock !== false,
   showCover: props.module.props.showCover !== false,
+  showPlayer: props.module.props.showPlayer !== false,
 }))
 
 const source = computed(() => {
@@ -81,6 +82,14 @@ watch(
 const audioEl = ref<HTMLAudioElement | null>(null)
 const playing = ref(false)
 const durationMs = ref(0)
+/** 本地播放位置（自研播放条要用；与上报给时钟的是同一份数据） */
+const currentMs = ref(0)
+
+/** 已播放比例，驱动播放条的填充长度 */
+const playedRatio = computed(() => {
+  if (durationMs.value <= 0) return 0
+  return Math.min(1, Math.max(0, currentMs.value / durationMs.value))
+})
 
 /** 频谱数据（A6 动效）：由统一的 rAF 调度器驱动，而不是每个模块各起一个循环 */
 const spectrum = ref<number[]>(new Array<number>(SPECTRUM_BARS).fill(0))
@@ -116,13 +125,31 @@ function onLoadedMetadata(): void {
 }
 
 function onTimeUpdate(): void {
-  if (!audioProps.value.reportClock) return
   const el = audioEl.value
   if (!el) return
+  // 本地进度条无论如何都要更新（它属于这个模块自己的界面），
+  // 而上报给时钟是另一件事，受"上报播放进度"开关控制
+  currentMs.value = Math.round(el.currentTime * 1000)
+  if (!audioProps.value.reportClock) return
   reportAudioState(props.sideId, {
-    currentMs: Math.round(el.currentTime * 1000),
+    currentMs: currentMs.value,
     durationMs: durationMs.value,
   })
+}
+
+/** 自研播放条的播放 / 暂停（与原生控件等价，只是外观归我们管） */
+function togglePlay(): void {
+  const el = audioEl.value
+  if (!el) return
+  if (el.paused) void el.play().catch(() => void 0)
+  else el.pause()
+}
+
+/** 拖动进度：直接写 currentTime，随后由 timeupdate 自然回填 */
+function onSeek(event: Event): void {
+  const el = audioEl.value
+  if (!el) return
+  el.currentTime = Number((event.target as HTMLInputElement).value) / 1000
 }
 
 function onPlay(): void {
@@ -148,6 +175,7 @@ function onEnded(): void {
 // 换曲后重置时长与时钟，避免残留上一首的进度
 watch(source, () => {
   durationMs.value = 0
+  currentMs.value = 0
   playing.value = false
   if (audioProps.value.reportClock) {
     reportAudioState(props.sideId, { currentMs: 0, durationMs: 0, playing: false })
@@ -225,12 +253,51 @@ onBeforeUnmount(() => {
       />
     </div>
 
+    <!--
+      自研播放条（M9 取代浏览器原生 `<audio controls>`）。
+      换掉它的原因有两条，都来自实测反馈：
+        1. 原生那条的**已播放部分**是浏览器用固定色画的，改不了 → 现在用工具强调色
+        2. 关不掉 → 现在可以整条隐藏（音频控制台提供播放控制时，这一条是重复的）
+      从波形图上就能看出用的是哪一侧的主题色，播放条与它保持一致。
+    -->
+    <div v-if="audioProps.showPlayer" class="player">
+      <button
+        class="player__play"
+        type="button"
+        :title="playing ? t('audio.pause') : t('audio.play')"
+        :aria-label="playing ? t('audio.pause') : t('audio.play')"
+        :aria-pressed="playing"
+        @click="togglePlay"
+      >
+        <AppIcon :name="playing ? 'pause' : 'play'" :size="14" />
+      </button>
+
+      <input
+        class="player__seek"
+        type="range"
+        min="0"
+        :max="durationMs > 0 ? Math.round(durationMs) : 1000"
+        step="10"
+        :value="Math.round(currentMs)"
+        :style="{ '--played': `${playedRatio * 100}%` }"
+        :aria-label="t('audio.seek')"
+        :aria-valuetext="`${formatDuration(currentMs)} / ${formatDuration(durationMs)}`"
+        @input="onSeek"
+      />
+
+      <span class="player__time">{{ formatDuration(currentMs) }}</span>
+    </div>
+
+    <!--
+      真正发声的元素。原生控件已由上面的自研播放条取代，因此隐藏它——
+      用 display:none 不影响播放（音频元素不需要可见），
+      而保持它在 DOM 里是 Web Audio 接管（createMediaElementSource）的前提。
+    -->
     <audio
       v-if="media.src"
       ref="audioEl"
       class="audio__el"
       :src="media.src"
-      controls
       preload="metadata"
       @loadedmetadata="onLoadedMetadata"
       @timeupdate="onTimeUpdate"
@@ -253,15 +320,14 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
-  padding: var(--sp-3);
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  transition: box-shadow var(--dur-slow) var(--ease-out);
-}
-
-.audio--playing {
-  box-shadow: 0 0 0 1px var(--accent, var(--accent-500)), var(--glow-accent);
+  /*
+   * M9 按实测反馈去掉内层卡片：模块本来就住在「模块卡片」里，
+   * 再套一层底色 + 描边就成了"卡片里还有一张卡片"，
+   * 左右两栏并排时尤其显得脏。这里只保留排布，不画面板。
+   */
+  padding: 0;
+  background: none;
+  border: none;
 }
 
 .audio__head {
@@ -330,9 +396,95 @@ onBeforeUnmount(() => {
   height: 40%;
 }
 
+/*
+ * 自研播放条。
+ *
+ * 轨道用 `linear-gradient` 把"已播放"那一段直接画成工具强调色——
+ * 这是换掉原生控件的**唯一**原因：原生那条的颜色由浏览器决定，改不了。
+ * 未播放的部分保留一档中性底色，否则整条轨道的长度看不出来、没法定位。
+ */
+.player {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.player__play {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: var(--accent-fg);
+  background: var(--accent, var(--accent-500));
+  border-radius: var(--radius-full);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.player__play:hover {
+  transform: scale(1.06);
+}
+
+.player__seek {
+  flex: 1;
+  min-width: 0;
+  height: 16px;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+.player__seek::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent, var(--accent-500)) var(--played, 0%),
+    var(--bg-active) var(--played, 0%)
+  );
+  border-radius: var(--radius-full);
+}
+
+.player__seek::-moz-range-track {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent, var(--accent-500)) var(--played, 0%),
+    var(--bg-active) var(--played, 0%)
+  );
+  border-radius: var(--radius-full);
+}
+
+.player__seek::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  appearance: none;
+  background: var(--accent, var(--accent-500));
+  border: none;
+  border-radius: var(--radius-full);
+}
+
+.player__seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent, var(--accent-500));
+  border: none;
+  border-radius: var(--radius-full);
+}
+
+.player__time {
+  flex: none;
+  min-width: 40px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* 隐藏的原生元素：不出现在版面上，但仍然是真正的播放器 */
 .audio__el {
-  width: 100%;
-  height: 36px;
+  display: none;
 }
 
 .audio__state {

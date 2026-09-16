@@ -396,6 +396,17 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   /**
+   * 折叠 / 展开一行。
+   *
+   * 刻意**不带 coalesceKey**：折叠是一次离散的开关动作，
+   * 连点两下应该是两步撤销（撤回"展开"、再撤回"折叠"），
+   * 合并成一步会让撤销看起来"没反应"。
+   */
+  function toggleRowCollapsed(rowId: string): void {
+    dispatch({ t: 'row/toggleCollapsed', rowId }, { label: '折叠 / 展开行' })
+  }
+
+  /**
    * 调整行高（用户拖动行间分界线）。
    *
    * 用 coalesceKey 合并同一次拖拽产生的连续命令：
@@ -642,6 +653,7 @@ export const useProjectStore = defineStore('project', () => {
     // helpers
     setSideField,
     setRowLabel,
+    toggleRowCollapsed,
     setRowHeight,
     patchLayout,
     addModule,

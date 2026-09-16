@@ -108,12 +108,22 @@ const hasDuration = computed(() => durationMs.value > 0)
   color: var(--text-disabled);
 }
 
+/*
+ * 轨道（M9 按实测反馈去掉圆角底色）。
+ *
+ * 用户的原话是"进度条的那个圆角背景也是如此"（指和音频模块的内层卡片一样去掉）。
+ * 去掉之后未播放的部分就是画布本身，整条进度看起来是"从左边长出来的一段颜色"，
+ * 更干净；代价是"总长度"不再有一条灰底作参照——不过左侧的时间
+ * （`00:12 / 03:40`）已经把这件事说清楚了。
+ *
+ * 已播放部分用 `--accent`，也就是**该工具自己的强调色**（由所在格下发），
+ * 左右两栏因此天然是一紫一青，不必额外配置。
+ */
 .progress__track {
   position: relative;
   height: 6px;
   overflow: hidden;
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border-subtle);
+  background: transparent;
   border-radius: var(--radius-full);
 }
 

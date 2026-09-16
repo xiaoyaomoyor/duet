@@ -151,8 +151,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </header>
 
         <div class="editor-dialog__body">
-          <!-- ① 基本：标题（单行，独占一行因为它需要宽度） -->
-          <section class="sec">
+          <!-- ① 基本：标题（双列布局里落在右列上） -->
+          <section class="sec sec--basics">
             <button
               class="sec__head"
               type="button"
@@ -185,8 +185,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             </div>
           </section>
 
-          <!-- ② 内容：模块自己的编辑器，来自注册表，整宽不参与并排 -->
-          <section class="sec">
+          <!-- ② 内容：模块自己的编辑器，占左列并跨两行（它是最需要宽度的那一块） -->
+          <section class="sec sec--content">
             <button
               class="sec__head"
               type="button"
@@ -216,7 +216,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </section>
 
           <!-- ③ 呈现选项：由模块定义的 options 驱动，自适应多列 -->
-          <section v-if="hasOptions" class="sec">
+          <section v-if="hasOptions" class="sec sec--options">
             <button
               class="sec__head"
               type="button"
@@ -331,7 +331,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .editor-dialog {
   display: flex;
   flex-direction: column;
-  width: min(620px, 100%);
+  /* 双列布局需要更宽：920px 下左列约 480px、右列约 380px */
+  width: min(920px, 100%);
   max-height: min(760px, 100%);
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
@@ -377,12 +378,52 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 /* 内容区独立滚动：模块编辑器可能很长（图集、参数表、代码对比） */
 .editor-dialog__body {
-  display: flex;
+  display: grid;
   flex: 1;
-  flex-direction: column;
-  gap: var(--sp-4);
+  /*
+   * 双列布局（M9 按实测反馈"内部使用双列布局，使整体更加紧凑"）。
+   *
+   * 分工不是平均分：左列给**模块自己的编辑器**（图集、参数表、代码对比
+   * 都需要横向空间，所以给 1.25fr 并跨两行）；右列放**标题与选项**
+   * 这类单行小控件，1fr 足够，堆在一起也不再各占一整屏。
+   *
+   * 窄屏（<880px）自动退回单列，见下面的媒体查询——那时两列都会挤成
+   * 一条窄缝，反而比单列更难用。
+   */
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--sp-4) var(--sp-5);
+  align-items: start;
   padding: var(--sp-4) var(--sp-5);
   overflow-y: auto;
+}
+
+.sec--content {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+}
+
+.sec--basics {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.sec--options {
+  grid-row: 2;
+  grid-column: 2;
+}
+
+@media (max-width: 880px) {
+  .editor-dialog__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 单列时按 DOM 顺序（标题 → 内容 → 选项）排列，并清掉显式定位 */
+  .sec--content,
+  .sec--basics,
+  .sec--options {
+    grid-row: auto;
+    grid-column: auto;
+  }
 }
 
 /* —— 可分块折叠的区段 —— */

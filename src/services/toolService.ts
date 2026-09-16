@@ -13,7 +13,7 @@ import { err, ok, type Result } from '@/lib/result'
 import { resolveBuiltinTools, type ResolvedTool } from '@/data/builtinTools'
 import { pickToolColor } from '@/lib/icons'
 import { normalizeForSearch } from '@/lib/text'
-import type { Tool, ToolCategory, ToolRef } from '@/types/project'
+import type { BuiltinToolOverride, Tool, ToolCategory, ToolRef } from '@/types/project'
 
 export { listTools, getTool }
 
@@ -37,6 +37,8 @@ export interface DisplayTool {
   builtinKey?: string
   builtin: boolean
   disabled: boolean
+  /** 内置工具是否被用户改写（设置页显示一个"已自定义"的角标） */
+  overridden?: boolean
   /** 临时工具（未入库，仅存在于当前对比页） */
   inline: boolean
 }
@@ -99,6 +101,7 @@ export function toDisplayTool(tool: Tool | ResolvedTool): DisplayTool {
     aliases: [...tool.aliases],
     builtin: tool.kind === 'builtin',
     disabled: 'disabled' in tool ? tool.disabled === true : false,
+    overridden: 'overridden' in tool ? tool.overridden === true : false,
     inline: false,
   }
   if (tool.iconAssetId !== undefined) result.iconAssetId = tool.iconAssetId
@@ -107,9 +110,13 @@ export function toDisplayTool(tool: Tool | ResolvedTool): DisplayTool {
   return result
 }
 
-/** 内置工具列表（含停用状态） */
-export function builtinTools(disabledKeys: readonly string[]): ResolvedTool[] {
-  return resolveBuiltinTools(disabledKeys)
+/** 内置工具列表（含停用 / 改写 / 删除状态） */
+export function builtinTools(
+  disabledKeys: readonly string[],
+  overrides: Record<string, BuiltinToolOverride> = {},
+  removedKeys: readonly string[] = [],
+): ResolvedTool[] {
+  return resolveBuiltinTools(disabledKeys, overrides, removedKeys)
 }
 
 // ——————————————————————————————————————————————————————————

@@ -2,7 +2,7 @@
 /**
  * 工具库设置：内置工具（可停用）/ 自定义工具（增删改）
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import AppDialog from '@/components/common/AppDialog.vue'
@@ -12,7 +12,10 @@ import ToolForm from './ToolForm.vue'
 import { useToolsStore } from '@/stores/useToolsStore'
 import { useUiStore } from '@/stores/useUiStore'
 import { searchTools } from '@/services/toolService'
+import { TOOL_CATEGORIES } from '@/data/builtinTools'
+import { loadLocalLogos, localLogosStatus } from '@/lib/localLogos'
 import type { DisplayTool } from '@/services/toolService'
+import type { ToolCategory } from '@/types/project'
 
 const { t } = useI18n()
 const tools = useToolsStore()
@@ -23,44 +26,51 @@ const formOpen = ref(false)
 const editing = ref<DisplayTool | null>(null)
 const deleteTarget = ref<DisplayTool | null>(null)
 
-const customList = computed(() => searchTools(tools.customTools.map(toDisplay), query.value))
-const builtinList = computed(() =>
-  query.value.trim()
-    ? searchTools(tools.allBuiltins, query.value)
-    : tools.allBuiltins,
-)
+/** 本地品牌 LOGO 目录是就绪还是空的（清单读完才知道） */
+const logoStatus = ref<'unknown' | 'empty' | 'ready'>('unknown')
 
-const hasCustom = computed(() => tools.customCount > 0)
+onMounted(async () => {
+  await loadLocalLogos()
+  logoStatus.value = localLogosStatus()
+})
 
-function toDisplay(tool: (typeof tools.customTools)[number]): DisplayTool {
-  return {
-    id: tool.id,
-    name: tool.name,
-    vendor: tool.vendor ?? '',
-    category: tool.category,
-    color: tool.color ?? '#8c82aa',
-    aliases: [...tool.aliases],
-    builtin: false,
-    disabled: false,
-    inline: false,
-    ...(tool.iconAssetId ? { iconAssetId: tool.iconAssetId } : {}),
-    ...(tool.homepage ? { homepage: tool.homepage } : {}),
+/**
+ * 统一列表：内置与自定义混在一起，按分类分组。
+ *
+ * M9 之前是"上面一块自定义（行式，能改能删）、下面一块内置（气泡，只能停用）"，
+ * 同一个东西两套长相、两套能力。用户要求整合，现在两者在界面上完全同等：
+ * 都是气泡、都能勾选停用、点名字都能打开同一个编辑窗口、在窗口里都能删除。
+ */
+const groups = computed(() => {
+  const all = searchTools(tools.allTools, query.value)
+  const byCategory = new Map<ToolCategory, DisplayTool[]>()
+  for (const tool of all) {
+    const list = byCategory.get(tool.category) ?? []
+    list.push(tool)
+    byCategory.set(tool.category, list)
   }
-}
+  // 按 TOOL_CATEGORIES 的声明顺序输出，避免分类顺序随插入顺序漂移
+  return TOOL_CATEGORIES.filter((item) => byCategory.has(item.id)).map((item) => ({
+    category: item.id,
+    items: byCategory.get(item.id) ?? [],
+  }))
+})
 
 function openCreate(): void {
   editing.value = null
   formOpen.value = true
 }
 
+/** 点气泡里的名字 → 打开编辑窗口（内置与自定义走同一条路） */
 function openEdit(tool: DisplayTool): void {
   editing.value = tool
   formOpen.value = true
 }
 
-async function toggleBuiltin(key: string, disabled: boolean): Promise<void> {
-  if (!key) return
-  await tools.setBuiltinDisabled(key, disabled)
+/** 点对勾 → 停用 / 启用 */
+async function toggleTool(tool: DisplayTool): Promise<void> {
+  const key = tool.builtinKey ?? tool.id
+  await tools.setDisabled(key, !tool.disabled)
 }
 
 async function confirmDelete(): Promise<void> {
@@ -68,9 +78,30 @@ async function confirmDelete(): Promise<void> {
   deleteTarget.value = null
   if (!target) return
 
-  const okResult = await tools.remove(target.id)
+  const okResult = target.builtin
+    ? await removeBuiltinTool(target)
+    : await tools.remove(target.id)
+
   if (okResult) ui.notify(t('toast.toolDeleted', { name: target.name }), 'success')
   else ui.notify(tools.lastError ?? t('errors.unknown'), 'danger')
+}
+
+/** 内置工具没有"删除"这一说，只有"从我的工具库里移除"（可在同一处恢复） */
+async function removeBuiltinTool(tool: DisplayTool): Promise<boolean> {
+  if (!tool.builtinKey) return false
+  await tools.removeBuiltin(tool.builtinKey)
+  return true
+}
+
+/**
+ * 编辑窗口里的删除入口 → 关掉编辑窗、弹出二次确认。
+ *
+ * 必须先关编辑窗：两个模态叠在一起时，确认框会被编辑窗的遮罩盖住，
+ * 点不到（而且两个遮罩都会拦截点击）。
+ */
+function onRequestDelete(tool: DisplayTool): void {
+  formOpen.value = false
+  deleteTarget.value = tool
 }
 
 function onSaved(name: string): void {
@@ -103,91 +134,82 @@ function onSaved(name: string): void {
     </div>
   </SettingsField>
 
-  <!-- 自定义工具 -->
+  <!--
+    统一工具列表（M9）。
+    内置与自定义**完全同等**：都是气泡、都能勾选停用、点名字都能进编辑窗口、
+    在窗口里都能删除。此前两者是两套长相两套能力，用户要求整合。
+  -->
   <section class="group">
     <header class="group__head">
-      <span class="group__title">{{ t('tools.custom') }}</span>
-      <span class="group__hint">{{ t('tools.customHint') }}</span>
-      <button class="ghost-btn" type="button" @click="openCreate">
-        <AppIcon name="plus" :size="14" />
-        {{ t('tools.newTool') }}
-      </button>
-    </header>
-
-    <p v-if="!hasCustom" class="group__empty">{{ t('tools.noCustom') }}</p>
-
-    <ul v-else class="tool-list">
-      <li v-for="tool in customList" :key="tool.id" class="tool-row">
-        <ToolIcon
-          :name="tool.name"
-          :color="tool.color"
-          :icon-asset-id="tool.iconAssetId"
-          :logo-key="tool.builtinKey ?? tool.id"
-          :size="26"
-        />
-        <span class="tool-row__text">
-          <span class="tool-row__name">{{ tool.name }}</span>
-          <span class="tool-row__meta">
-            {{ tool.vendor || t('common.none') }} · {{ t(tools.categoryLabelKey(tool.category)) }}
-          </span>
-        </span>
-        <button class="icon-btn" type="button" :title="t('common.edit')" @click="openEdit(tool)">
-          <AppIcon name="settings" :size="14" />
-        </button>
-        <button
-          class="icon-btn icon-btn--danger"
-          type="button"
-          :title="t('common.delete')"
-          @click="deleteTarget = tool"
-        >
-          <AppIcon name="trash" :size="14" />
-        </button>
-      </li>
-    </ul>
-  </section>
-
-  <!-- 内置工具 -->
-  <section class="group">
-    <header class="group__head">
-      <span class="group__title">{{ t('tools.builtin') }}</span>
-      <span class="group__hint">{{ t('tools.builtinHint') }}</span>
+      <span class="group__title">{{ t('tools.library') }}</span>
+      <span class="group__hint">{{ t('tools.chipHint') }}</span>
       <button
-        v-if="tools.disabledCount > 0"
+        v-if="tools.removedCount > 0 || tools.disabledCount > 0"
         class="ghost-btn"
         type="button"
         @click="tools.restoreBuiltins()"
       >
         {{ t('tools.restoreBuiltins') }}
       </button>
+      <button class="ghost-btn" type="button" @click="openCreate">
+        <AppIcon name="plus" :size="14" />
+        {{ t('tools.newTool') }}
+      </button>
     </header>
 
-    <ul class="tool-grid">
-      <li v-for="tool in builtinList" :key="tool.id" class="chip" :class="{ 'chip--off': tool.disabled }">
-        <ToolIcon
-          :name="tool.name"
-          :color="tool.color"
-          :icon-asset-id="tool.iconAssetId"
-          :logo-key="tool.builtinKey ?? tool.id"
-          :size="20"
-        />
-        <span class="chip__name u-truncate">{{ tool.name }}</span>
-        <button
-          class="chip__toggle"
-          type="button"
-          :aria-pressed="!tool.disabled"
-          :title="tool.disabled ? t('common.enable') : t('common.disable')"
-          @click="toggleBuiltin(tool.builtinKey ?? '', !tool.disabled)"
+    <p v-if="groups.length === 0" class="group__empty">{{ t('tools.noResults') }}</p>
+
+    <div v-for="group in groups" :key="group.category" class="cat">
+      <p class="cat__title">{{ t(tools.categoryLabelKey(group.category)) }}</p>
+      <ul class="tool-grid">
+        <li
+          v-for="tool in group.items"
+          :key="tool.id"
+          class="chip"
+          :class="{ 'chip--off': tool.disabled, 'chip--custom': !tool.builtin }"
+          :data-tool="tool.name"
         >
-          <AppIcon :name="tool.disabled ? 'plus' : 'check'" :size="12" />
-        </button>
-      </li>
-    </ul>
+          <ToolIcon
+            :name="tool.name"
+            :color="tool.color"
+            :icon-asset-id="tool.iconAssetId"
+            :logo-key="tool.builtinKey ?? tool.id"
+            :size="20"
+          />
+          <!-- 点名字 = 打开编辑窗口（内置工具在窗口里写的是"本地改写"） -->
+          <button
+            class="chip__name"
+            type="button"
+            :title="t('tools.editTool')"
+            @click="openEdit(tool)"
+          >
+            {{ tool.name }}
+          </button>
+          <span v-if="tool.overridden" class="chip__badge" :title="t('tools.overridden')">✎</span>
+          <button
+            class="chip__toggle"
+            type="button"
+            :aria-pressed="!tool.disabled"
+            :title="tool.disabled ? t('common.enable') : t('common.disable')"
+            :aria-label="tool.disabled ? t('common.enable') : t('common.disable')"
+            @click="toggleTool(tool)"
+          >
+            <AppIcon :name="tool.disabled ? 'plus' : 'check'" :size="12" />
+          </button>
+        </li>
+      </ul>
+    </div>
   </section>
 
   <!--
     免责声明（用户要求：想用真实品牌 LOGO，但要明确规避版权风险）。
     放在工具库底部而不是藏在"关于"里——用户正是在这一屏看到工具图标，
     提示只有出现在这里才起作用。
+
+    M9 增加一行**状态**：本地 LOGO 目录是空的还是就绪的。
+    在此之前这个能力失败时界面上一片安静，用户只会看到一堆字母方块，
+    完全分不清"这些品牌本来就没有图标"和"我的本地目录是空的"——
+    而这两者的处理方式完全不同（后者跑一次 npm run logos 就好）。
   -->
   <section class="disclaimer">
     <h4 class="disclaimer__title">
@@ -197,6 +219,14 @@ function onSaved(name: string): void {
     <p class="disclaimer__text">{{ t('tools.disclaimerTrademark') }}</p>
     <p class="disclaimer__text">{{ t('tools.disclaimerIcons') }}</p>
     <p class="disclaimer__text disclaimer__text--local">{{ t('tools.disclaimerLocalLogos') }}</p>
+    <p
+      v-if="logoStatus !== 'ready'"
+      class="disclaimer__text disclaimer__status"
+      data-testid="logo-status"
+    >
+      <AppIcon name="info" :size="12" />
+      {{ logoStatus === 'empty' ? t('tools.logosMissing') : t('tools.logosUnknown') }}
+    </p>
   </section>
 
   <ToolForm
@@ -204,14 +234,15 @@ function onSaved(name: string): void {
     :tool="editing"
     @close="formOpen = false"
     @saved="onSaved"
+    @request-delete="onRequestDelete"
   />
 
   <AppDialog
     :open="deleteTarget !== null"
     tone="danger"
     :title="t('common.delete')"
-    :message="t('tools.deleteConfirm')"
-    :confirm-label="t('common.delete')"
+    :message="deleteTarget?.builtin ? t('tools.removeBuiltinConfirm') : t('tools.deleteConfirm')"
+    :confirm-label="deleteTarget?.builtin ? t('tools.removeBuiltin') : t('common.delete')"
     @confirm="confirmDelete"
     @cancel="deleteTarget = null"
   />
@@ -258,6 +289,19 @@ function onSaved(name: string): void {
 .disclaimer__text--local {
   margin-bottom: 0;
   color: var(--text-muted);
+}
+
+/*
+ * LOGO 状态提示：只在"不是就绪"时才出现。
+ * 用 --warning 而不是 --danger —— 这不是错误，只是缺一步可选操作。
+ */
+.disclaimer__status {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  margin-top: var(--sp-2);
+  margin-bottom: 0;
+  color: var(--warning);
 }
 
 .search {
@@ -375,13 +419,43 @@ function onSaved(name: string): void {
   border-radius: var(--radius-full);
 }
 
+/* 自定义工具用虚线描边区分来源——它与内置工具能力相同，只是出处不同 */
+.chip--custom {
+  border-style: dashed;
+}
+
 .chip--off {
   opacity: 0.5;
 }
 
 .chip__name {
-  max-width: 110px;
+  max-width: 120px;
+  overflow: hidden;
   font-size: var(--fs-xs);
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip__name:hover {
+  color: var(--accent-500);
+  text-decoration: underline;
+}
+
+/* "已自定义"角标：提醒这个内置工具被本地改写过，官方更新不会再覆盖它 */
+.chip__badge {
+  font-size: 10px;
+  color: var(--accent-500);
+}
+
+.cat + .cat {
+  margin-top: var(--sp-3);
+}
+
+.cat__title {
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 .chip__toggle {

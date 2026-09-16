@@ -99,8 +99,29 @@ describe('mergeSettings', () => {
     expect(mergeSettings({ exportScale: 1 }).exportScale).toBe(1)
   })
 
-  it('非法 disabledBuiltinTools 回退为空数组', () => {
-    expect(mergeSettings({ disabledBuiltinTools: 'x' as never }).disabledBuiltinTools).toEqual([])
+  it('非法 disabledTools 回退为空数组', () => {
+    expect(mergeSettings({ disabledTools: 'x' as never }).disabledTools).toEqual([])
+  })
+
+  /*
+   * v0.3.5 把 disabledBuiltinTools 改名为 disabledTools（自定义工具也能停用了）。
+   * 旧记录里的那一份必须被接过来，否则用户此前停用过的内置工具会**悄悄复活**——
+   * 用户不会收到任何提示，只会发现工具库里又冒出来一堆自己关掉过的条目。
+   */
+  it('兼容旧的 disabledBuiltinTools 字段（改名后不丢用户偏好）', () => {
+    const legacy = { disabledBuiltinTools: ['midjourney', 'suno'] } as never
+    expect(mergeSettings(legacy).disabledTools.sort()).toEqual(['midjourney', 'suno'])
+  })
+
+  it('新字段存在时与旧字段取并集，而不是互相覆盖', () => {
+    const both = { disabledBuiltinTools: ['suno'], disabledTools: ['deepseek'] } as never
+    expect(mergeSettings(both).disabledTools.sort()).toEqual(['deepseek', 'suno'])
+  })
+
+  it('removedBuiltinTools 与 builtinToolOverrides 的脏数据被兜住', () => {
+    expect(mergeSettings({ removedBuiltinTools: 'x' as never }).removedBuiltinTools).toEqual([])
+    expect(mergeSettings({ builtinToolOverrides: null as never }).builtinToolOverrides).toEqual({})
+    expect(mergeSettings({ builtinToolOverrides: [] as never }).builtinToolOverrides).toEqual({})
   })
 })
 

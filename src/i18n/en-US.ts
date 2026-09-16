@@ -51,6 +51,8 @@ export default {
     settings: 'Settings',
     pages: 'Pages',
     toggleSidebar: 'Toggle project list',
+    collapseSidebar: 'Collapse the project list',
+    expandSidebar: 'Expand the project list',
     resizeSidebar: 'Drag to resize the project list (double-click to reset)',
     switchToPresent: 'Enter present view',
     switchToEdit: 'Back to edit view',
@@ -113,6 +115,18 @@ export default {
     showName: 'Show name',
     showVersion: 'Show version',
     showNote: 'Show note',
+    anonymize: 'Anonymise',
+    anonymizeHint:
+      'Masked fields stay masked in exports and read-only pages. Click a black box to reveal it temporarily while presenting.',
+    anonymizeName: 'Mask the tool name',
+    anonymizeVersion: 'Mask the version',
+    anonymizeIcon: 'Mask the logo (replace with a mosaic)',
+    revealName: 'Reveal the name temporarily',
+    hideName: 'Mask the name again',
+    revealVersion: 'Reveal the version temporarily',
+    hideVersion: 'Mask the version again',
+    revealIcon: 'Reveal the logo temporarily',
+    hideIcon: 'Mask the logo again',
     nameSize: 'Name size',
     versionSize: 'Version size',
   },
@@ -185,7 +199,7 @@ export default {
     aliases: 'Aliases',
     vendor: 'Vendor',
     homepage: 'Homepage',
-    restoreBuiltins: 'Re-enable all',
+    restoreBuiltins: 'Restore built-in tools',
     disclaimerTitle: 'About tool names and icons',
     disclaimerTrademark:
       'Tool names and icons belong to their respective owners. They are used here for identification and description only, and imply no affiliation or endorsement.',
@@ -193,8 +207,19 @@ export default {
       'This app ships no third-party brand icons by default — icons are generated from each brand colour and initial. You can also upload your own icon for any tool.',
     disclaimerLocalLogos:
       'To use real brand icons, run npm run logos locally: files go to public/brand-local/, which is never committed, so other users are unaffected.',
+    logosMissing:
+      'The local brand-icon folder is empty — every icon you see is a generated geometric one. Run npm run logos once to fetch the real icons.',
+    logosUnknown: 'Reading the local brand-icon manifest…',
     deleteConfirm:
       'Delete this custom tool? Comparisons using it will show an “Unknown tool” placeholder.',
+    removeBuiltin: 'Remove from library',
+    removeBuiltinConfirm:
+      'Remove this built-in tool from your library? Comparisons that use it keep working; you can restore it from the top-right of this panel.',
+    builtinOverrideNote:
+      'Built-in tools are not stored in the database — this saves a local override (only the fields you changed are pinned; the rest still follow app updates).',
+    resetBuiltin: 'Reset to default',
+    overridden: 'Locally modified',
+    chipHint: 'Click the name to edit, the check to disable — built-in and custom tools behave the same',
     searchPlaceholder: 'Search tools…',
     noCustom: 'No custom tools yet',
     countSummary: '{builtin} built-in · {custom} custom · {disabled} disabled',
@@ -308,6 +333,12 @@ export default {
     importDone: 'Imported {n} projects',
     importWarnings: '{n} notes during import',
     missingAssets: '{n} media files were not included in the file',
+  },
+
+  audio: {
+    play: 'Play',
+    pause: 'Pause',
+    seek: 'Playback position',
   },
 
   sync: {
@@ -534,6 +565,7 @@ export default {
     showWaveform: 'Show waveform',
     reportClock: 'Report playback time (drives lyrics and progress)',
     showCover: 'Show cover art (from embedded artwork; falls back to a music icon)',
+    showPlayer: 'Show the player bar (turn off to drive playback from the audio console)',
     loop: 'Loop',
     muted: 'Muted by default',
     controls: 'Show controls',
@@ -610,6 +642,7 @@ export default {
     moveRow: 'Drag to reorder rows',
     collapse: 'Collapse row',
     expand: 'Expand row',
+    toggleCollapse: 'Collapse / expand this row',
     labelPlaceholder: 'Row title (optional)',
     resizeHeight: 'Drag to resize the row height (double-click to reset)',
     empty: 'This row is still empty',
