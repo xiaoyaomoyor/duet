@@ -98,7 +98,7 @@ test.describe('M2 模块系统', () => {
     await closeDialog(page)
 
     await expect(cell.locator('.module-view__title').first()).toHaveText('价格')
-    // 卡片正文用的就是展示视图的渲染器，因此内容立刻可见
+    // 卡片正文用的就是演示视图的渲染器，因此内容立刻可见
     await expect(cell.locator('.module-view')).toContainText('¥99 / 月')
 
     // 自动保存
@@ -139,7 +139,7 @@ test.describe('M2 模块系统', () => {
     await createFromTemplate(page, /空白对比/)
 
     const card = leftCell(page, 0).locator('.card').first()
-    await card.locator('[aria-label="在展示视图隐藏"]').click()
+    await card.locator('[aria-label="在演示视图隐藏"]').click()
 
     await expect(card).toHaveClass(/card--hidden/)
     await expect(card.locator('.card__flag')).toHaveText('已隐藏')
@@ -248,7 +248,7 @@ test.describe('M2 模块系统', () => {
     await expect(dialog.getByText('与音频同步（按时间轴高亮）')).toBeVisible()
     await closeDialog(page)
 
-    // 卡片正文（= 展示视图的呈现）里出现歌词行
+    // 卡片正文（= 演示视图的呈现）里出现歌词行
     await expect(cell.locator('.module-view')).toContainText('第一句')
   })
 

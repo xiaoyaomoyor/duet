@@ -31,4 +31,16 @@ export interface AudioProps {
    * 只是这个模块自己不再提供一排控件。
    */
   showPlayer: boolean
+  /**
+   * 布局（v0.4.5）。
+   *
+   *   bar    长条：封面在左，右侧自上而下是名称、波形、播放条（时间在播放条右侧）
+   *   square 正方形：封面铺满整个方块作背景，名称/波形/播放器叠在它上面
+   *
+   * 两种布局共用同一份内容，只是摆放方式不同——所以做成一个选项，
+   * 而不是两个模块。
+   */
+  layout: AudioLayout
 }
+
+export type AudioLayout = 'bar' | 'square'

@@ -55,21 +55,6 @@ const saveLabel = computed(() =>
       <button
         class="compare-toolbar__btn"
         type="button"
-        :title="t('inspector.title')"
-        :aria-label="t('inspector.title')"
-        :aria-pressed="ui.inspectorOpen"
-        @click="ui.toggleInspector()"
-      >
-        <!--
-          开 / 合各一个图标：与侧栏折叠同一套做法（用户实测反馈"图标应该能区分状态"）。
-          方向朝右，因为对比配置在右边。
-        -->
-        <AppIcon :name="ui.inspectorOpen ? 'configCollapse' : 'configExpand'" :size="15" />
-      </button>
-
-      <button
-        class="compare-toolbar__btn"
-        type="button"
         :disabled="importing"
         :title="t('nav.import')"
         :aria-label="t('nav.import')"
@@ -86,6 +71,23 @@ const saveLabel = computed(() =>
         @click="ui.openExport()"
       >
         <AppIcon name="export" :size="15" />
+      </button>
+
+      <!--
+        对比配置的开关放在**最右**（v0.4.5 按实测反馈调整）。
+        它开出来的面板也在最右边，开关贴着它的边缘、指向也朝右，
+        位置和方向就都对上了；此前它挤在导入/导出左边，看着像第三个文件操作。
+      -->
+      <button
+        class="compare-toolbar__btn"
+        type="button"
+        :title="t('inspector.title')"
+        :aria-label="t('inspector.title')"
+        :aria-pressed="ui.inspectorOpen"
+        @click="ui.toggleInspector()"
+      >
+        <!-- 开 / 合各一个图标：与侧栏折叠同一套做法（用户反馈"图标应该能区分状态"） -->
+        <AppIcon :name="ui.inspectorOpen ? 'configCollapse' : 'configExpand'" :size="15" />
       </button>
     </div>
 

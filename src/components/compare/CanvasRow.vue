@@ -4,7 +4,7 @@
  *
  * 抽出为独立组件的原因：
  *   1. CompareCanvas 在 M2 后已有 500 行，行内逻辑再堆下去会失控
- *   2. 展示视图与编辑视图共用同一套"格 → 模块"渲染规则，
+ *   2. 演示视图与编辑视图共用同一套"格 → 模块"渲染规则，
  *      只有交互（拖拽、增删、编辑器）不同，用 readonly 开关区分
  *   3. §7.5 的左右对齐由这里的同一网格行保证，改动集中在一处
  *
@@ -25,7 +25,7 @@ const props = defineProps<{
   row: Row
   rowIndex: number
   sides: readonly Side[]
-  /** 只读（展示视图）：不渲染编辑器、不允许拖拽与增删 */
+  /** 只读（演示视图）：不渲染编辑器、不允许拖拽与增删 */
   readonly?: boolean
   /** 所属项目 id（音频模块登记同步音轨时需要） */
   projectId?: string
@@ -48,13 +48,11 @@ const emit = defineEmits<{
   insert: [index: number]
   /** 在指定位置新建一个通用模块行（横跨两栏） */
   addCommon: [index: number]
-  /** 折叠 / 展开该行（只有编辑视图会发；展示视图是本地临时覆盖） */
+  /** 折叠 / 展开该行（只有编辑视图会发；演示视图是本地临时覆盖） */
   toggleCollapse: [rowId: string]
   remove: [row: Row]
   /** 行标题变化（与模块无关，单独一个事件，避免复用 patchModule 造成语义混乱） */
   relabel: [rowId: string, label: string]
-  /** 行高变化；undefined 表示恢复默认（双击手柄） */
-  resizeHeight: [rowId: string, height: number | undefined]
   openPicker: [row: Row, sideId: SideId]
   reorderModules: [ref: CellRef, next: ModuleInstance[]]
   patchModule: [ref: ModuleRef, patch: { title?: string; hidden?: boolean }]
@@ -68,58 +66,14 @@ const { t } = useI18n()
 
 const isReadonly = computed(() => props.readonly === true)
 
-// ——————————————————————————————————————————————————————————
-// 行高拖拽
-// ——————————————————————————————————————————————————————————
-
-/** 行内容区默认最小高度（与 tokens 的密度设置无关，取一个够看的基线） */
-const DEFAULT_ROW_HEIGHT = 96
-const MIN_ROW_HEIGHT = 60
-const MAX_ROW_HEIGHT = 2000
-
-const cellsEl = ref<HTMLElement | null>(null)
-const resizing = ref(false)
-let startY = 0
-let startHeight = 0
-
-function onHeightResizeStart(event: PointerEvent): void {
-  startY = event.clientY
-  // 以当前实际渲染高度为起点，而不是 row.height——
-  // 内容比 height 高时两者不同，用后者会让第一次拖动"跳"一下
-  startHeight = cellsEl.value?.offsetHeight ?? props.row.height ?? DEFAULT_ROW_HEIGHT
-  resizing.value = true
-  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
-  document.body.style.userSelect = 'none'
-  document.body.style.cursor = 'row-resize'
-}
-
-function onHeightResizeMove(event: PointerEvent): void {
-  if (!resizing.value) return
-  event.preventDefault()
-
-  const next = Math.round(
-    Math.min(MAX_ROW_HEIGHT, Math.max(MIN_ROW_HEIGHT, startHeight + (event.clientY - startY))),
-  )
-  emit('resizeHeight', props.row.id, next)
-}
-
-function onHeightResizeEnd(event: PointerEvent): void {
-  if (!resizing.value) return
-  resizing.value = false
-  ;(event.target as HTMLElement).releasePointerCapture?.(event.pointerId)
-  document.body.style.userSelect = ''
-  document.body.style.cursor = ''
-}
-
-/** 键盘可达：上下方向键微调 */
-function onHeightResizeKeydown(event: KeyboardEvent): void {
-  const step = event.shiftKey ? 40 : 12
-  const current = props.row.height ?? cellsEl.value?.offsetHeight ?? DEFAULT_ROW_HEIGHT
-  if (event.key === 'ArrowUp') emit('resizeHeight', props.row.id, Math.max(MIN_ROW_HEIGHT, current - step))
-  else if (event.key === 'ArrowDown') emit('resizeHeight', props.row.id, Math.min(MAX_ROW_HEIGHT, current + step))
-  else return
-  event.preventDefault()
-}
+/**
+ * 行高拖拽在 v0.4.5 整块移除（用户："取消模块（行）之间通过拖动分界线
+ * 调整边界的设定"）。`Row.height` 这个字段**保留**在数据模型里：
+ * 老工程可能存过值，删字段要连带迁移，而它现在只是被忽略——
+ * 渲染层不再读它，行高完全由内容撑开。
+ *
+ * ⚠️ 如果将来要恢复这个能力，别忘了 `cellsEl` 那个 ref 也要一起接回来。
+ */
 
 function modulesOf(sideId: SideId): ModuleInstance[] {
   return props.row.cells[sideId]?.modules ?? []
@@ -140,7 +94,7 @@ const isFullRow = computed(() => props.row.kind === 'full')
 const renderSides = computed(() => (isFullRow.value ? props.sides.slice(0, 1) : props.sides))
 
 /**
- * 展示视图下该格应渲染的模块（§7.4 三态规则的落点）。
+ * 演示视图下该格应渲染的模块（§7.4 三态规则的落点）。
  *
  *   空模块（isEmpty）→ 不渲染
  *   手动隐藏（hidden）→ 不渲染
@@ -182,11 +136,11 @@ function isDimmed(sideId: SideId): boolean {
 // ——————————————————————————————————————————————————————————
 
 /**
- * 展示视图里的临时折叠覆盖。
+ * 演示视图里的临时折叠覆盖。
  *
  * 编辑视图的折叠是**数据**（`row.collapsed`，走命令层、可撤销、会保存）；
- * 展示视图的折叠是**演示动作**，不该反过来改掉这份对比，
- * 所以只记在组件本地的集合里，离开展示视图自然失效。
+ * 演示视图的折叠是**演示动作**，不该反过来改掉这份对比，
+ * 所以只记在组件本地的集合里，离开演示视图自然失效。
  */
 const localCollapsed = ref<Set<string>>(new Set())
 
@@ -227,7 +181,7 @@ function cellStyle(side: Side): Record<string, string> {
   return { '--accent': side.accent, '--accent-soft': sideTint(side.accent) }
 }
 
-/** 展示视图下，该行是否整行跳过 */
+/** 演示视图下，该行是否整行跳过 */
 const rowHasContent = computed(() =>
   props.sides.some((side) => presentModules(side.id).length > 0),
 )
@@ -319,7 +273,7 @@ defineExpose({ rowHasContent })
     <!-- 行标题行：展示态下承载折叠开关、序号与标题 -->
     <div v-if="isReadonly" class="row__label-row">
       <!--
-        展示视图里也能折叠 / 展开（用户要求）。
+        演示视图里也能折叠 / 展开（用户要求）。
         但这里**不写工程数据**：演示时随手收几行是"讲给别人看"的动作，
         不该反过来改掉这份对比本身——所以只是本次会话内的临时覆盖。
         编辑视图里的折叠才是持久的、可撤销的。
@@ -339,24 +293,11 @@ defineExpose({ rowHasContent })
     </div>
 
     <!--
-      行高拖拽手柄：贴在行内容区的下边缘。
-      语义是**最小高度**而不是固定高度（见 Row.height 的说明），
-      内容更高时行仍然会长高，所以这里只写 min-height。
+      行高拖拽手柄已在 v0.4.5 移除（用户："取消模块（行）之间通过拖动分界线
+      调整边界的设定"）。行高现在完全由内容决定——那本来也更符合"对比内容
+      自己撑开行"的直觉，而手动钉一个高度只会让两边内容对不齐。
+      **工具之间的中轴分界线保留**，那调的是整页版式，不是某一行的边界。
     -->
-    <div
-      v-if="!isReadonly"
-      class="row__height-handle u-split u-split--h"
-      role="separator"
-      aria-orientation="horizontal"
-      :aria-label="t('row.resizeHeight')"
-      tabindex="0"
-      @pointerdown="onHeightResizeStart"
-      @pointermove="onHeightResizeMove"
-      @pointerup="onHeightResizeEnd"
-      @pointercancel="onHeightResizeEnd"
-      @dblclick="emit('resizeHeight', row.id, undefined)"
-      @keydown="onHeightResizeKeydown"
-    />
 
     <!--
       折叠之后**只剩标题那一行**（用户要求）：
@@ -365,10 +306,8 @@ defineExpose({ rowHasContent })
     -->
     <div
       v-show="!isCollapsed"
-      ref="cellsEl"
       class="row__cells canvas__cells"
       :class="{ 'row__cells--full': isFullRow }"
-      :style="row.height ? { minHeight: `${row.height}px` } : undefined"
     >
       <div
         v-for="side in renderSides"
@@ -383,11 +322,16 @@ defineExpose({ rowHasContent })
             A1 双侧同步入场：每个模块包一层，按行内序号做 60ms 交错。
             放在这里而不是各模块内部，是为了让"新增模块忘记加入场动效"
             这件事在结构上不可能发生。
+
+            这一层同时挂上 .u-module-card（与编辑视图的卡片**同一份声明**）：
+            用户实测反馈"演示视图应该和编辑视图预览状态一致，卡片都着色为
+            工具的强调色"。此前这里是个裸容器，成稿里没有卡片底色与强调条，
+            与编辑时看到的样子并不一致。
           -->
           <div
             v-for="(module, index) in presentModules(side.id)"
             :key="module.id"
-            class="row__module anim-enter-up"
+            class="row__module u-module-card anim-enter-up"
             :style="{ animationDelay: `${Math.min(index, 6) * 60}ms` }"
           >
             <!--
@@ -623,15 +567,6 @@ defineExpose({ rowHasContent })
 /* 通用模块行：只有一格，横跨两栏（宽度比在整行内容面前没有意义） */
 .row__cells--full {
   grid-template-columns: 1fr;
-}
-
-/*
- * 行高拖拽手柄：横跨整行、贴在下边缘。
- * 抓取高度与"看得见的那条线"由 .u-split--h 统一提供（抓取 10px、线 3px），
- * 与中轴、左栏、对比配置四条线用同一份实现。
- */
-.row__height-handle {
-  margin: 0 calc(var(--sp-2) * -1);
 }
 
 .row__cell {

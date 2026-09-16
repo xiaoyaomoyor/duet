@@ -118,7 +118,7 @@ function poll(): void {
    * 而它们的到达时间并不一致：
    *   · durationMs > 0 —— 媒体元素触发 loadedmetadata
    *   · element 已登记 —— AudioRenderer 注册（它刻意延后一个 tick）
-   * 进入展示视图时旧画布卸载会把 element 置空、durationMs 却还留着，
+   * 进入演示视图时旧画布卸载会把 element 置空、durationMs 却还留着，
    * 于是第一轮 poll 看到"两侧就绪"、却一个 element 都拿不到 → no-tracks；
    * 而就绪集合此后再没变过，attach 也就再没被调用，
    * 控制栏永久停在"两侧都需要有音频"的降级态（实测就是这个现象）。

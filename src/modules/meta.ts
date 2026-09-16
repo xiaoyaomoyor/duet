@@ -57,8 +57,8 @@ export interface ModuleMeta {
   keywords?: string[]
 }
 
-/** 已被作者实测、标为"可用"的模块类型（v0.4.0） */
-export const STABLE_MODULE_TYPES: readonly string[] = ['image', 'text', 'audio']
+/** 已被作者实测、标为"可用"的模块类型（v0.4.5 起含歌词） */
+export const STABLE_MODULE_TYPES: readonly string[] = ['image', 'text', 'audio', 'lyrics']
 
 /** 某个模块类型是否已实测 */
 export function moduleMaturity(type: string): ModuleMaturity {

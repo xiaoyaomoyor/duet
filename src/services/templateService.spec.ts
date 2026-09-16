@@ -81,7 +81,7 @@ describe('instantiateTemplate', () => {
     expect(row.cells[sideA.id]?.modules[0]?.id).not.toBe(row.cells[sideB.id]?.modules[0]?.id)
   })
 
-  it('所有模块初始为空内容（因此展示视图默认什么都不显示，§7.4）', () => {
+  it('所有模块初始为空内容（因此演示视图默认什么都不显示，§7.4）', () => {
     const project = instantiateTemplate(music!, { name: 'x' })
     for (const row of project.sheet.rows) {
       for (const cell of Object.values(row.cells)) {

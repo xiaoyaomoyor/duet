@@ -1,9 +1,9 @@
 /**
- * M3 验收：展示视图与导出
+ * M3 验收：演示视图与导出
  *
  * 覆盖三条承诺：
- *   1. 展示视图**绝对只读**（结构上不存在可输入元素）
- *   2. 空模块/隐藏模块在展示视图不出现，整行为空时整行跳过
+ *   1. 演示视图**绝对只读**（结构上不存在可输入元素）
+ *   2. 空模块/隐藏模块在演示视图不出现，整行为空时整行跳过
  *   3. 三种导出都能产出文件，且长图**不是空白**
  */
 import { expect, test, type Page } from '@playwright/test'
@@ -21,14 +21,14 @@ async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
-/** 进入展示视图（对比页工具条上的按钮） */
+/** 进入演示视图（对比页工具条上的按钮） */
 async function enterPresent(page: Page): Promise<void> {
-  await page.getByRole('button', { name: '进入展示视图' }).click()
+  await page.getByRole('button', { name: '进入演示视图' }).click()
   await expect(page.locator('.present')).toBeVisible()
 }
 
-test.describe('M3 展示视图', () => {
-  test('进入展示视图后只读，且没有可输入元素', async ({ page }) => {
+test.describe('M3 演示视图', () => {
+  test('进入演示视图后只读，且没有可输入元素', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
     await enterPresent(page)
@@ -36,7 +36,7 @@ test.describe('M3 展示视图', () => {
     // 存在展示态画布根节点
     await expect(page.locator('[data-present-root]')).toBeVisible()
 
-    // 核心断言：展示视图内不存在任何可输入/可编辑元素
+    // 核心断言：演示视图内不存在任何可输入/可编辑元素
     const editableCount = await page.evaluate(() => {
       const root = document.querySelector('[data-present-root]')
       if (!root) return -1
@@ -48,7 +48,7 @@ test.describe('M3 展示视图', () => {
     await expect(page.locator('.canvas__add-module')).toHaveCount(0)
   })
 
-  test('Esc 退出展示视图，回到编辑态', async ({ page }) => {
+  test('Esc 退出演示视图，回到编辑态', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
     await enterPresent(page)
@@ -74,14 +74,14 @@ test.describe('M3 展示视图', () => {
     await expect(zoomLabel).toHaveText('100%')
   })
 
-  test('空模块与隐藏模块在展示视图不出现', async ({ page }) => {
+  test('空模块与隐藏模块在演示视图不出现', async ({ page }) => {
     await page.goto('/')
     // 图片模板：封面/图片/参数表三行，全部是空模块
     await createFromTemplate(page, /图片对比/)
 
     await enterPresent(page)
 
-    // 全部为空 → 展示视图一行都不渲染
+    // 全部为空 → 演示视图一行都不渲染
     await expect(page.locator('.canvas__row')).toHaveCount(0)
     // 并给出空状态引导，而不是白屏（限定在展示遮罩层内：
     // 画布自身也有一份同样文案的空状态，不限定会撞上 strict mode）
@@ -102,7 +102,7 @@ test.describe('M3 展示视图', () => {
     await page.getByRole('dialog', { name: '选择模块类型' }).getByRole('button', { name: '文字' }).click()
     const secondCard = cell.locator('.card').nth(1)
     await fillModuleText(page, secondCard, '这段不该出现')
-    await secondCard.locator('[aria-label="在展示视图隐藏"]').click()
+    await secondCard.locator('[aria-label="在演示视图隐藏"]').click()
 
     await enterPresent(page)
 
@@ -212,7 +212,7 @@ test.describe('M3 导出', () => {
     expect(html).toContain('--bg-base')
   })
 
-  test('导出后视图态被还原（不会把用户留在展示视图）', async ({ page }) => {
+  test('导出后视图态被还原（不会把用户留在演示视图）', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 

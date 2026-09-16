@@ -4,7 +4,7 @@
  *
  * M7 大幅瘦身（用户实测反馈"顶栏挤了一排图标，分不清哪个是哪个"）：
  *   移除 —— 撤回/重做（改由 Ctrl+Z / Ctrl+Shift+Z，见 useGlobalShortcuts）
- *          保存状态、属性、进入展示视图、导入、导出
+ *          保存状态、属性、进入演示视图、导入、导出
  *   保留 —— 品牌，以及**对比 / 设置**这两个页面级入口（只有图标）
  *
  * 被移除的那一组的去处：对比页工具条（CompareToolbar）——
@@ -36,7 +36,7 @@ const activePage = computed<'compare' | 'settings'>(() =>
   route.meta.layout === 'settings' ? 'settings' : 'compare',
 )
 
-/** 是否处于展示视图（由当前项目的视图态决定） */
+/** 是否处于演示视图（由当前项目的视图态决定） */
 const isPresent = computed(() => project.current?.ui.mode === 'present')
 
 function togglePresent(): void {
@@ -92,7 +92,7 @@ function togglePresent(): void {
       <!--
         「演示」按钮（v0.4.0 从对比页工具条搬到这里，用户要求"和演示模式里的
         「编辑」按钮相呼应"）。两个按钮的位置对称：进入演示在应用顶栏最右，
-        退出演示在展示视图顶栏最右。
+        退出演示在演示视图顶栏最右。
         它**带文字**，与那三个纯图标入口刻意区分：这是一个动作，
         不是"我在哪一页"的状态。没有打开项目时禁用。
       -->

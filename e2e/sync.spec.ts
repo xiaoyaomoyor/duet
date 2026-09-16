@@ -187,11 +187,11 @@ test.describe('M4 同步播放', () => {
   /**
    * M8 聚光灯：「色彩弱化」。
    *
-   * 为什么必须在**展示视图里**按播放：进入展示视图会重新挂载整块画布
+   * 为什么必须在**演示视图里**按播放：进入演示视图会重新挂载整块画布
    * （编辑态那份不渲染），音频元素是新的、播放状态自然归零。
-   * 真实用法也正是这样——用户在展示视图里点某一侧的播放键试听。
+   * 真实用法也正是这样——用户在演示视图里点某一侧的播放键试听。
    */
-  test('聚光灯：只有一侧在播放时，另一侧在展示视图被弱化', async ({ page }) => {
+  test('聚光灯：只有一侧在播放时，另一侧在演示视图被弱化', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
     await importBothTracks(page)
@@ -200,7 +200,7 @@ test.describe('M4 同步播放', () => {
     await page.getByRole('button', { name: '对比配置', exact: true }).click()
     await page.getByRole('radio', { name: '色彩弱化' }).click()
 
-    await page.getByRole('button', { name: '进入展示视图' }).click()
+    await page.getByRole('button', { name: '进入演示视图' }).click()
     await expect(page.locator('.present')).toBeVisible()
 
     const root = page.locator('[data-present-root]')
@@ -246,17 +246,17 @@ test.describe('M4 同步播放', () => {
     await expect(page.getByRole('button', { name: /设为主轨/ }).first()).toBeVisible()
   })
 
-  test('控制栏在展示视图下也随画布一起工作', async ({ page }) => {
+  test('控制栏在演示视图下也随画布一起工作', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
     await importBothTracks(page)
 
     /*
      * M7 起控制栏是**画布里的一个通用模块行**（不再吸在画布上方），
-     * 因此它理所当然会出现在展示视图里——而且必须能出现在成稿里，
+     * 因此它理所当然会出现在演示视图里——而且必须能出现在成稿里，
      * 这也正是"完全手动"这个选择的意义所在。
      */
-    await page.getByRole('button', { name: '进入展示视图' }).click()
+    await page.getByRole('button', { name: '进入演示视图' }).click()
     await expect(page.locator('.present')).toBeVisible()
     await expect(page.locator('[data-present-root] .syncbar')).toBeVisible()
 
@@ -281,12 +281,12 @@ test.describe('M4 动效开关', () => {
     await page.locator('select').first().selectOption('never')
     await backToCompare(page)
 
-    await page.getByRole('button', { name: '进入展示视图' }).click()
+    await page.getByRole('button', { name: '进入演示视图' }).click()
     const module = page.locator('[data-present-root] .row__module').first()
     await expect(module).toHaveClass(/anim-enter-up/)
   })
 
-  test('关闭动效时进入展示视图仍然正常（只是没有位移）', async ({ page }) => {
+  test('关闭动效时进入演示视图仍然正常（只是没有位移）', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
@@ -298,7 +298,7 @@ test.describe('M4 动效开关', () => {
     await page.locator('select').first().selectOption('always')
     await backToCompare(page)
 
-    await page.getByRole('button', { name: '进入展示视图' }).click()
+    await page.getByRole('button', { name: '进入演示视图' }).click()
     const root = page.locator('[data-present-root]')
     // 内容仍然可见（动效关闭不等于内容隐藏）
     await expect(root).toContainText('关闭动效')

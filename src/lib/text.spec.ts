@@ -1,5 +1,57 @@
 import { describe, expect, it } from 'vitest'
-import { charCount, highlightSegments, initials, isBlank, normalizeForSearch, truncate } from './text'
+import {
+  charCount,
+  highlightSegments,
+  initials,
+  isBlank,
+  normalizeForSearch,
+  stripMediaExtension,
+  truncate,
+} from './text'
+
+describe('stripMediaExtension', () => {
+  it('去掉常见的媒体扩展名', () => {
+    expect(stripMediaExtension('Song.mp3')).toBe('Song')
+    expect(stripMediaExtension('take-01.WAV')).toBe('take-01')
+    expect(stripMediaExtension('demo.flac')).toBe('demo')
+    expect(stripMediaExtension('clip.m4a')).toBe('clip')
+    expect(stripMediaExtension('shot.png')).toBe('shot')
+  })
+
+  it('只去掉**最后一个**扩展名', () => {
+    expect(stripMediaExtension('a.b.flac')).toBe('a.b')
+  })
+
+  /*
+   * 这条是防"砍过头"的：曲名里带小数的很常见（`Song 2.5`），
+   * 2.5 不是扩展名，砍掉就成了另一个名字。
+   */
+  it('不把名字里的数字小数点当扩展名', () => {
+    expect(stripMediaExtension('Song 2.5')).toBe('Song 2.5')
+    expect(stripMediaExtension('v1.22')).toBe('v1.22')
+  })
+
+  it('没有扩展名时原样返回', () => {
+    expect(stripMediaExtension('no-extension')).toBe('no-extension')
+    expect(stripMediaExtension('中文曲名')).toBe('中文曲名')
+  })
+
+  it('过长或过短的后缀都不动', () => {
+    // 6 位以上多半是名字的一部分（不是任何一种媒体扩展名）
+    expect(stripMediaExtension('backup.backup')).toBe('backup.backup')
+    // 单字符后缀不是媒体扩展名
+    expect(stripMediaExtension('track.a')).toBe('track.a')
+  })
+
+  it('空串与纯空白返回空串（不抛错）', () => {
+    expect(stripMediaExtension('')).toBe('')
+    expect(stripMediaExtension('   ')).toBe('')
+  })
+
+  it('去掉首尾空白（文件名常带空格）', () => {
+    expect(stripMediaExtension(' Song.mp3 ')).toBe('Song')
+  })
+})
 
 describe('truncate', () => {
   it('未超长时原样返回', () => {

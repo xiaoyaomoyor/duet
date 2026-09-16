@@ -18,7 +18,7 @@
  *      它们是编辑态的提示语，出现在成稿里就成了噪音。
  *      需要修改时点右上角的编辑按钮打开弹窗。
  *
- * 只读态（展示视图 / 导出）不渲染编辑按钮，其余完全一致，
+ * 只读态（演示视图 / 导出）不渲染编辑按钮，其余完全一致，
  * 因此"编辑视图看到的样子"确实等于成稿。
  */
 import { computed, ref } from 'vue'
@@ -346,30 +346,53 @@ function onPatch(patch: Record<string, unknown>): void {
  * ————————————————————————————————————————————————————————— */
 
 .side-head__mask {
-  font: inherit;
-  color: transparent;
+  padding: 0 2px;
   cursor: pointer;
   background: #000;
   border: none;
   border-radius: var(--radius-xs);
-  padding: 0 2px;
   transition:
     color var(--dur-fast) var(--ease-out),
     background var(--dur-fast) var(--ease-out);
 }
 
+/*
+ * ⚠️ 字号与字重必须和**未遮住时的那个 span 完全一致**。
+ *
+ * `<button>` 不会继承兄弟元素的排版：它只从父元素（`.side-head__line`）
+ * 继承，而那个父元素的字号是默认正文大小。M9 只写了 `font: inherit`，
+ * 于是"匿名之后文字变小了一圈"（实测反馈）。
+ * 现在两处显式对齐：名称用名称那套，版本用版本那套。
+ */
+.side-head__mask {
+  font-family: inherit;
+  font-size: calc(var(--fs-2xl) * var(--name-scale, 1));
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  color: transparent;
+}
+
 .side-head__mask--version {
   font-family: var(--font-mono);
   font-size: calc(var(--fs-sm) * var(--version-scale, 1));
+  font-weight: 400;
 }
 
 .side-head__mask--hidden {
   user-select: none;
 }
 
+/*
+ * 显现态：恢复文字色，**背景保持透明**（用户："展示显示后文字也不要出现背景按钮，
+ * 也就是保持文字透明底"）。只在鼠标指到它时才给一点极淡的底，
+ * 作为"这里可以再点一下遮回去"的提示——那是个悬停态，不是常驻的按钮外观。
+ */
 .side-head__mask:not(.side-head__mask--hidden) {
-  /* 显现态：去掉黑底、恢复文字色，让"这一刻是露出来的"一眼可辨 */
   color: inherit;
+  background: transparent;
+}
+
+.side-head__mask:not(.side-head__mask--hidden):hover {
   background: var(--accent-soft);
 }
 
@@ -381,12 +404,18 @@ function onPatch(patch: Record<string, unknown>): void {
 /*
  * LOGO 的马赛克块。尺寸与正常 LOGO 完全一致（72px），
  * 这样打码不会让左右两栏的头部高度发生变化。
+ *
+ * ⚠️ 宽高**必须显式写出来**：这个元素是个 `<button>`，不像 `ToolIcon`
+ * 那样自带 `width/height` 属性。M9 漏了这两行，于是它塌成 0×0 ——
+ * 表现就是"匿名图片没有变成马赛克"（其实渲染了，只是没有面积）。
  */
 .side-head__logo--masked {
-  display: block;
+  flex: none;
+  width: 72px;
+  height: 72px;
   padding: 0;
   cursor: pointer;
-  background-color: transparent;
+  background-color: var(--bg-surface-2);
   background-repeat: repeat;
   background-size: 16px 16px;
   border: none;
@@ -395,9 +424,11 @@ function onPatch(patch: Record<string, unknown>): void {
 
 .side-head__logo--reveal {
   display: block;
+  width: 72px;
+  height: 72px;
   padding: 0;
   cursor: pointer;
-  background: var(--accent-soft);
+  background: transparent;
   border: none;
   border-radius: var(--radius-sm);
 }

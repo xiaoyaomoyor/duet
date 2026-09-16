@@ -3,7 +3,7 @@
  * 模块卡片（编辑视图）
  *
  * 设计（M6 起，按用户实测反馈重做）：
- *   卡片**就是最终效果**——内容和展示视图完全一致，因为两边用的是同一个
+ *   卡片**就是最终效果**——内容和演示视图完全一致，因为两边用的是同一个
  *   `ModuleView`。编辑视图额外提供的只有右上角的四个按钮
  *   （编辑 / 隐藏 / 复制 / 删除）与左侧拖拽手柄，它们悬浮在内容之上，
  *   不占据版式空间，所以"编辑视图看到的样子"确实等于"成稿的样子"。
@@ -36,9 +36,9 @@ const props = defineProps<{
   module: ModuleInstance
   sideId: SideId
   accent: string
-  /** 编辑器是否为只读（展示视图复用同一张卡片时用） */
+  /** 编辑器是否为只读（演示视图复用同一张卡片时用） */
   readonly?: boolean
-  /** 是否显示拖拽手柄（展示视图不显示） */
+  /** 是否显示拖拽手柄（演示视图不显示） */
   draggable?: boolean
   /** 子序号（2.1 / 2.2），由 CanvasRow 算好后透传给 ModuleView */
   number?: string | undefined
@@ -62,7 +62,7 @@ const editing = ref(false)
  *
  * 必须与 `isPresentable` 区分开：隐藏但有内容的模块要照常显示内容，
  * 只是置灰 + 打角标；否则用户会以为自己的内容丢了。
- * 判定本身复用 `isModuleEmpty`，与展示视图同一套逻辑。
+ * 判定本身复用 `isModuleEmpty`，与演示视图同一套逻辑。
  */
 const empty = computed(() => isModuleEmpty(props.module))
 
@@ -76,7 +76,11 @@ function forwardProps(patch: Record<string, unknown>): void {
 </script>
 
 <template>
-  <article class="card" :class="{ 'card--hidden': module.hidden }" :style="{ '--accent': accent }">
+  <article
+    class="card u-module-card"
+    :class="{ 'card--hidden': module.hidden }"
+    :style="{ '--accent': accent }"
+  >
     <!-- 右上角操作区：悬浮或键盘聚焦时出现 -->
     <div v-if="!readonly" class="card__actions">
       <button
@@ -120,7 +124,7 @@ function forwardProps(patch: Record<string, unknown>): void {
     </div>
 
     <!--
-      有内容时走 ModuleView 的默认正文（就是展示视图那套渲染）；
+      有内容时走 ModuleView 的默认正文（就是演示视图那套渲染）；
       空模块时用 #body 插槽换成"点击填写"的占位框——
       标题仍然由 ModuleView 渲染，两种状态下的标题结构因此完全一致。
     -->
@@ -156,26 +160,12 @@ function forwardProps(patch: Record<string, unknown>): void {
 
 <style scoped>
 .card {
-  position: relative;
-  padding: var(--sp-3);
   /*
-   * 整卡可拖：给一个"可以抓"的鼠标指针。
-   * 只加在卡片本身，卡片内的按钮/输入框用自己的指针覆盖掉它。
+   * 卡片的"外壳"（底色 + 左侧强调条 + 圆角）来自基础层的 .u-module-card，
+   * 演示视图用的是同一份声明——两边必须长得一样（v0.4.5 的实测反馈）。
+   * 这里只补编辑态专属的部分：整卡可拖的指针与过渡。
    */
   cursor: grab;
-  /*
-   * 背景着色与工具卡片（SideHeader）对齐 —— 用户实测反馈：
-   * "工具卡片有颜色，下面的模块卡片却是白板，看着不像一套东西"。
-   *
-   * 两层写法：先铺不透明的 --bg-surface，再叠一层本侧主题色的极淡底。
-   * 不能只写 `background: var(--accent-soft)` —— 那是半透明的，
-   * 画布底纹会透上来，和工具卡片（它叠在 surface 上）就不是同一个颜色了。
-   */
-  background-color: var(--bg-surface);
-  background-image: linear-gradient(var(--accent-soft), var(--accent-soft));
-  border: 1px solid var(--border-subtle);
-  border-left: 2px solid var(--accent, var(--accent-500));
-  border-radius: var(--radius-md);
   transition:
     opacity var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out);

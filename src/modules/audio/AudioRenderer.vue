@@ -3,7 +3,7 @@
  * 音频渲染器
  *
  * 职责：
- *   1. 播放音频（原生控件，保证在展示视图里也一定能用）
+ *   1. 播放音频（原生控件，保证在演示视图里也一定能用）
  *   2. 把播放时间上报到侧内时钟，供歌词与进度条联动
  *   3. 播放时给出律动光效（A5 动效的 M2 版本，M4 换成真实频谱）
  */
@@ -17,6 +17,7 @@ import { getSyncEngine } from '@/composables/useAudioClock'
 import { onRafTick } from '@/composables/useRafTicker'
 import { repairEmbeddedCover } from '@/services/assetService'
 import { formatDuration } from '@/lib/time'
+import { stripMediaExtension } from '@/lib/text'
 import type { ModuleRendererProps } from '../types'
 import type { MediaData } from '../shared/mediaData'
 import type { AudioProps } from './data'
@@ -37,7 +38,14 @@ const audioProps = computed<AudioProps>(() => ({
   reportClock: props.module.props.reportClock !== false,
   showCover: props.module.props.showCover !== false,
   showPlayer: props.module.props.showPlayer !== false,
+  layout: props.module.props.layout === 'square' ? 'square' : 'bar',
 }))
+
+/**
+ * 展示用的曲名：**去掉扩展名**（用户实测反馈"不需要显示媒体与扩展名，
+ * 比如 xxx.mp3"）。剥离规则与边界都在 `stripMediaExtension` 里，并有单测。
+ */
+const displayName = computed(() => stripMediaExtension(data.value.name ?? ''))
 
 const source = computed(() => {
   if (data.value.assetId) return assetSource(data.value.assetId)
@@ -259,11 +267,53 @@ onBeforeUnmount(() => {
   unregisterSyncTrack(props.sideId)
   stopSpectrum()
 })
+
+/**
+ * 正方形布局的背景图。
+ *
+ * 用 CSS 变量把封面地址传下去，而不是再渲染一个 `<img>`：
+ * 背景天然被 `background-size: cover` 裁成正方形，也不会被屏幕阅读器
+ * 当成一张有含义的图（它只是背景）。
+ * 没有封面时退回"品牌色渐变"——总比一块空白好，而且仍然能区分左右两侧。
+ */
+const squareStyle = computed(() => {
+  if (!coverUrl.value) return undefined
+  return { '--audio-cover': `url("${coverUrl.value}")` }
+})
+
+/**
+ * 封面的可渲染地址。
+ *
+ * `MediaImage` 内部自己解析 assetId → blob URL，但背景图需要**地址本身**，
+ * 所以这里单独解析一次。共用一个解析器（mediaResolver）因此仍是同一份缓存。
+ */
+const coverUrl = ref<string | null>(null)
+const coverMedia = useResolvedMedia(
+  computed(() => (coverAssetId.value ? assetSource(coverAssetId.value) : undefined)),
+)
+watch(
+  () => coverMedia.src,
+  (src) => {
+    coverUrl.value = src
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
-  <div class="audio" :class="{ 'audio--playing': playing }">
-    <div class="audio__head">
+  <div
+    class="audio"
+    :class="[`audio--${audioProps.layout}`, { 'audio--playing': playing }]"
+    :style="squareStyle"
+  >
+    <!--
+      正方形布局：封面铺满整块作背景，其余内容叠在它上面。
+      背景用 CSS 变量下发而不是真的塞一个 <img>：
+      这样它天然被裁切成正方形、且不会参与无障碍朗读（它只是装饰）。
+    -->
+    <div v-if="audioProps.layout === 'square'" class="audio__backdrop" aria-hidden="true" />
+
+    <div class="audio__body">
       <!--
         封面三态：
           有内嵌封面        → 渲染它
@@ -271,13 +321,14 @@ onBeforeUnmount(() => {
                               否则左右两栏一个有一块图、一个没有，
                               标题的起始位置就对不齐了）
           开关关掉          → 整个不渲染，也不留空位
+        正方形布局下封面已经铺成背景，这一块整块不渲染。
       -->
-      <template v-if="audioProps.showCover">
+      <template v-if="audioProps.showCover && audioProps.layout === 'bar'">
         <MediaImage
           v-if="coverAssetId"
           class="audio__cover"
           :asset-id="coverAssetId"
-          :alt="data.name ?? ''"
+          :alt="displayName || t('media.untitled')"
           fit="cover"
           ratio="1/1"
           :rounded="false"
@@ -289,102 +340,243 @@ onBeforeUnmount(() => {
       </template>
 
       <div class="audio__info">
-        <span class="audio__name u-truncate">{{ data.name ?? t('media.untitled') }}</span>
+        <!-- 曲名去掉扩展名：`Song.mp3` → `Song`（用户实测反馈） -->
+        <span class="audio__name u-truncate">{{ displayName || t('media.untitled') }}</span>
         <span class="audio__duration">
           {{ durationMs > 0 ? formatDuration(durationMs) : '--:--' }}
         </span>
       </div>
-    </div>
 
-    <!--
-      频谱：引擎接管的播放由 rAF 驱动真实的频率数据（A6）；
-      没有数据时保持样式表里那套错落的静态波形（见 hasSpectrum 的说明）。
-    -->
-    <div v-if="audioProps.showWaveform" class="wave" aria-hidden="true">
-      <span
-        v-for="(value, index) in spectrum"
-        :key="index"
-        class="wave__bar"
-        :class="{ 'wave__bar--active': playing }"
-        :style="playing && hasSpectrum ? { height: `${Math.max(8, Math.round(value * 100))}%` } : undefined"
+      <!--
+        频谱：引擎接管的播放由 rAF 驱动真实的频率数据（A6）；
+        没有数据时保持样式表里那套错落的静态波形（见 hasSpectrum 的说明）。
+      -->
+      <div v-if="audioProps.showWaveform" class="wave" aria-hidden="true">
+        <span
+          v-for="(value, index) in spectrum"
+          :key="index"
+          class="wave__bar"
+          :class="{ 'wave__bar--active': playing }"
+          :style="
+            playing && hasSpectrum ? { height: `${Math.max(8, Math.round(value * 100))}%` } : undefined
+          "
+        />
+      </div>
+
+      <!--
+        自研播放条（M9 取代浏览器原生 `<audio controls>`）。
+        换掉它的原因有两条，都来自实测反馈：
+          1. 原生那条的**已播放部分**是浏览器用固定色画的，改不了 → 现在用工具强调色
+          2. 关不掉 → 现在可以整条隐藏（音频控制台提供播放控制时，这一条是重复的）
+        时间固定在播放条**右侧**（用户明确要求的位置）。
+      -->
+      <div v-if="audioProps.showPlayer" class="player">
+        <button
+          class="player__play"
+          type="button"
+          :title="playing ? t('audio.pause') : t('audio.play')"
+          :aria-label="playing ? t('audio.pause') : t('audio.play')"
+          :aria-pressed="playing"
+          @click="togglePlay"
+        >
+          <AppIcon :name="playing ? 'pause' : 'play'" :size="14" />
+        </button>
+
+        <input
+          class="player__seek"
+          type="range"
+          min="0"
+          :max="durationMs > 0 ? Math.round(durationMs) : 1000"
+          step="10"
+          :value="Math.round(currentMs)"
+          :style="{ '--played': `${playedRatio * 100}%` }"
+          :aria-label="t('audio.seek')"
+          :aria-valuetext="`${formatDuration(currentMs)} / ${formatDuration(durationMs)}`"
+          @input="onSeek"
+        />
+
+        <span class="player__time">{{ formatDuration(currentMs) }}</span>
+      </div>
+
+      <!--
+        真正发声的元素。原生控件已由上面的自研播放条取代，因此隐藏它——
+        用 display:none 不影响播放（音频元素不需要可见），
+        而保持它在 DOM 里是 Web Audio 接管（createMediaElementSource）的前提。
+      -->
+      <audio
+        v-if="media.src"
+        ref="audioEl"
+        class="audio__el"
+        :src="media.src"
+        preload="metadata"
+        @loadedmetadata="onLoadedMetadata"
+        @timeupdate="onTimeUpdate"
+        @play="onPlay"
+        @pause="onPause"
+        @ended="onEnded"
       />
+
+      <p v-else-if="media.status === 'loading'" class="audio__state">{{ t('common.loading') }}</p>
+
+      <p v-else class="audio__state audio__state--error">
+        <AppIcon name="comment" :size="14" />
+        {{ media.error ? t(media.error.messageKey) : t('media.error.unknown') }}
+      </p>
     </div>
-
-    <!--
-      自研播放条（M9 取代浏览器原生 `<audio controls>`）。
-      换掉它的原因有两条，都来自实测反馈：
-        1. 原生那条的**已播放部分**是浏览器用固定色画的，改不了 → 现在用工具强调色
-        2. 关不掉 → 现在可以整条隐藏（音频控制台提供播放控制时，这一条是重复的）
-      从波形图上就能看出用的是哪一侧的主题色，播放条与它保持一致。
-    -->
-    <div v-if="audioProps.showPlayer" class="player">
-      <button
-        class="player__play"
-        type="button"
-        :title="playing ? t('audio.pause') : t('audio.play')"
-        :aria-label="playing ? t('audio.pause') : t('audio.play')"
-        :aria-pressed="playing"
-        @click="togglePlay"
-      >
-        <AppIcon :name="playing ? 'pause' : 'play'" :size="14" />
-      </button>
-
-      <input
-        class="player__seek"
-        type="range"
-        min="0"
-        :max="durationMs > 0 ? Math.round(durationMs) : 1000"
-        step="10"
-        :value="Math.round(currentMs)"
-        :style="{ '--played': `${playedRatio * 100}%` }"
-        :aria-label="t('audio.seek')"
-        :aria-valuetext="`${formatDuration(currentMs)} / ${formatDuration(durationMs)}`"
-        @input="onSeek"
-      />
-
-      <span class="player__time">{{ formatDuration(currentMs) }}</span>
-    </div>
-
-    <!--
-      真正发声的元素。原生控件已由上面的自研播放条取代，因此隐藏它——
-      用 display:none 不影响播放（音频元素不需要可见），
-      而保持它在 DOM 里是 Web Audio 接管（createMediaElementSource）的前提。
-    -->
-    <audio
-      v-if="media.src"
-      ref="audioEl"
-      class="audio__el"
-      :src="media.src"
-      preload="metadata"
-      @loadedmetadata="onLoadedMetadata"
-      @timeupdate="onTimeUpdate"
-      @play="onPlay"
-      @pause="onPause"
-      @ended="onEnded"
-    />
-
-    <p v-else-if="media.status === 'loading'" class="audio__state">{{ t('common.loading') }}</p>
-
-    <p v-else class="audio__state audio__state--error">
-      <AppIcon name="comment" :size="14" />
-      {{ media.error ? t(media.error.messageKey) : t('media.error.unknown') }}
-    </p>
   </div>
 </template>
 
 <style scoped>
 .audio {
   display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
   /*
-   * M9 按实测反馈去掉内层卡片：模块本来就住在「模块卡片」里，
+   * v0.4.5 按实测反馈去掉内层卡片：模块本来就住在「模块卡片」里，
    * 再套一层底色 + 描边就成了"卡片里还有一张卡片"，
    * 左右两栏并排时尤其显得脏。这里只保留排布，不画面板。
    */
   padding: 0;
   background: none;
   border: none;
+}
+
+.audio__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 100%;
+  min-width: 0;
+}
+
+/* —— 长条布局：封面在左，右侧自上而下是名称 / 波形 / 播放条 —— */
+.audio--bar .audio__body {
+  flex-direction: row;
+  gap: var(--sp-3);
+  align-items: stretch;
+}
+
+/*
+ * 长条布局里，名称 / 波形 / 播放条在封面的右侧竖着排。
+ * 用一个额外的包裹层表达"封面的右侧"这件事——
+ * body 是 flex row，封面是第一格，其余三块需要各自占一整行。
+ */
+.audio--bar .audio__body > :not(.audio__cover) {
+  flex: 1;
+  min-width: 0;
+}
+
+.audio--bar .audio__info {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/*
+ * 为了把"名称在上、波形与播放条在下"排成右侧的一列，
+ * body 在长条布局下用 grid 更直接：
+ *   第一列 = 封面（跨三行），第二列 = 名称 / 波形 / 播放条
+ */
+.audio--bar {
+  display: block;
+}
+
+.audio--bar .audio__body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  gap: var(--sp-2) var(--sp-3);
+  align-items: center;
+}
+
+.audio--bar .audio__cover {
+  grid-row: 1 / span 3;
+}
+
+.audio--bar .audio__info {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.audio--bar .wave {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.audio--bar .player {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+/* 没有封面时不该留一格空列 */
+.audio--bar .audio__body > .audio__info:first-child {
+  grid-column: 1 / -1;
+}
+
+.audio--bar .audio__body > .audio__info:first-child ~ .wave,
+.audio--bar .audio__body > .audio__info:first-child ~ .player {
+  grid-column: 1 / -1;
+}
+
+/* —— 正方形布局：封面铺满作背景，其余内容叠在上面 —— */
+.audio--square {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+.audio__backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: var(--accent-soft, var(--bg-surface-2));
+  background-image: var(--audio-cover, none);
+  background-position: center;
+  background-size: cover;
+}
+
+/*
+ * 叠在封面上的那层内容。
+ * 加一层自上而下的暗化渐变：封面可能是亮的，白字压上去会看不清。
+ * 用渐变而不是整块半透明黑，是为了让上半部分仍然看得到封面。
+ */
+.audio--square .audio__body {
+  position: relative;
+  justify-content: flex-end;
+  height: 100%;
+  padding: var(--sp-3);
+  background: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 45%) 0%,
+    rgb(0 0 0 / 25%) 45%,
+    rgb(0 0 0 / 70%) 100%
+  );
+}
+
+/* 封面之上的一切都必须用浅色字——它们压在一张不确定的图片上 */
+.audio--square .audio__name,
+.audio--square .audio__duration,
+.audio--square .player__time {
+  color: #fff;
+}
+
+.audio--square .player__seek::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--accent, var(--accent-500)) var(--played, 0%),
+    rgb(255 255 255 / 35%) var(--played, 0%)
+  );
+}
+
+.audio--square .player__seek::-moz-range-track {
+  background: linear-gradient(
+    to right,
+    var(--accent, var(--accent-500)) var(--played, 0%),
+    rgb(255 255 255 / 35%) var(--played, 0%)
+  );
+}
+
+.audio--square .audio__el,
+.audio--square .audio__state {
+  display: none;
 }
 
 .audio__head {

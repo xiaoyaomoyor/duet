@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 展示视图（Present）
+ * 演示视图（Present）
  *
  * 三条硬性要求（§9.2）：
  *   1. **绝对只读**：不存在任何可输入元素，误触不改数据
@@ -92,40 +92,26 @@ function onFullscreenChange(): void {
 }
 
 /**
- * 工具栏的显隐（M8 按用户实测反馈改）。
+ * 工具栏的显隐（v0.4.5 改成按**鼠标位置**判断，不再按时间）。
  *
- *   普通展示态 → **常驻显示**。用户明确要求"常态显示"：
- *     自动淡出会让人找不到退出按钮，而演示时鼠标本来就停在画面上。
- *   全屏态     → 鼠标移到顶部才出现，3 秒后淡出。
- *     全屏是为了投屏/录屏，一条常驻的工具栏会一直挡在成稿上方。
+ *   普通演示态 → 常驻显示。
+ *   全屏态     → 只有鼠标靠近屏幕**最上边**才显示，离开顶部立刻收起。
  *
- * 关键是"进全屏"这个动作本身要立刻收起工具栏：刚进全屏时鼠标往往还在
- * 顶部附近，如果只靠 mousemove 触发，工具栏会赖着不走。
+ * 为什么把"3 秒后自动淡出"换掉（用户实测反馈）：
+ *   按时间隐藏意味着"我正看着工具栏上的信息，它自己消失了"，
+ *   想让它回来还得动一下鼠标。改成按位置之后规则是**可预期的**：
+ *   鼠标在顶部就有工具栏，移开就没有，与停留多久无关。
  */
-let hideTimer: ReturnType<typeof setTimeout> | null = null
+const TOOLBAR_HOT_ZONE = 72
 
-function scheduleHide(): void {
-  if (hideTimer) clearTimeout(hideTimer)
+function onPointerMove(event: MouseEvent): void {
   if (!isFullscreen.value) return
-  hideTimer = setTimeout(() => {
-    toolbarVisible.value = false
-  }, 3000)
-}
-
-function revealToolbar(): void {
-  toolbarVisible.value = true
-  scheduleHide()
+  toolbarVisible.value = event.clientY <= TOOLBAR_HOT_ZONE
 }
 
 watch(isFullscreen, (full) => {
-  // 退出全屏 → 工具栏常驻；进入全屏 → 先亮出来，随后按空闲计时收起
-  if (!full) {
-    if (hideTimer) clearTimeout(hideTimer)
-    hideTimer = null
-    toolbarVisible.value = true
-    return
-  }
-  revealToolbar()
+  // 退出全屏 → 常驻；进入全屏 → 先收起，鼠标移到顶部再出现
+  toolbarVisible.value = !full
 })
 
 function onKeydown(event: KeyboardEvent): void {
@@ -156,13 +142,12 @@ function onKeydown(event: KeyboardEvent): void {
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   document.addEventListener('fullscreenchange', onFullscreenChange)
-  revealToolbar()
+  toolbarVisible.value = true
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
-  if (hideTimer) clearTimeout(hideTimer)
 })
 
 /** 供父组件读取的当前缩放（导出时可能用到） */
@@ -177,7 +162,7 @@ defineExpose({ zoom, hasContent })
       role="region"
       :aria-label="t('compare.present')"
       :style="rootStyle"
-      @mousemove.passive="revealToolbar"
+      @mousemove.passive="onPointerMove"
     >
       <!--
         悬浮工具栏：仅展示用，导出长图时必须排除。
@@ -374,7 +359,7 @@ defineExpose({ zoom, hasContent })
 
 /*
  * 「编辑视图」：带文字的动作按钮，与顶栏那个「演示」按钮同一套长相。
- * 展示视图的工具栏本身就是半透明浮层，所以这个按钮只在被指到时才给底色，
+ * 演示视图的工具栏本身就是半透明浮层，所以这个按钮只在被指到时才给底色，
  * 平时保持"安静"，免得在成稿上方一直亮着一块。
  */
 .present__action {
@@ -486,7 +471,7 @@ defineExpose({ zoom, hasContent })
 .present__hotkeys {
   position: fixed;
   right: var(--sp-3);
-  /* 让开右下角那枚版本徽标（它在展示视图里同样可见），两者上下叠放 */
+  /* 让开右下角那枚版本徽标（它在演示视图里同样可见），两者上下叠放 */
   bottom: calc(var(--sp-2) + 16px);
   font-size: 10px;
   color: var(--text-disabled);

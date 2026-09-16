@@ -70,17 +70,17 @@ test.describe('M5 代码块模块', () => {
     expect(errors).toEqual([])
   })
 
-  test('只填空格的代码块被判定为空：展示视图里不出现（§7.4）', async ({ page }) => {
+  test('只填空格的代码块被判定为空：演示视图里不出现（§7.4）', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
     await addModule(page, 0, '代码块')
 
-    // 注意：编辑视图的卡片正文**就是**展示视图的呈现，
-    // 所以"空模块不渲染"这条规则要在展示视图上验证。
+    // 注意：编辑视图的卡片正文**就是**演示视图的呈现，
+    // 所以"空模块不渲染"这条规则要在演示视图上验证。
     const card = addedCard(page)
     await fillModuleText(page, card, '   \n  ')
 
-    await page.getByRole('button', { name: '进入展示视图' }).click()
+    await page.getByRole('button', { name: '进入演示视图' }).click()
     await expect(page.locator('.present')).toBeVisible()
 
     // 唯一有内容的模块是空白文字模块 + 空白代码块 → 两者都算空，整页给出引导

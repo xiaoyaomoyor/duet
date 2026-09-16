@@ -10,7 +10,7 @@
  *   Ctrl/Cmd + Z          撤回
  *   Ctrl/Cmd + Shift + Z  重做
  *   Ctrl/Cmd + Y          重做（Windows 上更习惯的另一个键位）
- *   Ctrl/Cmd + E          切换 编辑视图 / 展示视图
+ *   Ctrl/Cmd + E          切换 编辑视图 / 演示视图
  *   Ctrl/Cmd + K          打开命令面板（原先挂在 TopBar 上，一并收拢到这里）
  *
  * 两条"不该抢"的规则：

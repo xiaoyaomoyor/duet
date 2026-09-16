@@ -7,8 +7,8 @@
  *
  * 三个契约的职责边界：
  *   - editor   ：编辑视图里的"怎么填"
- *   - renderer ：展示视图里的"怎么呈现"（含动效）
- *   - isEmpty  ：决定"是否算已填写"，直接驱动展示视图的空模块隐藏规则（§7.4）
+ *   - renderer ：演示视图里的"怎么呈现"（含动效）
+ *   - isEmpty  ：决定"是否算已填写"，直接驱动演示视图的空模块隐藏规则（§7.4）
  */
 
 import type { Component } from 'vue'
@@ -21,7 +21,7 @@ export interface ModuleEditorProps {
   module: ModuleInstance
   /** 所属对比方 id（模块可能需要知道自己属于左侧还是右侧） */
   sideId: string
-  /** 是否为只读态（展示视图 / 只读导出） */
+  /** 是否为只读态（演示视图 / 只读导出） */
   readonly: boolean
   /** 写入内容：走 store 的命令层，带 coalesceKey 合并连续输入 */
   patchData: (patch: Record<string, unknown>) => void
@@ -91,7 +91,7 @@ export interface ModuleDefinition<TData = unknown, TProps = Record<string, unkno
   options?: ModuleOption[]
   editor: Component
   renderer: Component
-  /** 是否"未填写"：直接决定展示视图是否隐藏（§7.4） */
+  /** 是否"未填写"：直接决定演示视图是否隐藏（§7.4） */
   isEmpty: (data: TData, props: TProps) => boolean
   /** 可选：导出长图前的准备（等待图片解码等） */
   beforeExport?: (el: HTMLElement) => Promise<void>

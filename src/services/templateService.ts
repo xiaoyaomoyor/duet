@@ -61,7 +61,7 @@ export interface TemplateField {
   type: ModuleTypeId
   /** 模块标题的 i18n key，形如 'modules.lyrics' */
   titleKey: string
-  /** 默认是否在展示视图隐藏（例如"待补充"这类占位模块） */
+  /** 默认是否在演示视图隐藏（例如"待补充"这类占位模块） */
   hidden?: boolean
   /** 该模块自由配置（透传到 ModuleInstance.props） */
   props?: Record<string, unknown>
@@ -166,7 +166,7 @@ export interface InstantiateOptions {
 /**
  * 由模板生成一个完整的 Project。
  * 生成的骨架中所有模块都是"空模块"（data 为 schema.create() 的默认值），
- * 因此展示视图默认什么都不显示 —— 与 §7.4 的空模块规则一致。
+ * 因此演示视图默认什么都不显示 —— 与 §7.4 的空模块规则一致。
  */
 export function instantiateTemplate(
   template: ProjectTemplate,

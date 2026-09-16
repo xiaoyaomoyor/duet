@@ -177,7 +177,7 @@ export interface ModuleInstance {
   type: ModuleTypeId
   /** 用户可改写的标题（如把「文字」改成「价格」） */
   title: string
-  /** 有内容但不想在展示视图显示 */
+  /** 有内容但不想在演示视图显示 */
   hidden: boolean
   data: unknown
   props: Record<string, unknown>
@@ -241,7 +241,7 @@ export interface LayoutConfig {
   showRowNumbers?: boolean | undefined
 
   /**
-   * 展示视图里是否保留背景图案。
+   * 演示视图里是否保留背景图案。
    *
    * 默认**关**：成稿要的是内容本身，编辑器里的网格/圆点是"对齐辅助线"，
    * 出现在成稿里只会显得脏。开着是为了做"整页填充"那种视觉稿。

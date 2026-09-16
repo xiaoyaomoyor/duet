@@ -37,10 +37,10 @@ const settings = useSettingsStore()
 
 const loading = ref(false)
 
-/** 是否处于展示视图（编辑树在此时不渲染） */
+/** 是否处于演示视图（编辑树在此时不渲染） */
 const isPresent = computed(() => store.current?.ui.mode === 'present')
 
-/** 对比配置只在编辑态出现：展示视图里它没有意义，还占地方 */
+/** 对比配置只在编辑态出现：演示视图里它没有意义，还占地方 */
 const showConfig = computed(() => ui.inspectorOpen && !isPresent.value)
 
 const configStyle = computed(() => ({ '--config-width': `${ui.inspectorWidth}px` }))
@@ -148,7 +148,7 @@ if (projects.items.length === 0 && !projects.loading) {
   void projects.load()
 }
 
-/** 展示视图退出（PresentOverlay 已经写过 mode，这里只做 UI 收尾） */
+/** 演示视图退出（PresentOverlay 已经写过 mode，这里只做 UI 收尾） */
 function onPresentExit(): void {
   ui.inspectorOpen = false
 }
@@ -186,7 +186,7 @@ function onPresentExit(): void {
         </div>
 
         <!--
-          对比配置面板：只在编辑态出现（展示视图里它没有意义，还占地方）。
+          对比配置面板：只在编辑态出现（演示视图里它没有意义，还占地方）。
           分界处可拖拽调宽，双击恢复默认，方向键微调——与左侧项目列表同一套操作。
         -->
         <template v-if="showConfig">
@@ -214,7 +214,7 @@ function onPresentExit(): void {
     <TemplateGallery v-else />
   </div>
 
-  <!-- 展示视图：独立遮罩层（§9.2） -->
+  <!-- 演示视图：独立遮罩层（§9.2） -->
   <PresentOverlay
     v-if="store.current && isPresent"
     :project="store.current"

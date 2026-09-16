@@ -161,12 +161,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </header>
 
         <div class="side-dialog__body">
-          <section class="section">
+          <!--
+            双列布局（v0.4.5 按实测反馈"编辑工具名称卡片的窗口也改为紧凑的双列布局"）。
+            左列是工具列表（它需要一个能滚动的列表高度），
+            右列是名称 / 字号 / 备注 / 图标 / 显示开关 / 匿名——
+            这些全是单行小控件，各占一整屏只会把窗口拉得很长。
+          -->
+          <section class="section section--tools">
             <h3 class="section__title">{{ t('compare.changeTool') }}</h3>
             <ToolPicker :current="side.toolRef" @select="onSelectTool" />
           </section>
 
-          <section class="section">
+          <div class="section section--fields">
             <h3 class="section__title">{{ t('compare.textFields') }}</h3>
 
             <label class="field">
@@ -252,7 +258,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 @change="onNoteChange"
               />
             </label>
-          </section>
 
           <section class="section">
             <h3 class="section__title">{{ t('compare.icon') }}</h3>
@@ -297,6 +302,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               <span>{{ t(item.labelKey) }}</span>
             </label>
           </section>
+          </div>
         </div>
 
         <footer class="side-dialog__foot">
@@ -326,8 +332,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .side-dialog {
   display: flex;
   flex-direction: column;
-  width: min(560px, 100%);
-  max-height: min(780px, 100%);
+  /* 双列布局需要更宽：左列给工具列表，右列给那些单行小控件 */
+  width: min(880px, 100%);
+  max-height: min(760px, 100%);
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
@@ -370,12 +377,31 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .side-dialog__body {
-  display: flex;
+  display: grid;
   flex: 1;
-  flex-direction: column;
+  /* 双列：左列工具列表（需要能滚动的列表高度），右列其余设置 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   gap: var(--sp-5);
-  padding: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
   overflow-y: auto;
+}
+
+/* 窄屏（<760px）退回单列：两列都会挤成窄缝，反而更难用 */
+@media (max-width: 760px) {
+  .side-dialog__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.section--tools {
+  min-width: 0;
+}
+
+.section--fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
 }
 
 .section {

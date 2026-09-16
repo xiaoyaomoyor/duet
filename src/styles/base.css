@@ -157,6 +157,30 @@ ol {
 }
 
 /*
+ * —— 模块卡片的"外壳"（编辑视图与演示视图共用） ——
+ *
+ * v0.4.5 抽出来（用户实测反馈"演示视图应该和编辑视图预览状态一致，
+ * 卡片都着色为工具的强调色"）。
+ *
+ * 此前编辑视图的卡片有底色 + 左侧强调条（ModuleCard 自己的 .card），
+ * 而演示视图只是把 ModuleView 裸着排进去——同一份内容，两边长得不一样，
+ * 直接违背了"编辑视图看到的样子 == 成稿的样子"这条一直挂在文档里的承诺。
+ * 抽到基础层之后，两边调的是同一份声明，想不一致都难。
+ *
+ * 底色用 --accent-soft（由所在格下发，值来自 lib/color.ts 的 sideTint），
+ * 因此左右两侧自然是各自的工具色。
+ */
+.u-module-card {
+  position: relative;
+  padding: var(--sp-3);
+  background-color: var(--bg-surface);
+  background-image: linear-gradient(var(--accent-soft), var(--accent-soft));
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--accent, var(--accent-500));
+  border-radius: var(--radius-md);
+}
+
+/*
  * —— 拖动分界线（全应用统一） ——
  *
  * 用户实测反馈："其他可拖动的分界线，宽度向两个工具中间那条对齐"。

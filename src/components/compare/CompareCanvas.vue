@@ -30,9 +30,9 @@ import type { CellRef, ModuleInstance, ModuleRef, Project, Row, SideId } from '@
 const props = defineProps<{
   project: Project
   /**
-   * 只读（展示视图 / 只读导出）。
+   * 只读（演示视图 / 只读导出）。
    * 为 true 时：不渲染编辑器与增删按钮、不启用拖拽排序，
-   * 直接渲染各模块的展示视图渲染器。
+   * 直接渲染各模块的演示视图渲染器。
    */
   readonly?: boolean
 }>()
@@ -83,9 +83,9 @@ const soloPlayingSideId = computed(() => {
 const spotlightMode = computed(() => layout.value.spotlight ?? 'off')
 
 /**
- * 聚光灯只在**展示视图**生效。
+ * 聚光灯只在**演示视图**生效。
  *
- * 用户的原话是"正在播放的工具整体在**展示模式**中占据更大的比例"。
+ * 用户的原话是"正在播放的工具整体在**演示模式**中占据更大的比例"。
  * 编辑视图不跟进还有一个更实际的理由：一边听一边排版时，
  * 画布因为播放状态忽宽忽窄、忽明忽暗，是纯粹的干扰。
  */
@@ -160,7 +160,7 @@ const backgroundVars = computed(() => {
   }
 })
 
-/** 展示视图下是否保留背景图案（默认关：成稿要的是内容本身） */
+/** 演示视图下是否保留背景图案（默认关：成稿要的是内容本身） */
 const showBackground = computed(() => !isReadonly.value || layout.value.backgroundInPresent === true)
 
 /** 整页实心填充（相对于"图案铺在内容底下"） */
@@ -176,6 +176,16 @@ const showRowNumbers = computed(() => layout.value.showRowNumbers === true)
 const MIN_COLUMN_FRAC = 0.2
 const MAX_COLUMN_FRAC = 0.8
 
+/**
+ * 画布根节点。
+ *
+ * ⚠️ 这个 ref **必须**绑在模板的 `.canvas` 上（`ref="canvasEl"`）。
+ * M6 引入中轴拖拽时漏了这一步，于是 `canvasEl.value` 永远是 null、
+ * `width` 永远是 0、`onColumnResizeMove` 在第二行就 return ——
+ * 手柄能按下去、鼠标指针也变成 col-resize，但**左右宽度纹丝不动**。
+ * 实测反馈"工具之间的分界线调整功能似乎不生效"说的就是它：
+ * 整条链路只有一个环节断了，而且不报任何错。
+ */
 const canvasEl = ref<HTMLElement | null>(null)
 const resizingColumns = ref(false)
 let resizeStartX = 0
@@ -195,7 +205,14 @@ function onColumnResizeMove(event: PointerEvent): void {
   event.preventDefault()
 
   const width = canvasEl.value?.clientWidth ?? 0
-  if (width <= 0) return
+  // 宽度拿不到就没法把像素换算成比例——这里**不能**静默 return 当作没事发生，
+  // 开发期告警一次，免得又出现"手柄能拖但没反应"这种极难定位的状态
+  if (width <= 0) {
+    if (import.meta.env.DEV) {
+      console.warn('[duet/canvas] 中轴拖拽拿不到画布宽度：canvasEl 是否忘了绑定？')
+    }
+    return
+  }
 
   // 把像素位移换算成占比，再写回两侧的权重
   const delta = (event.clientX - resizeStartX) / width
@@ -318,7 +335,7 @@ function modulesOf(row: Row, sideId: SideId): ModuleInstance[] {
 }
 
 /**
- * 展示视图下应该渲染的行：左右两格都没有可见模块时整行跳过，
+ * 演示视图下应该渲染的行：左右两格都没有可见模块时整行跳过，
  * 避免出现"空行把内容撑开"的观感问题。
  *
  * 注意：单个模块的"空/隐藏"判定在 CanvasRow 内（那里才有渲染细节），
@@ -372,6 +389,7 @@ function onDuplicateModule(ref: ModuleRef): void {
 <template>
   <div class="canvas-wrap">
     <div
+      ref="canvasEl"
       class="canvas"
       :class="[
         backgroundClass,
@@ -414,7 +432,6 @@ function onDuplicateModule(ref: ModuleRef): void {
             @toggle-collapse="store.toggleRowCollapsed"
             @remove="removeRow"
             @relabel="onRelabel"
-            @resize-height="store.setRowHeight"
             @open-picker="openPicker"
             @reorder-modules="onModulesReorder"
             @patch-module="onPatchModule"
@@ -727,7 +744,7 @@ function onDuplicateModule(ref: ModuleRef): void {
  * 这两个是连续量，枚举成类会爆炸。--bg-tint 留空时回落到主题自带的描边色，
  * 也就是"跟随主题"。
  *
- * .canvas--bg-hidden 用于"展示视图不显示背景"：图案是编辑器里的对齐辅助，
+ * .canvas--bg-hidden 用于"演示视图不显示背景"：图案是编辑器里的对齐辅助，
  * 出现在成稿里只会显脏。
  */
 .canvas--bg-grid {

@@ -14,7 +14,7 @@ const variant = computed<KeyValueProps['variant']>(() =>
   props.module.props.variant === 'striped' ? 'striped' : 'plain',
 )
 
-/** 只渲染填了内容的行；全空的行在展示视图没有意义（§7.4） */
+/** 只渲染填了内容的行；全空的行在演示视图没有意义（§7.4） */
 const visibleRows = computed(() =>
   data.value.rows.filter((row) => row && (row.key?.trim() || row.value?.trim())),
 )

@@ -541,7 +541,8 @@ function rowCount(projectId: string): number {
 }
 
 .sidebar__foot {
-  padding: var(--sp-2) var(--sp-3);
+  /* 给左下角的版本徽标让出一行，避免"共 N 个项目"与它叠在一起 */
+  padding: var(--sp-2) var(--sp-3) calc(var(--sp-2) + 18px);
   border-top: 1px solid var(--border-subtle);
 }
 

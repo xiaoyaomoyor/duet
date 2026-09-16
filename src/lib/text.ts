@@ -15,6 +15,30 @@ export function isBlank(input: string | null | undefined): boolean {
   return input == null || input.trim() === ''
 }
 
+/**
+ * 去掉媒体文件名末尾的扩展名（v0.4.5）。
+ *
+ * 用户的原话是"不需要显示媒体与扩展名，比如 xxx.mp3"——
+ * `.mp3` 这类后缀是文件系统的东西，不是内容的一部分，
+ * 出现在对比页上只会让人觉得没做完。
+ *
+ * 只剥掉**最后一个点之后、以字母开头、共 2~5 位**的字母数字后缀：
+ *   `Song.mp3`    → `Song`
+ *   `a.b.flac`    → `a.b`
+ *   `Song 2.5`    → `Song 2.5`（以数字开头，是版本号不是扩展名）
+ *   `v1.22`       → `v1.22`（同上）
+ *   `no-extension`→ 原样
+ *
+ * 为什么要求"以字母开头"：真实的媒体扩展名无一例外都是字母开头
+ * （mp3 / wav / flac / m4a / png / jpeg / webp…），而曲名里的 `.5`、`.22`
+ * 几乎总是版本号。第一版没加这条，`v1.22` 被砍成了 `v1`——测试当场抓到。
+ */
+export function stripMediaExtension(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) return ''
+  return trimmed.replace(/\.[a-z][a-z0-9]{1,4}$/i, '')
+}
+
 /** 取名称首字，用于程序化图标（中文取第一个字，英文取首字母，最多 2 个字符） */
 export function initials(name: string, max = 2): string {
   const trimmed = name.trim()
