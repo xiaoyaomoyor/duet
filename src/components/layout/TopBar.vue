@@ -1,21 +1,22 @@
 <script setup lang="ts">
 /**
- * 顶栏：品牌 + 两个一级入口
+ * 顶栏：品牌 + 两个页面级入口
  *
  * M7 大幅瘦身（用户实测反馈"顶栏挤了一排图标，分不清哪个是哪个"）：
  *   移除 —— 撤回/重做（改由 Ctrl+Z / Ctrl+Shift+Z，见 useGlobalShortcuts）
  *          保存状态、属性、进入展示视图、导入、导出
- *   保留 —— 品牌，以及**对比 / 设置**这两个页面级入口
+ *   保留 —— 品牌，以及**对比 / 设置**这两个页面级入口（只有图标）
  *
  * 被移除的那一组的去处：对比页工具条（CompareToolbar）——
  * 它们全都作用于"当前这份对比"，跟着对比页走比钉在全局顶栏上更符合语义。
  *
- * 选中态用**圆角矩形紫底**而不是下划线：这两个按钮代表"我现在在哪个页面"，
- * 是一个状态而不是一次操作，实心色块比一根细线更容易一眼扫到。
+ * 两个入口用**圆角矩形紫底**表示选中，而不是下划线：
+ * 它们代表"我现在在哪个页面"，是一个状态而不是一次操作，
+ * 实心色块比一根细线更容易一眼扫到。
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import AppIcon from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
 import { useUiStore } from '@/stores/useUiStore'
@@ -23,7 +24,6 @@ import { APP } from '@/app.config'
 
 const { t } = useI18n()
 const route = useRoute()
-const router = useRouter()
 const ui = useUiStore()
 
 /**
@@ -35,14 +35,6 @@ const ui = useUiStore()
 const activePage = computed<'compare' | 'settings'>(() =>
   route.meta.layout === 'settings' ? 'settings' : 'compare',
 )
-
-function goCompare(): void {
-  void router.push({ name: 'compare' })
-}
-
-function goSettings(): void {
-  void router.push({ name: 'settings' })
-}
 </script>
 
 <template>
@@ -78,10 +70,10 @@ function goSettings(): void {
         :class="{ 'topbar__nav--active': activePage === 'compare' }"
         :to="{ name: 'compare' }"
         data-testid="nav-compare-page"
-        @click="goCompare"
+        :title="t('nav.compare')"
+        :aria-label="t('nav.compare')"
       >
-        <AppIcon name="compare" :size="16" />
-        <span>{{ t('nav.compare') }}</span>
+        <AppIcon name="compare" :size="17" />
       </RouterLink>
 
       <RouterLink
@@ -89,10 +81,10 @@ function goSettings(): void {
         :class="{ 'topbar__nav--active': activePage === 'settings' }"
         :to="{ name: 'settings' }"
         data-testid="nav-settings-page"
-        @click="goSettings"
+        :title="t('nav.settings')"
+        :aria-label="t('nav.settings')"
       >
-        <AppIcon name="settings" :size="16" />
-        <span>{{ t('nav.settings') }}</span>
+        <AppIcon name="settings" :size="17" />
       </RouterLink>
     </nav>
   </header>
@@ -150,13 +142,18 @@ function goSettings(): void {
   text-transform: uppercase;
 }
 
+/*
+ * 页面入口：**只有图标**（用户明确要求"顶栏右侧只留两个图标"）。
+ * 图标本身有歧义风险（"网格"和"齿轮"都可能是设置），因此必须补 title + aria-label，
+ * 两者也正好是可访问名与无障碍检查的落点。
+ * 选中态是圆角矩形紫底——比下划线更容易一眼扫到，它表达的是"我在哪一页"这个状态。
+ */
 .topbar__nav {
   display: inline-flex;
-  gap: var(--sp-2);
   align-items: center;
+  justify-content: center;
+  width: 36px;
   height: 32px;
-  padding: 0 var(--sp-3);
-  font-size: var(--fs-sm);
   color: var(--text-secondary);
   text-decoration: none;
   border-radius: var(--radius-md);
@@ -182,7 +179,6 @@ function goSettings(): void {
   color: var(--accent-fg);
   background: var(--accent-700);
 }
-
 .topbar__icon-btn {
   display: inline-flex;
   align-items: center;
