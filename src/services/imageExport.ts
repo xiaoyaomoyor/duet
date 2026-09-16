@@ -193,8 +193,20 @@ async function safeToBlob(
         backgroundColor: options.backgroundColor,
         pixelRatio: options.scale,
         cacheBust: true,
-        // 排除工具栏、悬浮按钮等不该出现在导出图里的元素
-        filter: (node) => !(node instanceof Element && node.classList.contains('no-export')),
+        /*
+         * 过滤掉不该出现在导出图里的节点。
+         *
+         * 除了显式的 .no-export，这里还要**剔除所有注释节点**——
+         * 原因是踩过的真实故障：导出会把 DOM 序列化成 SVG 再用 <img> 加载，
+         * 而 XML 规定注释里不得出现连续两个短横线（"--"）。
+         * 模板注释里只要写了 CSS 变量名（如 --col-frac），
+         * 整张 SVG 就会解析失败，表现是"导出失败"且原因极难定位。
+         * 注释本来就不参与渲染，去掉它既修了这个坑，也让产物更干净
+         * （顺带清掉 Vue 的 <!--v-if--> 与 teleport 标记）。
+         */
+        filter: (node) =>
+          node.nodeType !== Node.COMMENT_NODE &&
+          !(node instanceof Element && node.classList.contains('no-export')),
       }),
       new Promise<never>((_resolve, reject) => {
         setTimeout(
@@ -209,9 +221,30 @@ async function safeToBlob(
     return ok(blob)
   } catch (error) {
     return err(
-      `导出失败：${error instanceof Error ? error.message : String(error)}。若内容包含外链图片，请先"镜像"为本地资源后重试。`,
+      `导出失败：${describeExportError(error)}。若内容包含外链图片，请先"镜像"为本地资源后重试。`,
     )
   }
+}
+
+/**
+ * 把导出过程中抛出的东西变成人能看懂的一句话。
+ *
+ * 为什么需要：html-to-image 内部的图片加载失败时，
+ * `img.onerror = reject` 直接把**原始 Event 对象**抛出来，
+ * `String(event)` 得到的就是毫无信息量的 `[object Event]`——
+ * 用户看到"导出失败：[object Event]"，完全无从下手。
+ * 这里把事件目标上的信息挖出来（是哪个资源、什么类型）。
+ */
+function describeExportError(error: unknown): string {
+  if (error instanceof Event) {
+    const target = error.target as (HTMLImageElement & { href?: { baseVal?: string } }) | null
+    const src = target?.currentSrc || target?.src || target?.href?.baseVal || ''
+    return src
+      ? `渲染时资源加载失败（${error.type}）：${src.slice(0, 120)}`
+      : `渲染时资源加载失败（${error.type}）`
+  }
+  if (error instanceof Error) return error.message
+  return String(error)
 }
 
 function waitForImage(img: HTMLImageElement): Promise<void> {
