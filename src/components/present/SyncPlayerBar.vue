@@ -365,12 +365,12 @@ function retryAttach(): void {
   width: 32px;
   height: 32px;
   color: var(--accent-fg);
-  background: var(--accent-600);
+  background: var(--accent-solid);
   border-radius: var(--radius-full);
 }
 
 .syncbar__play:hover {
-  background: var(--accent-700);
+  background: var(--accent-solid-hover);
 }
 
 .syncbar__time {
@@ -387,7 +387,7 @@ function retryAttach(): void {
 .syncbar__seek {
   flex: 1;
   min-width: 80px;
-  accent-color: var(--accent-600);
+  accent-color: var(--accent-solid);
 }
 
 .syncbar__side {
@@ -426,7 +426,7 @@ function retryAttach(): void {
 
 .syncbar__volume {
   width: 64px;
-  accent-color: var(--accent-600);
+  accent-color: var(--accent-solid);
 }
 
 .syncbar__drift {

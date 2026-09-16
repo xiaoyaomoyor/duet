@@ -88,11 +88,18 @@ const html = computed(() => renderMarkdown(data.value.text))
   border-radius: var(--radius-sm);
 }
 
+/*
+ * 行内代码。
+ * 这里原本用的是 --accent-300 —— 它在紫夜主题下是浅紫（还行），
+ * 但在**浅色主题下也是浅紫**（#c4b5fd），压在 #f4f4f6 的面板上只有 1.6:1，
+ * 基本等于看不见。这是"同一个色号在不同主题下明暗关系相反"的又一个受害者。
+ * 改用 --accent-500：三个主题下都是各自那套配色里**保证可读**的那一档。
+ */
 .md :deep(.md__inline-code) {
   padding: 0 4px;
   font-family: var(--font-mono);
   font-size: 0.92em;
-  color: var(--accent-300);
+  color: var(--accent-500);
   background: var(--bg-surface-2);
   border-radius: var(--radius-xs);
 }

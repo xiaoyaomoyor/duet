@@ -71,6 +71,87 @@ beforeEach(async () => {
   await clearProjects()
 })
 
+/**
+ * 派生资源（内嵌封面）必须随导出一起走。
+ *
+ * 这是 M8 修掉的一个真 bug：封面的 id 挂在**资源记录**的 `derived.thumbAssetId` 上，
+ * 不在 module.data 里，因此"扫模块数据收集 assetId"那一轮永远收集不到它。
+ * 结果：音频被导出、封面图没有，但音频上的 derived 被原样保留 ——
+ * 回导之后就是一个指向不存在资源的**悬空引用**，界面表现为错误占位。
+ */
+describe('导出包含派生资源（内嵌封面）', () => {
+  it('音频资源带 thumbAssetId 时，封面图也进导出集合', async () => {
+    const project = createProject({ name: '封面往返', templateId: 'music' })
+
+    const audioBlob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/mpeg' })
+    const coverBlob = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' })
+
+    const audio: Asset = {
+      id: 'b'.repeat(32),
+      kind: 'audio',
+      mime: 'audio/mpeg',
+      name: 'song.mp3',
+      size: audioBlob.size,
+      createdAt: 1,
+      blob: audioBlob,
+      derived: { thumbAssetId: 'c'.repeat(32) },
+    }
+    const cover: Asset = {
+      id: 'c'.repeat(32),
+      kind: 'image',
+      mime: 'image/png',
+      name: 'song.mp3 · 封面',
+      size: coverBlob.size,
+      createdAt: 1,
+      blob: coverBlob,
+    }
+
+    // 音频挂在第一行左侧的模块上；封面**只**出现在 derived 里
+    const row = project.sheet.rows[0]!
+    const sideId = project.sheet.sides[0]!.id
+    row.cells[sideId]!.modules[0]!.data = { assetId: audio.id, name: audio.name }
+
+    mockAssetList([audio, cover])
+
+    const result = await exportDuet([project])
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const ids = (result.value.assets ?? []).map((item) => item.id)
+    expect(ids).toContain(audio.id)
+    // 关键断言：封面不在 module.data 里，但仍然必须被带上
+    expect(ids).toContain(cover.id)
+  })
+
+  it('悬空引用不会让导出崩（指向的资源已经不存在）', async () => {
+    const project = createProject({ name: '悬空', templateId: 'music' })
+
+    const audioBlob = new Blob([new Uint8Array([1])], { type: 'audio/mpeg' })
+    const audio: Asset = {
+      id: 'd'.repeat(32),
+      kind: 'audio',
+      mime: 'audio/mpeg',
+      name: 'ghost.mp3',
+      size: audioBlob.size,
+      createdAt: 1,
+      blob: audioBlob,
+      derived: { thumbAssetId: 'e'.repeat(32) },
+    }
+
+    const row = project.sheet.rows[0]!
+    const sideId = project.sheet.sides[0]!.id
+    row.cells[sideId]!.modules[0]!.data = { assetId: audio.id }
+
+    mockAssetList([audio])
+
+    const result = await exportDuet([project])
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    // 缺失的派生资源只应产生一条警告，不该让整个导出失败
+    expect(result.value.warnings?.length ?? 0).toBeGreaterThan(0)
+  })
+})
+
 describe('blob 工具', () => {
   it('Blob → data URI → Blob 往返保持字节一致', async () => {
     const original = new Blob([new Uint8Array([1, 2, 3, 250])], { type: 'image/png' })

@@ -1,5 +1,5 @@
 /**
- * 数据迁移单测（v2 → v3）
+ * 数据迁移单测（v2 → v3 → v4）
  *
  * 这一层的风险不在"遍历游标"，而在**字段改写**：
  * 哨兵值（星级用 -1 表示未评分，评分用 null）、默认观感（封面是 1:1 + 裁切）、
@@ -9,7 +9,7 @@
  * 因此这里逐条锁住改写结果，而不是只断言"类型变了"。
  */
 import { describe, expect, it } from 'vitest'
-import { migrateModule } from './schema'
+import { migrateModule, migrateSideAccent } from './schema'
 
 describe('migrateModule：cover → image', () => {
   it('补上原封面的默认观感', () => {
@@ -130,5 +130,44 @@ describe('migrateModule：幂等与不影响其他模块', () => {
 
     const result = migrateModule({ type: 'cover', data: null, props: null })
     expect(result.type).toBe('image')
+  })
+})
+
+/**
+ * v3 → v4：把两侧烧死的 hex 认回配色预设。
+ *
+ * 为什么值得单测：这一步决定"老工程切到亮色主题后颜色对不对"。
+ * 认错了会把用户自定义的颜色悄悄改掉；认漏了则浅色主题下依旧看不清。
+ */
+describe('migrateSideAccent：hex → 预设', () => {
+  it('认识的色值会补上 accentPreset，hex 原样保留', () => {
+    const result = migrateSideAccent({ id: 'a', accent: '#a78bfa' })
+    expect(result.accentPreset).toBe('violet')
+    // hex 不动：它仍然是"不认预设的路径"的回退值
+    expect(result.accent).toBe('#a78bfa')
+  })
+
+  it('亮色主题下的取值同样能认回来（老工程可能在浅色下创建）', () => {
+    expect(migrateSideAccent({ accent: '#6d28d9' }).accentPreset).toBe('violet')
+    expect(migrateSideAccent({ accent: '#0e7490' }).accentPreset).toBe('cyan')
+  })
+
+  it('自定义颜色原样保留，不硬塞一个预设', () => {
+    const custom = { id: 'a', accent: '#123456' }
+    // 用户当初选的就是自定义色，我们无权替他改成别的
+    expect(migrateSideAccent(custom)).toEqual(custom)
+  })
+
+  it('已经有 accentPreset 的侧不再处理（幂等）', () => {
+    const side = { accent: '#ff0000', accentPreset: 'red' }
+    expect(migrateSideAccent(side)).toEqual(side)
+    // 连跑两次结果一致
+    expect(migrateSideAccent(migrateSideAccent(side))).toEqual(side)
+  })
+
+  it('accent 缺失或类型异常时不崩', () => {
+    expect(() => migrateSideAccent({})).not.toThrow()
+    expect(() => migrateSideAccent({ accent: 123 })).not.toThrow()
+    expect(migrateSideAccent({ accent: null }).accentPreset).toBeUndefined()
   })
 })

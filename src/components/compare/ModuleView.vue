@@ -24,6 +24,14 @@ const props = defineProps<{
   accent: string
   /** 只读渲染（展示视图 / 导出长图 / 只读 HTML） */
   readonly?: boolean
+  /**
+   * 子序号，形如 `2.1`。
+   *
+   * 由上层（CanvasRow）算好传进来，因为"第几行第几个"只有那一层知道；
+   * 放在 ModuleView 里渲染是为了让编辑视图与展示视图**共用同一个位置**，
+   * 这样序号在成稿里的样子与编辑时看到的一模一样。
+   */
+  number?: string | undefined
 }>()
 
 const { t } = useI18n()
@@ -42,6 +50,9 @@ const showTitle = computed(() => props.module.title.trim().length > 0)
 
 <template>
   <section class="module-view" :style="{ '--accent': accent }">
+    <!-- 子序号：贴在模块左上角（用户要求"2.2 在模块的左上角"） -->
+    <span v-if="number" class="module-view__number">{{ number }}</span>
+
     <h4 v-if="showTitle" class="module-view__title">{{ module.title }}</h4>
 
     <!--
@@ -74,6 +85,19 @@ const showTitle = computed(() => props.module.title.trim().length > 0)
   flex-direction: column;
   gap: var(--sp-2);
   min-width: 0;
+}
+
+/*
+ * 子序号。刻意做得比标题更轻（更小、更淡、等宽字体）：
+ * 它是"索引"而不是内容，抢戏会让对比页变吵。
+ * 用等宽字体是为了让 2.1 与 2.11 的左边缘对齐。
+ */
+.module-view__number {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-disabled);
+  letter-spacing: 0.02em;
 }
 
 /*

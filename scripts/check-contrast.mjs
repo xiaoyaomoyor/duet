@@ -214,6 +214,21 @@ const SEMANTIC_TEXT = ['--accent-500', '--side-a', '--side-b', '--success', '--w
 /** 非文本（描边、图标、焦点环）：AA 1.4.11 要求 3:1 */
 const NON_TEXT = ['--border-strong', '--accent-500', '--side-a', '--side-b']
 
+/**
+ * 实心强调面上的文字，形如 [前景, 背景]。
+ *
+ * 这一组此前完全没有被检查，而它恰恰出过两次问题：
+ *   1. `--accent-fg` 在"暗"主题里是近黑色（因为那里的 accent-500 是**浅**蓝），
+ *      一旦被用在深蓝的实心面上，就成了"深色文字压深色底"。
+ *   2. 选中态与主操作按钮混用了同一套实心色，深浅主题下观感完全走样。
+ * 教训：**"面上的文字"必须作为一个整体校验**，只查它跟页面背景的关系没有意义——
+ * 页面背景根本不是它实际压着的东西。
+ */
+const ON_SOLID_PAIRS = [
+  ['--accent-fg', '--accent-solid'],
+  ['--accent-fg', '--accent-solid-hover'],
+]
+
 const AA_TEXT = 4.5
 const AA_NON_TEXT = 3
 
@@ -257,6 +272,27 @@ for (const [themeId, overrides] of themes) {
     for (const name of SEMANTIC_TEXT) check(name, AA_TEXT)
     // 非文本只查最主要的那个背景，避免报告过长
     if (bgName === '--bg-surface') for (const name of NON_TEXT) check(name, AA_NON_TEXT)
+  }
+
+  // 实心面上的文字：背景不是页面层级，而是实心色本身，因此单独一组
+  for (const [fgName, bgName] of ON_SOLID_PAIRS) {
+    const bgRaw = resolveToken(tokens, bgName)
+    const fgRaw = resolveToken(tokens, fgName)
+    if (!bgRaw || !fgRaw) continue
+
+    const bgOpaque = composite(bgRaw, { r: 255, g: 255, b: 255, a: 1 })
+    const fg = composite(fgRaw, bgOpaque)
+    const value = contrast(fg, bgOpaque)
+    const ok = value >= AA_TEXT
+    if (!ok) themeFailed += 1
+    rows.push({
+      ok,
+      name: `${fgName} on ${bgName}`,
+      value,
+      min: AA_TEXT,
+      fg: hex(fg),
+      bg: hex(bgOpaque),
+    })
   }
 
   console.log(`=== 主题 ${themeId} ===`)

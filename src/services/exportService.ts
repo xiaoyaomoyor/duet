@@ -81,6 +81,21 @@ export async function exportDuet(
   if (referenced.size > 0) {
     const all = await listAssets()
     const byId = new Map(all.map((asset) => [asset.id, asset]))
+
+    /*
+     * 把**派生资源**也纳入导出集合。
+     *
+     * 派生的封面 id 挂在资源记录上（`derived.thumbAssetId`），不在 module.data 里，
+     * 因此上面那轮"扫 module 数据"永远收集不到它。此前的结果是：
+     * 音频被导出、封面图没有，但音频上的 `derived.thumbAssetId` 被原样保留——
+     * 回导之后就是一个指向不存在资源的**悬空引用**，界面表现为错误占位
+     * （而不是"没有封面"的音乐图标）。
+     */
+    for (const assetId of Array.from(referenced)) {
+      const derivedId = byId.get(assetId)?.derived?.thumbAssetId
+      if (derivedId && !referenced.has(derivedId)) referenced.add(derivedId)
+    }
+
     const targets = Array.from(referenced)
 
     for (const [index, assetId] of targets.entries()) {

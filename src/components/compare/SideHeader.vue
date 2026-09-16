@@ -33,6 +33,8 @@ import type { Side } from '@/types/project'
 const props = defineProps<{
   side: Side
   readonly?: boolean
+  /** 聚光灯「色彩弱化」：没在播放的一侧整体退到后面 */
+  dimmed?: boolean
   /** 写入侧字段 */
   patch?: (patch: Record<string, unknown>) => void
 }>()
@@ -82,7 +84,7 @@ function onPatch(patch: Record<string, unknown>): void {
 </script>
 
 <template>
-  <header class="side-head" :style="headerStyle">
+  <header class="side-head" :class="{ 'side-head--dimmed': dimmed }" :style="headerStyle">
     <!-- 强调色条：左侧竖条 -->
     <span class="side-head__bar" aria-hidden="true" />
 
@@ -138,6 +140,15 @@ function onPatch(patch: Record<string, unknown>): void {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
+}
+
+/* 聚光灯「色彩弱化」：与模块格用完全相同的处理，否则工具头会显得"没跟上" */
+.side-head--dimmed {
+  opacity: 0.35;
+  filter: saturate(0.35);
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    filter var(--dur-slow) var(--ease-out);
 }
 
 /* 左侧强调条：占满整卡高度，颜色随本侧主题色 */

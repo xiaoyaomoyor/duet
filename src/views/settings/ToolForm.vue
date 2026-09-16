@@ -375,11 +375,11 @@ const previewName = computed(() => name.value.trim() || t('tools.newTool'))
 
 .btn--primary {
   color: var(--accent-fg);
-  background: var(--accent-600);
-  border-color: var(--accent-600);
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
 }
 
 .btn--primary:hover {
-  background: var(--accent-700);
+  background: var(--accent-solid-hover);
 }
 </style>

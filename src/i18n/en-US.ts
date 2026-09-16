@@ -70,7 +70,6 @@ export default {
     noProjectsHint: 'Click “+” in the top-left to start from a template',
     emptySearch: 'No matching projects',
     count: '{n} projects',
-    rightClickHint: 'Right-click a project to pin / rename / duplicate / delete',
     pin: 'Pin',
     unpin: 'Unpin',
   },
@@ -504,6 +503,7 @@ export default {
       network: 'Network request failed — check the URL or your connection',
       unsupported: 'This browser cannot play that media format',
       tooLarge: 'File exceeds the size limit',
+      decode: 'This image cannot be decoded — the file may be corrupt',
       unknown: 'Failed to load media',
     },
   },
@@ -641,7 +641,7 @@ export default {
   },
 
   inspector: {
-    title: 'Inspector',
+    title: 'Compare setup',
     row: 'Selected row',
     module: 'Selected module',
     noSelection: 'Nothing selected',
@@ -655,8 +655,46 @@ export default {
     backgroundGrid: 'Grid',
     backgroundDots: 'Dots',
     density: 'Density',
-    open: 'Open inspector',
-    close: 'Collapse inspector',
+    open: 'Open compare setup',
+    close: 'Collapse compare setup',
+    resize: 'Drag to resize the compare setup panel (double-click to reset)',
+
+    groupLayout: 'Layout',
+    groupAccent: 'Colors',
+    accentHint:
+      'Pick a color for each side. Presets follow the theme: darker on light themes, lighter on dark ones.',
+    accentCustom: 'Custom color',
+    groupNumber: 'Numbering',
+    showNumbers: 'Show row and module numbers',
+    showNumbersHint: 'Row numbers sit at the top-left of a row; module numbers (2.2) on each module.',
+    groupBackground: 'Background',
+    backgroundFill: 'Fill',
+    fillPattern: 'Pattern',
+    fillSolid: 'Full page',
+    backgroundScale: 'Pattern density',
+    backgroundTint: 'Pattern color',
+    tintAuto: 'Follow theme',
+    backgroundInPresent: 'Keep background in present view',
+    backgroundInPresentHint:
+      'The background is an alignment aid while editing; finished output usually does not need it.',
+    groupSpotlight: 'Spotlight',
+    spotlightOff: 'Off',
+    spotlightRatio: 'Emphasize ratio',
+    spotlightDim: 'Dim the other',
+    spotlightHint:
+      'Applies in present view when exactly one side is playing. “Emphasize ratio” gives the playing side more room; “Dim the other” fades the silent side.',
+  },
+
+  accentPreset: {
+    violet: 'Violet',
+    cyan: 'Cyan',
+    pink: 'Pink',
+    blue: 'Blue',
+    orange: 'Orange',
+    green: 'Green',
+    amber: 'Amber',
+    red: 'Red',
+    slate: 'Slate',
   },
 
   toast: {

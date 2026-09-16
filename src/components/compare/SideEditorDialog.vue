@@ -509,11 +509,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 .btn--primary {
   color: var(--accent-fg);
-  background: var(--accent-600);
-  border: 1px solid var(--accent-600);
+  background: var(--accent-solid);
+  border: 1px solid var(--accent-solid);
 }
 
 .btn--primary:hover {
-  background: var(--accent-700);
+  background: var(--accent-solid-hover);
 }
 </style>

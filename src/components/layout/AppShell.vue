@@ -21,11 +21,9 @@ import { useI18n } from 'vue-i18n'
 import TopBar from './TopBar.vue'
 import ProjectSidebar from './ProjectSidebar.vue'
 import TabBar from './TabBar.vue'
-import InspectorPanel from '@/components/editor/InspectorPanel.vue'
 import ExportDialog from '@/components/export/ExportDialog.vue'
 import AppToasts from '@/components/common/AppToasts.vue'
 import { useUiStore } from '@/stores/useUiStore'
-import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts'
 import { applySidebarWidth } from '@/lib/theme'
@@ -34,7 +32,6 @@ import { APP } from '@/app.config'
 const { t } = useI18n()
 const route = useRoute()
 const ui = useUiStore()
-const project = useProjectStore()
 const settings = useSettingsStore()
 
 useGlobalShortcuts()
@@ -42,10 +39,7 @@ useGlobalShortcuts()
 /** 设置界面不显示对比标签页 */
 const showTabs = computed(() => route.meta.layout !== 'settings')
 
-/** 属性面板只在对比界面、且存在打开的项目时出现 */
-const showInspector = computed(() => showTabs.value && ui.inspectorOpen && project.hasProject)
-
-/** 版本徽标文案（如 "DUET: v0.2.5"） */
+/** 版本徽标文案（如 "DUET: v0.3.0"） */
 const versionLabel = computed(() => `${APP.nameEn.toUpperCase()}: v${APP.version}`)
 
 /** 路由级别的标题（供侧栏与顶栏共享的语义区域使用） */
@@ -150,7 +144,7 @@ onBeforeUnmount(() => {
     -->
     <div
       v-if="!ui.sidebarCollapsed"
-      class="shell__resizer"
+      class="shell__resizer u-split u-split--v"
       role="separator"
       aria-orientation="vertical"
       :aria-label="t('nav.resizeSidebar')"
@@ -174,8 +168,6 @@ onBeforeUnmount(() => {
       </div>
     </main>
 
-    <InspectorPanel v-if="showInspector" class="shell__inspector" />
-
     <ExportDialog :open="ui.exportOpen" @close="ui.closeExport()" />
 
     <AppToasts />
@@ -194,15 +186,20 @@ onBeforeUnmount(() => {
   position: relative; /* 分隔条的定位基准 */
   display: grid;
   grid-template:
-    'topbar topbar topbar' var(--size-topbar)
-    'sidebar main inspector' 1fr / var(--size-sidebar) 1fr auto;
+    'topbar topbar' var(--size-topbar)
+    'sidebar main' 1fr / var(--size-sidebar) 1fr;
   height: 100vh;
   overflow: hidden;
   background: var(--bg-base);
 }
 
+/*
+ * 折叠态只改第一列的宽度。
+ * 对比配置面板已搬到 CompareView 内部（它属于对比页，不属于外壳），
+ * 因此这里不再需要第三列，--size-inspector 也随之取消。
+ */
 .shell--compact {
-  grid-template-columns: var(--size-sidebar-collapsed) 1fr auto;
+  grid-template-columns: var(--size-sidebar-collapsed) 1fr;
 }
 
 .shell__topbar {
@@ -219,29 +216,21 @@ onBeforeUnmount(() => {
  * 分隔条绝对定位、**不占网格列**：
  * 这样 grid-template-columns 仍然是"侧栏 1fr auto"，
  * 宽度只需要由 --size-sidebar 一个变量管。
+ *
+ * 可见线宽与抓取宽度由 .u-split--v 统一提供（3px / 12px），
+ * 与中轴、对比配置、行高四条线对齐。
  */
 .shell__resizer {
   position: absolute;
   top: var(--size-topbar);
   bottom: 0;
-  left: calc(var(--size-sidebar) - 3px);
+  left: calc(var(--size-sidebar) - 6px);
   z-index: var(--z-sticky);
-  width: 6px;
-  cursor: col-resize;
-  background: transparent;
-  transition: background var(--dur-fast) var(--ease-out);
 }
 
-.shell__resizer:hover,
-.shell__resizer--active,
-.shell__resizer:focus-visible {
+/* 拖拽过程中保持亮起：鼠标偶尔划出 12px 抓取区时线不该闪一下 */
+.shell__resizer--active::after {
   background: var(--accent-500);
-}
-
-/* 键盘聚焦时才显示轮廓：鼠标点击不该留下焦点圈 */
-.shell__resizer:focus-visible {
-  outline: 2px solid var(--accent-500);
-  outline-offset: 1px;
 }
 
 .shell__main {
@@ -255,10 +244,6 @@ onBeforeUnmount(() => {
 .shell__content {
   flex: 1;
   min-height: 0;
-}
-
-.shell__inspector {
-  grid-area: inspector;
 }
 
 /*

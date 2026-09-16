@@ -108,18 +108,53 @@ function extract(buffer: ArrayBuffer): Id3Picture | null {
   let cursor = HEADER_SIZE
   const tagEnd = Math.min(HEADER_SIZE + tagSize, buffer.byteLength)
 
-  // 扩展头（仅 v2.4 常见）：跳过它再开始读帧
+  /*
+   * 扩展头（标志位 0x40）。
+   *
+   * 两个版本的**长度字段编码完全不同**，早先这里对两者都按 synchsafe 读，
+   * 结果是：带扩展头的 v2.3 文件整段错位、静默解析失败（用户看到的
+   * 就是"Windows 有封面、对奏没有"）。实测合成的 v2.3 EAH 文件复现了它。
+   *   v2.4：长度是 synchsafe，且这个值已经覆盖了长度字段自身
+   *   v2.3：长度是普通 uint32，且**不含**它自己的 4 个字节
+   */
   if ((flags & 0x40) !== 0) {
-    const extSize = readSynchsafe(view, cursor)
-    cursor += extSize > 0 ? extSize : 6
+    if (majorVersion === 4) {
+      const extSize = readSynchsafe(view, cursor)
+      cursor += extSize > 0 ? extSize : 6
+    } else {
+      const extSize = view.getUint32(cursor)
+      // 明显越界的长度当作坏的扩展头，只跳最小的 6 字节（标志 2 + 填充 4）
+      const sane = extSize > 0 && extSize < tagSize
+      cursor += sane ? 4 + extSize : 6
+    }
   }
 
-  while (cursor + FRAME_HEADER_SIZE <= tagEnd) {
+  /*
+   * 标签级去同步（v2.3 的 0x80）：**整段标签体**在写入时被转义过，
+   * 因此必须先把整段还原，再按帧头里的长度切帧。
+   *
+   * 为什么不能在"切出 APIC 帧之后"再还原：
+   *   v2.3 的帧长记的是**还原前**的长度，而去同步会让实际字节变多，
+   *   按这个长度在转义后的字节流上切片会**切短**，图片尾部被截掉。
+   *   （实测：12 字节的图只剩 10 字节，且不报任何错。）
+   * v2.4 把去同步降到了帧级（格式标志 0x02），那时帧长记的是转义后的长度，
+   * 所以那一支仍然按帧切片——见 readApicFrame 的说明。
+   */
+  const tagUnsynchronised = (flags & 0x80) !== 0
+
+  const rawBody = new Uint8Array(view.buffer, view.byteOffset + cursor, tagEnd - cursor)
+  const body = tagUnsynchronised ? deUnsynchronise(rawBody) : rawBody
+
+  // 还原之后一律在**标签体自己的坐标系**里走，不再回头用绝对偏移
+  const bodyView = new DataView(body.buffer, body.byteOffset, body.byteLength)
+  let frameCursor = 0
+
+  while (frameCursor + FRAME_HEADER_SIZE <= body.byteLength) {
     const frameId = String.fromCharCode(
-      view.getUint8(cursor),
-      view.getUint8(cursor + 1),
-      view.getUint8(cursor + 2),
-      view.getUint8(cursor + 3),
+      bodyView.getUint8(frameCursor),
+      bodyView.getUint8(frameCursor + 1),
+      bodyView.getUint8(frameCursor + 2),
+      bodyView.getUint8(frameCursor + 3),
     )
 
     // 全 0 的帧 id 表示"后面是填充字节"，可以停了
@@ -128,18 +163,87 @@ function extract(buffer: ArrayBuffer): Id3Picture | null {
     // v2.4 的帧长也是 synchsafe；v2.3 是普通 big-endian uint32。
     // 混用会让游标错位，读出乱七八糟的"图片"。
     const frameSize =
-      majorVersion === 4 ? readSynchsafe(view, cursor + 4) : view.getUint32(cursor + 4)
+      majorVersion === 4 ? readSynchsafe(bodyView, frameCursor + 4) : bodyView.getUint32(frameCursor + 4)
 
-    const frameStart = cursor + FRAME_HEADER_SIZE
+    // v2.4 的帧格式标志低字节里，0x02 = 该帧做了去同步
+    const frameFlags = bodyView.getUint8(frameCursor + 9)
+    const frameUnsynchronised = majorVersion === 4 && (frameFlags & 0x02) !== 0
+
+    const frameStart = frameCursor + FRAME_HEADER_SIZE
     const frameEnd = frameStart + frameSize
-    if (frameSize <= 0 || frameEnd > tagEnd) break
+    if (frameSize <= 0 || frameEnd > body.byteLength) break
 
     if (frameId === 'APIC') {
-      const picture = readApic(view, frameStart, frameEnd)
+      const picture = readApicFrame(bodyView, frameStart, frameEnd, frameUnsynchronised)
       if (picture) return picture
     }
 
-    cursor = frameEnd
+    frameCursor = frameEnd
+  }
+
+  return null
+}
+
+/**
+ * 取出 APIC 帧并解析。
+ *
+ * 这里只处理 **v2.4 的帧级去同步**（格式标志 0x02）：
+ * 帧长记的是转义后的长度，所以在帧自己的坐标系里切片、再还原 —— 顺序与标签级相反。
+ * v2.3 的标签级去同步已经在 extract() 里对整段标签体做掉了，
+ * 因为那里的帧长记的是**还原前**的长度。
+ */
+function readApicFrame(
+  view: DataView,
+  start: number,
+  end: number,
+  unsynchronised: boolean,
+): Id3Picture | null {
+  const raw = new Uint8Array(view.buffer, view.byteOffset + start, end - start)
+  const bytes = unsynchronised ? deUnsynchronise(raw) : raw
+  return readApic(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), 0, bytes.byteLength)
+}
+
+/** 去掉去同步插入的 `0x00`：每个 `0xFF` 后面紧跟的那个 `0x00` 是填充，不是数据 */
+export function deUnsynchronise(input: Uint8Array): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(input.byteLength)
+  let written = 0
+
+  for (let index = 0; index < input.byteLength; index += 1) {
+    const byte = input[index] ?? 0
+    out[written] = byte
+    written += 1
+    if (byte === 0xff && input[index + 1] === 0x00) index += 1
+  }
+
+  return out.slice(0, written)
+}
+
+/**
+ * 按文件头魔数判断图片类型。
+ *
+ * 为什么必须做这一步：MIME 字段是**文件自己声称**的，可以撒谎也可以为空；
+ * 而图片字节是不是真的能解码，只有魔数知道。早先只校验了"data 非空 + mime 以 image/ 开头"，
+ * 于是被去同步污染过的坏图会**照常落库**，最后在界面上表现为一张破图或干脆空白。
+ * 宁可判定为"没有封面"（回退到音乐图标占位），也不要塞一个坏 blob 进库。
+ */
+function sniffImageMime(bytes: Uint8Array): string | null {
+  const at = (index: number): number => bytes[index] ?? -1
+
+  if (at(0) === 0xff && at(1) === 0xd8 && at(2) === 0xff) return 'image/jpeg'
+  if (at(0) === 0x89 && at(1) === 0x50 && at(2) === 0x4e && at(3) === 0x47) return 'image/png'
+  if (at(0) === 0x47 && at(1) === 0x49 && at(2) === 0x46) return 'image/gif'
+  if (at(0) === 0x42 && at(1) === 0x4d) return 'image/bmp'
+  if (
+    at(0) === 0x52 &&
+    at(1) === 0x49 &&
+    at(2) === 0x46 &&
+    at(3) === 0x46 &&
+    at(8) === 0x57 &&
+    at(9) === 0x45 &&
+    at(10) === 0x42 &&
+    at(11) === 0x50
+  ) {
+    return 'image/webp'
   }
 
   return null
@@ -180,10 +284,21 @@ function readApic(view: DataView, start: number, end: number): Id3Picture | null
   if (cursor >= end) return null
 
   const data = new Uint8Array(view.buffer, view.byteOffset + cursor, end - cursor)
-
-  // 空图片或 mime 明显不对时当作没有：宁可没有封面，也不要塞一个坏 blob 进库
   if (data.byteLength === 0) return null
-  if (!mime.startsWith('image/')) return null
+
+  /*
+   * 用魔数校验，而不是相信 MIME 字段。
+   *
+   * mime 是文件**自己声称**的，可以撒谎、也可以为空；图片字节能不能解码只有魔数知道。
+   * 早先只挡了"空数据 + mime 不以 image/ 开头"，于是被去同步污染过的坏字节
+   * 会照常落库，最后在界面上表现为破图或空白——用户完全无从判断是文件的问题
+   * 还是应用的问题。现在宁可判定为"没有封面"（回退到音乐图标占位）。
+   */
+  const sniffed = sniffImageMime(data)
+  if (!sniffed) return null
+
+  // MIME 为空或明显对不上时以魔数为准（Windows 常见的 image/jpg 也在这里被规范化）
+  const resolvedMime = mime.startsWith('image/') ? mime : sniffed
 
   /*
    * 拷贝一份，而不是直接返回上面那个视图。
@@ -197,5 +312,5 @@ function readApic(view: DataView, start: number, end: number): Id3Picture | null
   const copy = new Uint8Array(data.byteLength)
   copy.set(data)
 
-  return { mime, data: copy }
+  return { mime: resolvedMime, data: copy }
 }

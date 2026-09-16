@@ -15,7 +15,7 @@ import { useResolvedMedia, assetSource } from '@/composables/useResolvedMedia'
 import { registerSyncTrack, reportAudioState, unregisterSyncTrack } from '@/composables/useAudioClock'
 import { getSyncEngine } from '@/composables/useAudioClock'
 import { onRafTick } from '@/composables/useRafTicker'
-import { getAsset } from '@/db/assetsRepo'
+import { repairEmbeddedCover } from '@/services/assetService'
 import { formatDuration } from '@/lib/time'
 import type { ModuleRendererProps } from '../types'
 import type { MediaData } from '../shared/mediaData'
@@ -64,10 +64,15 @@ watch(
     coverAssetId.value = undefined
     if (!assetId) return
     try {
-      const asset = await getAsset(assetId)
-      coverAssetId.value = asset?.derived?.thumbAssetId
+      /*
+       * 用 repairEmbeddedCover 而不是直接读 derived.thumbAssetId：
+       * 它会顺带处理两种"读出来是空的"情况——M8 之前解析器的 bug 导致
+       * 当初就没抽出封面的老资源，以及 .duet 往返后指向不存在资源的悬空引用。
+       * 两者都表现为"Windows 有封面、对奏没有"，而用户无从判断原因。
+       */
+      coverAssetId.value = (await repairEmbeddedCover(assetId)) ?? undefined
     } catch {
-      // 读不到封面不算错误：模板会退回纯文字头部
+      // 读不到封面不算错误：模板会退回音乐图标占位
       coverAssetId.value = undefined
     }
   },
@@ -194,6 +199,7 @@ onBeforeUnmount(() => {
           fit="cover"
           ratio="1/1"
           :rounded="false"
+          silent-on-error
         />
         <span v-else class="audio__cover audio__cover--placeholder" aria-hidden="true">
           <AppIcon name="music" :size="20" />

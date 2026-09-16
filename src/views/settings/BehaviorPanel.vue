@@ -116,7 +116,7 @@ async function updateSidebarWidth(value: number): Promise<void> {
   flex: none;
   width: 34px;
   height: 18px;
-  accent-color: var(--accent-600);
+  accent-color: var(--accent-solid);
 }
 
 .spacer {
@@ -135,6 +135,6 @@ input[type='range'].control {
   padding: 0;
   background: none;
   border: none;
-  accent-color: var(--accent-600);
+  accent-color: var(--accent-solid);
 }
 </style>

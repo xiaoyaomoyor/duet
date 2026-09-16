@@ -228,6 +228,25 @@ function rowCount(projectId: string): number {
                       {{ t('compare.rows', { n: rowCount(project.id) }) }}
                     </span>
                   </span>
+                  <!--
+                    ⋯ 菜单按钮：悬浮/聚焦时出现。
+                    这里曾按实测反馈删掉过一个六点图标（它长得像拖拽手柄，
+                    实际只是右键菜单的另一个入口，外形与语义对不上）。
+                    但删掉之后菜单只剩右键一条路，对鼠标用户几乎不可见——
+                    所以现在换成一个**语义正确**的 ⋯：它本来就表示"更多操作"。
+                  -->
+                  <span
+                    class="sidebar__item-more"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="t('common.more')"
+                    :title="t('common.more')"
+                    :aria-expanded="menuFor === project.id"
+                    @click.stop="toggleMenu(project.id)"
+                    @keydown.enter.stop.prevent="toggleMenu(project.id)"
+                  >
+                    <AppIcon name="more" :size="15" />
+                  </span>
                 </button>
 
                 <ul v-if="menuFor === project.id" class="ctx-menu">
@@ -264,12 +283,6 @@ function rowCount(projectId: string): number {
 
       <div class="sidebar__foot">
         <span class="sidebar__hint">{{ t('sidebar.count', { n: projects.items.length }) }}</span>
-        <!--
-          菜单只由右键唤出（六点图标已按实测反馈删除），
-          因此这里必须留一句提示——否则"能置顶/重命名/删除"这件事
-          对新用户来说完全不可见。
-        -->
-        <span class="sidebar__hint sidebar__hint--dim">{{ t('sidebar.rightClickHint') }}</span>
       </div>
     </template>
 
@@ -396,7 +409,13 @@ function rowCount(projectId: string): number {
   background: var(--bg-hover);
 }
 
-.sidebar__item--active {
+/*
+ * 选中项被悬停时**保持**浅色选中底，不要退回灰底。
+ * 这条规则必须写在 :hover 之后：否则鼠标一放上去，被选中的那一项
+ * 看起来就和没选中一样了（标签栏那边是同一个问题，同一套写法）。
+ */
+.sidebar__item--active,
+.sidebar__item--active:hover {
   background: var(--accent-soft);
 }
 
@@ -423,6 +442,38 @@ function rowCount(projectId: string): number {
   color: var(--text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * ⋯ 菜单按钮：默认隐藏、悬浮或键盘聚焦时出现。
+ * 用 opacity 而不是 display —— 后者会让它无法成为 Tab 焦点，
+ * 键盘用户就永远打不开菜单了（这个坑在模块卡片上已经踩过一次）。
+ */
+.sidebar__item-more {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--text-muted);
+  border-radius: var(--radius-xs);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.sidebar__item:hover .sidebar__item-more,
+.sidebar__item:focus-within .sidebar__item-more,
+.sidebar__item-more:focus-visible {
+  opacity: 1;
+}
+
+.sidebar__item-more:hover,
+.sidebar__item-more:focus-visible {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .sidebar__rename {
@@ -473,9 +524,6 @@ function rowCount(projectId: string): number {
 }
 
 .sidebar__foot {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   padding: var(--sp-2) var(--sp-3);
   border-top: 1px solid var(--border-subtle);
 }
@@ -483,10 +531,5 @@ function rowCount(projectId: string): number {
 .sidebar__hint {
   font-size: var(--fs-xs);
   color: var(--text-disabled);
-}
-
-.sidebar__hint--dim {
-  color: var(--text-disabled);
-  opacity: 0.8;
 }
 </style>

@@ -22,6 +22,9 @@ import { useProjectStore } from '@/stores/useProjectStore'
 import { useUiStore } from '@/stores/useUiStore'
 import { isPresentable } from '@/modules/visibility'
 import { moduleTitle } from '@/i18n/helper'
+import { useResolvedTheme } from '@/composables/useResolvedTheme'
+import { usePlayingSides } from '@/composables/usePlayingSides'
+import { resolveAccent } from '@/data/accentPresets'
 import type { CellRef, ModuleInstance, ModuleRef, Project, Row, SideId } from '@/types/project'
 
 const props = defineProps<{
@@ -40,15 +43,78 @@ const ui = useUiStore()
 
 const isReadonly = computed(() => props.readonly === true)
 
-const sides = computed(() => props.project.sheet.sides)
+const accentTheme = useResolvedTheme()
+
+/**
+ * 两侧数据的**展示副本**：把配色解析成"当前主题下的实际色值"。
+ *
+ * 为什么在这里做而不是让每个下游自己算：
+ *   `side.accent` 被 CanvasRow / SideHeader / SyncPlayerBar / ModuleView
+ *   等六七个地方读。如果在各自那里解析，就会出现"有的地方跟主题、有的地方不跟"
+ *   这种最难查的不一致。收口在这一处之后，下游继续读 `side.accent` 即可，
+ *   一个字都不用改，而且拿到的永远是对的。
+ *
+ * 注意解析只影响**渲染**：写回工程的仍然是预设 id（见 data/accentPresets.ts），
+ * 所以切主题不会污染工程数据。
+ */
+const sides = computed(() =>
+  props.project.sheet.sides.map((side) => ({
+    ...side,
+    accent: resolveAccent(side, accentTheme.value) || 'var(--accent-500)',
+  })),
+)
 const rows = computed(() => props.project.sheet.rows)
 const layout = computed(() => props.project.sheet.layout)
+
+// ————————————————————————————————————————————————————————
+// 聚光灯：只有一侧在播放时，让"正在听的那一边"更突出
+// ————————————————————————————————————————————————————————
+
+const playingSides = usePlayingSides(computed(() => sides.value.map((side) => side.id)))
+
+/** 恰好一侧在播放时返回它的 id，否则 null（两侧都播 / 都没播时不该有偏向） */
+const soloPlayingSideId = computed(() => {
+  const playing = Object.entries(playingSides.value)
+    .filter(([, isPlaying]) => isPlaying)
+    .map(([id]) => id)
+  return playing.length === 1 ? (playing[0] ?? null) : null
+})
+
+const spotlightMode = computed(() => layout.value.spotlight ?? 'off')
+
+/**
+ * 聚光灯只在**展示视图**生效。
+ *
+ * 用户的原话是"正在播放的工具整体在**展示模式**中占据更大的比例"。
+ * 编辑视图不跟进还有一个更实际的理由：一边听一边排版时，
+ * 画布因为播放状态忽宽忽窄、忽明忽暗，是纯粹的干扰。
+ */
+const spotlightSideId = computed(() =>
+  isReadonly.value && spotlightMode.value !== 'off' ? soloPlayingSideId.value : null,
+)
+
+/** 需要"色彩弱化"的侧：正在被强调的那一侧之外的所有侧 */
+const dimmedSideIds = computed(() => {
+  if (spotlightMode.value !== 'dim' || !spotlightSideId.value) return []
+  return sides.value.map((side) => side.id).filter((id) => id !== spotlightSideId.value)
+})
 
 const canvasStyle = computed(() => {
   const ratio = layout.value.ratio
   // ratio 理论上恒为两个正数，但工程文件可能被手改过，这里兜一层
   const a = Number.isFinite(ratio?.[0]) && ratio[0] > 0 ? ratio[0] : 1
   const b = Number.isFinite(ratio?.[1]) && ratio[1] > 0 ? ratio[1] : 1
+
+  /*
+   * 比例强调：在用户设的比例基础上给正在播放的一侧加权，
+   * 而不是直接写死 62:38 —— 用户手里的 1:1 或 3:2 是他特意调过的，
+   * 用固定值会把它抹掉。
+   */
+  const emphasised = spotlightSideId.value
+  const boost = spotlightMode.value === 'ratio' ? 1.7 : 1
+  const firstId = sides.value[0]?.id
+  const weightA = emphasised && firstId === emphasised ? a * boost : a
+  const weightB = emphasised && firstId !== emphasised ? b * boost : b
 
   return {
     '--side-a': sides.value[0]?.accent ?? 'var(--accent-500)',
@@ -60,10 +126,10 @@ const canvasStyle = computed(() => {
      * 渲染时被写死成 `1fr 1fr`——所以"拖动中轴调宽度"这件事
      * 数据上早就支持，只是从来没接到 CSS。
      */
-    '--col-a': `${a}fr`,
-    '--col-b': `${b}fr`,
+    '--col-a': `${weightA}fr`,
+    '--col-b': `${weightB}fr`,
     /** 左列占内容宽度的比例，供中轴拖拽手柄定位 */
-    '--col-frac': `${a / (a + b)}`,
+    '--col-frac': `${weightA / (weightA + weightB)}`,
   }
 })
 
@@ -71,6 +137,38 @@ const canvasStyle = computed(() => {
 const backgroundClass = computed(() => `canvas--bg-${layout.value.background}`)
 
 const densityClass = computed(() => `canvas--${layout.value.density}`)
+
+// ————————————————————————————————————————————————————————
+// 背景图案参数（对比配置里可调）
+// ————————————————————————————————————————————————————————
+
+const DEFAULT_BG_SCALE = 32
+
+/**
+ * 背景参数写成 CSS 变量而不是几套写死的类：
+ * 「密度 / 颜色 / 填充形式」三者的组合有几十种，枚举成类会爆炸，
+ * 而它们本身都是连续量，交给变量最自然。
+ */
+const backgroundVars = computed(() => {
+  const scale = Number.isFinite(layout.value.backgroundScale)
+    ? Math.min(96, Math.max(8, layout.value.backgroundScale as number))
+    : DEFAULT_BG_SCALE
+
+  return {
+    '--bg-scale': `${scale}px`,
+    // 留空 = 跟随主题（用各主题自己的 --border-* 色）
+    '--bg-tint': layout.value.backgroundTint ?? '',
+    '--bg-tint-fallback': 'var(--border-subtle)',
+  }
+})
+
+/** 展示视图下是否保留背景图案（默认关：成稿要的是内容本身） */
+const showBackground = computed(() => !isReadonly.value || layout.value.backgroundInPresent === true)
+
+/** 整页实心填充（相对于"图案铺在内容底下"） */
+const solidFill = computed(() => layout.value.backgroundFill === 'solid')
+
+const showRowNumbers = computed(() => layout.value.showRowNumbers === true)
 
 // ————————————————————————————————————————————————————————
 // 中轴拖拽：调整左右宽度比
@@ -275,7 +373,15 @@ function onDuplicateModule(ref: ModuleRef): void {
 
 <template>
   <div class="canvas-wrap">
-    <div class="canvas" :class="[densityClass, backgroundClass]" :style="canvasStyle">
+    <div
+      class="canvas"
+      :class="[
+        densityClass,
+        backgroundClass,
+        { 'canvas--bg-hidden': !showBackground, 'canvas--bg-fill': solidFill },
+      ]"
+      :style="[canvasStyle, backgroundVars]"
+    >
       <!-- 工具头 -->
       <div class="canvas__heads">
         <SideHeader
@@ -283,6 +389,7 @@ function onDuplicateModule(ref: ModuleRef): void {
           :key="side.id"
           :side="side"
           :readonly="project.ui.mode === 'present'"
+          :dimmed="dimmedSideIds.includes(side.id)"
           :patch="(patch: Record<string, unknown>) => store.setSideField(side.id, patch)"
         />
       </div>
@@ -303,6 +410,8 @@ function onDuplicateModule(ref: ModuleRef): void {
             :row-index="rowIndex"
             :sides="sides"
             :project-id="project.id"
+            :show-numbers="showRowNumbers"
+            :dimmed-side-ids="dimmedSideIds"
             @insert="insertRowAt"
             @add-common="openCommonPicker"
             @remove="removeRow"
@@ -327,6 +436,8 @@ function onDuplicateModule(ref: ModuleRef): void {
           :row-index="rowIndex"
           :sides="sides"
           :project-id="project.id"
+          :show-numbers="showRowNumbers"
+          :dimmed-side-ids="dimmedSideIds"
           readonly
         />
       </div>
@@ -347,7 +458,7 @@ function onDuplicateModule(ref: ModuleRef): void {
       -->
       <div
         v-if="!isReadonly && visibleRows.length > 0"
-        class="canvas__axis-resizer"
+        class="canvas__axis-resizer u-split u-split--v"
         role="separator"
         aria-orientation="vertical"
         :aria-label="t('compare.resizeColumns')"
@@ -395,11 +506,8 @@ function onDuplicateModule(ref: ModuleRef): void {
  * 再加上半个中缝就是真正的中线。这样无论比例怎么变，
  * 手柄都精确压在视觉中缝上，而不是画布正中。
  *
- * M7（用户实测反馈"手柄太宽了"）：把**看得见的线**和**抓得到的范围**拆开——
- * 元素本身仍有 12px 宽（保证好抓、好按），真正画出来的那条线只有 3px，
- * 由 ::after 居中绘制。
- * 直接把这个 div 改窄到 3px 也能满足"细"，但那样鼠标要精确对准 3px
- * 才拖得动，是把手感换成了好看。两者可以都要。
+ * 宽度与"看得见的那条线"由 .u-split--v 统一提供（抓取 12px、线 3px），
+ * 这里只负责把它摆到正确的位置上。
  */
 .canvas__axis-resizer {
   position: absolute;
@@ -410,30 +518,6 @@ function onDuplicateModule(ref: ModuleRef): void {
       var(--canvas-gutter, 32px) / 2 - 6px
   );
   z-index: 2;
-  width: 12px;
-  cursor: col-resize;
-}
-
-.canvas__axis-resizer::after {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 3px;
-  margin-left: -1.5px;
-  content: '';
-  background: transparent;
-  border-radius: var(--radius-full);
-  transition: background var(--dur-fast) var(--ease-out);
-}
-
-.canvas__axis-resizer:hover::after,
-.canvas__axis-resizer:focus-visible::after {
-  background: var(--accent-500);
-}
-
-.canvas__axis-resizer:focus-visible {
-  outline: none;
 }
 
 .canvas__heads {
@@ -644,16 +728,42 @@ function onDuplicateModule(ref: ModuleRef): void {
   gap: var(--sp-8);
 }
 
-/* —— 背景样式（Inspector 可切换） —— */
+/* —— 背景样式（对比配置里可切换） ——
+ *
+ * 图案的**密度**与**颜色**都走 CSS 变量（--bg-scale / --bg-tint）：
+ * 这两个是连续量，枚举成类会爆炸。--bg-tint 留空时回落到主题自带的描边色，
+ * 也就是"跟随主题"。
+ *
+ * .canvas--bg-hidden 用于"展示视图不显示背景"：图案是编辑器里的对齐辅助，
+ * 出现在成稿里只会显脏。
+ */
 .canvas--bg-grid {
   background-image:
-    linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
-  background-size: 32px 32px;
+    linear-gradient(to right, var(--bg-tint, var(--border-subtle)) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--bg-tint, var(--border-subtle)) 1px, transparent 1px);
+  background-size: var(--bg-scale, 32px) var(--bg-scale, 32px);
 }
 
 .canvas--bg-dots {
-  background-image: radial-gradient(var(--border-default) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: radial-gradient(var(--bg-tint, var(--border-default)) 1px, transparent 1px);
+  background-size: var(--bg-scale, 20px) var(--bg-scale, 20px);
+}
+
+.canvas--bg-hidden {
+  background-image: none;
+}
+
+/*
+ * 整页实心填充：底色铺满整个对比页（而不只是内容区），
+ * 用来做"整页一张视觉稿"的效果。
+ */
+.canvas--bg-fill {
+  min-height: 100%;
+  background-color: var(--bg-tint, var(--bg-surface));
+  background-blend-mode: normal;
+}
+
+.canvas--bg-fill.canvas--bg-hidden {
+  background-color: transparent;
 }
 </style>

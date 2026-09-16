@@ -134,6 +134,87 @@ ol {
   overscroll-behavior: contain;
 }
 
+/*
+ * —— 选中态（全应用唯一的一种"我被选中了"着色） ——
+ *
+ * 参照物是左侧项目列表里被选中的那一项：**浅色底**（--accent-soft），
+ * 而不是实心深色。两者语义完全不同，不能混用：
+ *   选中态 = "我在这一项上"       → 浅底 + 主题色前景
+ *   实心面 = "点这里会发生一件事"  → --accent-solid + --accent-fg（主操作按钮）
+ *
+ * 之所以抽成工具类而不是每个组件各写一遍：用户实测反馈里"选中的颜色不对"
+ * 出现过两次（标签页、顶栏入口），根因都是各自手写了一套实心配色。
+ * 收敛到这里之后，"像不像项目列表里选中的那一项"这件事只需要维护一处。
+ */
+.u-selected {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+/* 选中态里的图标跟随主题色，这样没有文字时也能一眼看出选中的是哪一个 */
+.u-selected .u-selected-icon {
+  color: var(--accent-500);
+}
+
+/*
+ * —— 拖动分界线（全应用统一） ——
+ *
+ * 用户实测反馈："其他可拖动的分界线，宽度向两个工具中间那条对齐"。
+ * 那条（中轴）的做法是：**元素本身够宽好抓，画出来的线很细**。
+ * 这里把它抽成工具类，让左栏、对比配置、行高、中轴四条线用同一份实现——
+ * 否则四条线会各自漂移成 3px / 4px / 6px / 8px 四种宽度（这正是之前的状态）。
+ *
+ * 线宽固定 3px：细到不抢内容，粗到看得见。
+ */
+.u-split {
+  position: relative;
+}
+
+.u-split::after {
+  position: absolute;
+  content: '';
+  background: transparent;
+  border-radius: var(--radius-full);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.u-split:hover::after,
+.u-split:focus-visible::after {
+  background: var(--accent-500);
+}
+
+.u-split:focus-visible {
+  outline: none;
+}
+
+/* 竖向分界（左栏 / 对比配置 / 中轴）：抓取宽度 12px，线 3px */
+.u-split--v {
+  width: 12px;
+  cursor: col-resize;
+}
+
+.u-split--v::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+}
+
+/* 横向分界（行高）：抓取高度 10px，线 3px */
+.u-split--h {
+  height: 10px;
+  cursor: row-resize;
+}
+
+.u-split--h::after {
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 3px;
+  margin-top: -1.5px;
+}
+
 @media print {
   body {
     overflow: visible;

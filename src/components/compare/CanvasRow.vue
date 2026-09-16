@@ -29,6 +29,10 @@ const props = defineProps<{
   readonly?: boolean
   /** 所属项目 id（音频模块登记同步音轨时需要） */
   projectId?: string
+  /** 是否在行与模块的左上角显示序号（对比配置里的开关） */
+  showNumbers?: boolean
+  /** 聚光灯"色彩弱化"要压暗的侧 */
+  dimmedSideIds?: readonly string[]
 }>()
 
 /**
@@ -152,6 +156,25 @@ function moduleRef(sideId: SideId, moduleId: string): ModuleRef {
   return { rowId: props.row.id, sideId, moduleId }
 }
 
+/** 行序号从 1 开始（给用户看的，不是数组下标） */
+const rowNumber = computed(() => props.rowIndex + 1)
+
+/**
+ * 模块的子序号，形如 `2.2`（第 2 行第 2 个模块）。
+ *
+ * 编号在**每一侧内部各自从 1 开始**，而不是左右连续排下去：
+ * 左右两栏是同一道题的两个答案，2.1 在左边和右边指的是同一个维度，
+ * 连续编号会让"左边的 2.3 对应右边的 2.4"这种误解变得很难解释。
+ */
+function moduleNumber(sideId: SideId, moduleId: string): string {
+  const index = modulesOf(sideId).findIndex((module) => module.id === moduleId)
+  return `${rowNumber.value}.${index + 1}`
+}
+
+function isDimmed(sideId: SideId): boolean {
+  return props.dimmedSideIds?.includes(sideId) === true
+}
+
 function cellStyle(side: Side): Record<string, string> {
   /*
    * 通用行不属于任何一侧，因此不套用某一边的主题色（否则会误导"这是左边的"）。
@@ -187,6 +210,9 @@ defineExpose({ rowHasContent })
   >
     <!-- 行头：编辑态可拖拽/命名/增删 -->
     <div v-if="!isReadonly" class="row__head">
+      <!-- 行序号：在整行的左上角，与模块的子序号（2.1 / 2.2）形成层级 -->
+      <span v-if="showNumbers" class="row__number">{{ rowNumber }}</span>
+
       <span class="row-drag-handle row__grip" :title="t('row.moveRow')">
         <AppIcon name="grip" :size="13" />
       </span>
@@ -236,8 +262,11 @@ defineExpose({ rowHasContent })
       </div>
     </div>
 
-    <!-- 行标题：展示态是静态胶囊 -->
-    <div v-if="isReadonly && row.label" class="row__label">{{ row.label }}</div>
+    <!-- 行标题：展示态是静态胶囊；序号在展示态同样保留（它是内容的一部分） -->
+    <div v-if="isReadonly && (row.label || showNumbers)" class="row__label-row">
+      <span v-if="showNumbers" class="row__number">{{ rowNumber }}</span>
+      <span v-if="row.label" class="row__label">{{ row.label }}</span>
+    </div>
 
     <!--
       行高拖拽手柄：贴在行内容区的下边缘。
@@ -246,7 +275,7 @@ defineExpose({ rowHasContent })
     -->
     <div
       v-if="!isReadonly"
-      class="row__height-handle"
+      class="row__height-handle u-split u-split--h"
       role="separator"
       aria-orientation="horizontal"
       :aria-label="t('row.resizeHeight')"
@@ -269,6 +298,7 @@ defineExpose({ rowHasContent })
         v-for="side in renderSides"
         :key="side.id"
         class="row__cell canvas__cell"
+        :class="{ 'row__cell--dimmed': isDimmed(side.id) }"
         :style="cellStyle(side)"
       >
         <!-- 展示态：只渲染非空且未隐藏的模块 -->
@@ -292,18 +322,25 @@ defineExpose({ rowHasContent })
               :module="module"
               :side-id="side.id"
               :accent="side.accent"
+              :number="showNumbers ? moduleNumber(side.id, module.id) : undefined"
               readonly
             />
           </div>
         </template>
 
-        <!-- 编辑态：可拖拽排序的模块卡片 -->
+        <!--
+          编辑态：可拖拽排序的模块卡片。
+          整张卡片都可以拖（不再要求抓住左侧那个小手柄），
+          但按钮/输入框/链接这些**交互元素**必须排除，
+          否则点"编辑"会变成拖拽（filter + preventOnFilter）。
+        -->
         <VueDraggable
           v-else
           :model-value="modulesOf(side.id)"
           class="row__modules"
-          handle=".module-drag-handle"
           group="duet-modules"
+          filter=".card__actions, .card__empty, button, input, textarea, select, a, audio, video, [contenteditable='true']"
+          :prevent-on-filter="true"
           :animation="180"
           ghost-class="module-ghost"
           @update:model-value="(next: ModuleInstance[]) => emit('reorderModules', cellRef(side.id), next)"
@@ -314,6 +351,7 @@ defineExpose({ rowHasContent })
             :module="module"
             :side-id="side.id"
             :accent="side.accent"
+            :number="showNumbers ? moduleNumber(side.id, module.id) : undefined"
             draggable
             @patch="(patch) => emit('patchModule', moduleRef(side.id, module.id), patch)"
             @patch-data="(patch) => emit('patchData', moduleRef(side.id, module.id), patch)"
@@ -364,6 +402,42 @@ defineExpose({ rowHasContent })
 
 .row__grip:active {
   cursor: grabbing;
+}
+
+/*
+ * 行序号：整行左上角，与模块的子序号（2.1 / 2.2）形成层级。
+ * 用等宽字体 + 固定最小宽度，序号从 9 变 10 时行头不会抖一下。
+ */
+.row__number {
+  flex: none;
+  min-width: 18px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* 展示态的序号与行标题排在同一行 */
+.row__label-row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  margin-bottom: var(--sp-2);
+}
+
+/*
+ * 聚光灯「色彩弱化」：没在播放的一侧整体退到后面去。
+ *
+ * 用 opacity + saturate 而不是直接盖一层半透明遮罩：
+ * 遮罩会连内容一起糊掉，而我们要的是"更低调"，不是"看不清"。
+ * 过渡时长与动效体系里的 --dur-slow 对齐，避免切换时突兀。
+ */
+.row__cell--dimmed {
+  opacity: 0.35;
+  filter: saturate(0.35);
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    filter var(--dur-slow) var(--ease-out);
 }
 
 .row__label-input {
@@ -442,23 +516,11 @@ defineExpose({ rowHasContent })
 
 /*
  * 行高拖拽手柄：横跨整行、贴在下边缘。
- * 平时完全透明，鼠标进入行时淡淡显形——常驻会把版面切得很碎。
- *
- * M7：厚度从 8px 收到 4px。它是整行宽，8px 高的实心条显形时像一道粗横杠，
- * 比它要调的那点行高还抢眼。（中轴手柄同样收细，理由见 CompareCanvas。）
+ * 抓取高度与"看得见的那条线"由 .u-split--h 统一提供（抓取 10px、线 3px），
+ * 与中轴、左栏、对比配置四条线用同一份实现。
  */
 .row__height-handle {
-  height: 4px;
   margin: 0 calc(var(--sp-2) * -1);
-  cursor: row-resize;
-  border-radius: var(--radius-full);
-  transition: background var(--dur-fast) var(--ease-out);
-}
-
-.row__height-handle:hover,
-.row__height-handle:focus-visible {
-  background: var(--accent-500);
-  outline: none;
 }
 
 .row__cell {

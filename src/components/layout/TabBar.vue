@@ -47,7 +47,7 @@ async function close(id: string): Promise<void> {
         v-for="project in tabs"
         :key="project.id"
         class="tabbar__tab"
-        :class="{ 'tabbar__tab--active': store.current?.id === project.id }"
+        :class="{ 'u-selected': store.current?.id === project.id }"
         type="button"
         :aria-current="store.current?.id === project.id ? 'page' : undefined"
         @click="activate(project.id)"
@@ -119,19 +119,13 @@ async function close(id: string): Promise<void> {
   background: var(--bg-hover);
 }
 
-.tabbar__tab--active {
-  color: var(--accent-fg);
-  background: var(--accent-700);
-}
-
-.tabbar__tab--active:hover {
-  color: var(--accent-fg);
-  background: var(--accent-700);
-}
-
-/* 选中态里那个小圆点要换成"白底"，否则紫点上叠紫点等于没有 */
-.tabbar__tab--active .tabbar__dot {
-  background: var(--accent-fg);
+/*
+ * 选中态由 .u-selected 提供（浅色底 + 主题色前景，与项目列表选中项同源）。
+ * 这里只处理"选中项被悬停"时不要退回灰底——否则鼠标一放上去就像没选中。
+ */
+.tabbar__tab.u-selected:hover {
+  color: var(--text-primary);
+  background: var(--accent-soft);
 }
 
 .tabbar__dot {
@@ -160,8 +154,13 @@ async function close(id: string): Promise<void> {
   transition: opacity var(--dur-fast) var(--ease-out);
 }
 
+/* 选中态里的叉号也要看得清（关闭当前标签是高频操作） */
+.tabbar__tab.u-selected .tabbar__close {
+  color: var(--text-secondary);
+}
+
 .tabbar__tab:hover .tabbar__close,
-.tabbar__tab--active .tabbar__close {
+.tabbar__tab.u-selected .tabbar__close {
   opacity: 1;
 }
 

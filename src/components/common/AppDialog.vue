@@ -184,12 +184,12 @@ function onKeydown(event: KeyboardEvent): void {
 
 .btn--primary {
   color: var(--accent-fg);
-  background: var(--accent-600);
-  border-color: var(--accent-600);
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
 }
 
 .btn--primary:hover {
-  background: var(--accent-700);
+  background: var(--accent-solid-hover);
 }
 
 .btn--danger {

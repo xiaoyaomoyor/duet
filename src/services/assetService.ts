@@ -143,6 +143,37 @@ export async function importFiles(
 }
 
 /**
+ * 按需补抽内嵌封面（自愈）。
+ *
+ * 两个必须存在的理由：
+ *   1. **老数据**。封面提取只在导入那一刻发生，而 M8 之前解析器有几个真 bug
+ *      （v2.3 扩展头、去同步），那批文件导进来时就没抽出封面，
+ *      光修解析器救不了已经躺在库里的资源。
+ *   2. **悬空引用**。`.duet` 导出的资源集合曾经漏掉派生资源，
+ *      回导后 `derived.thumbAssetId` 指向一个不存在的 id。
+ *
+ * 触发时机放在"读音频资源发现 thumbAssetId 指不到东西"的时候：
+ * 不做全库扫描（可能很大），只在真正要显示封面的那一刻补一次，
+ * 补完写回资源记录，下次就直接命中。
+ *
+ * @returns 可用的封面资源 id；确实没有内嵌图时返回 null
+ */
+export async function repairEmbeddedCover(audioAssetId: string): Promise<string | null> {
+  const audio = await getAsset(audioAssetId)
+  if (!audio || audio.kind !== 'audio') return null
+
+  // 已登记的封面还有效 → 什么都不用做
+  const known = audio.derived?.thumbAssetId
+  if (known && (await getAsset(known))) return known
+
+  const coverId = await extractEmbeddedCover(audio.blob, audio)
+  if (!coverId) return null
+
+  await putAsset({ ...audio, derived: { ...audio.derived, thumbAssetId: coverId } })
+  return coverId
+}
+
+/**
  * 导入媒体（本地文件或外链）。
  *
  * 外链的阶梯降级：

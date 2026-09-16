@@ -27,6 +27,7 @@ import {
   CodeXml,
   Copy,
   Download,
+  Ellipsis,
   Eye,
   EyeOff,
   FileCode,
@@ -42,8 +43,10 @@ import {
   Link,
   ListOrdered,
   Lock,
+  Maximize,
   MessageSquareText,
   Mic,
+  Minimize,
   Minus,
   MonitorPlay,
   Music,
@@ -61,7 +64,9 @@ import {
   SlidersHorizontal,
   Sparkles,
   SquareDashed,
+  SquarePen,
   Star,
+  Swords,
   Table,
   Tag,
   Trash2,
@@ -84,6 +89,7 @@ export const ICONS: Record<string, LucideIcon> = {
   trash: Trash2,
   copy: Copy,
   edit: Pencil,
+  more: Ellipsis,
   undo: Undo2,
   redo: Redo2,
   /*
@@ -107,12 +113,23 @@ export const ICONS: Record<string, LucideIcon> = {
 
   // —— 应用外壳 ——
   settings: Settings,
+  /*
+   * 「对比」页面的入口图标：**versus 语义**（用户明确要求）。
+   *
+   * 换掉了原来的网格（LayoutGrid）——网格表达的是"排布"，不是"两方对阵"，
+   * 放在这里跟旁边的设置齿轮一样抽象，扫一眼分不出这一栏是干什么的。
+   * 双剑交叉是图标库里表达 versus 的通用符号，指向性比网格强得多。
+   */
+  versus: Swords,
   // 模块/条目的"属性/选项"。刻意与 settings（齿轮）区分开：
   // 之前两者用了同一个图标，用户反映"属性和设置长得一个样"。
   options: SlidersHorizontal,
   sidebar: PanelLeft,
   present: Presentation,
   lock: Lock,
+  // 全屏切换：进/出用两个图标，避免"同一个图标表示相反动作"
+  maximize: Maximize,
+  minimize: Minimize,
 
   // —— 媒体与模块 ——
   image: Image,
@@ -155,6 +172,8 @@ export const ICONS: Record<string, LucideIcon> = {
   tools: Wrench,
   storage: HardDrive,
   info: Info,
+  // "返回编辑视图"：一支笔，而不是回退箭头——它去的是"编辑"这个状态，不是一个上一页
+  toEdit: SquarePen,
 }
 
 /** 已登记的图标名（供开发期校验与文档使用） */

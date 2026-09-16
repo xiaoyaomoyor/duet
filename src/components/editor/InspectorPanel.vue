@@ -1,29 +1,47 @@
 <script setup lang="ts">
 /**
- * 属性面板（画布布局）
+ * 对比配置面板（原「属性」）
  *
- * M2 范围：画布级布局参数（中轴间距、最大宽度、中轴光带、背景、密度）。
- * 这些值属于 sheet.layout，改动经命令层，因此可撤销、会自动保存。
+ * 定位（M8 按用户实测反馈调整）：
+ *   它配置的是**这一份对比页内部**的东西（布局、配色、序号、背景、聚光灯），
+ *   因此展开区域从对比页工具条**下面**开始，而不是像侧栏那样占满整个外壳高度。
+ *   这样标签栏与工具条仍然是通栏的，不会被一个"页面内部的配置"截断。
+ *   宽度也像左侧项目列表那样可以在分界处拖动调节。
  *
- * 退出方式：面板上方的关闭按钮；状态记在 useUiStore（瞬时，不落盘）。
+ * 面板内容分五组：
+ *   布局   —— 中轴间距 / 最大宽度 / 密度 / 中轴光带
+ *   配色   —— 左右两侧各自从预设里挑（不再需要去设置里选"默认配色"）
+ *   序号   —— 行号与模块子序号
+ *   背景   —— 图案 / 密度 / 颜色 / 填充形式 / 展示模式是否保留
+ *   聚光灯 —— 只有一侧在播放时如何突出它
+ *
+ * 所有改动都经命令层写入 sheet.layout / sheet.sides，因此可撤销、会自动保存。
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUiStore } from '@/stores/useUiStore'
-import type { LayoutConfig } from '@/types/project'
+import { useResolvedTheme } from '@/composables/useResolvedTheme'
+import { ACCENT_PRESETS, presetColor, resolveAccent } from '@/data/accentPresets'
+import type { LayoutConfig, SideId } from '@/types/project'
 
 const { t } = useI18n()
 const store = useProjectStore()
 const ui = useUiStore()
+const theme = useResolvedTheme()
 
 const layout = computed<LayoutConfig | undefined>(() => store.current?.sheet.layout)
+const sides = computed(() => store.current?.sheet.sides ?? [])
 
 function patch(patchValue: Partial<LayoutConfig>): void {
-  store.dispatch({ t: 'layout/patch', patch: patchValue }, { label: '调整布局', coalesceKey: 'layout' })
+  store.dispatch(
+    { t: 'layout/patch', patch: patchValue },
+    { label: '调整对比配置', coalesceKey: 'layout' },
+  )
 }
 
+/** 背景图案的类型（含"无"） */
 const backgrounds: Array<{ value: LayoutConfig['background']; labelKey: string }> = [
   { value: 'solid', labelKey: 'inspector.backgroundSolid' },
   { value: 'grid', labelKey: 'inspector.backgroundGrid' },
@@ -35,14 +53,58 @@ const densities: Array<{ value: LayoutConfig['density']; labelKey: string }> = [
   { value: 'normal', labelKey: 'settings.densityNormal' },
   { value: 'comfy', labelKey: 'settings.densityComfy' },
 ]
+
+const spotlights: Array<{ value: NonNullable<LayoutConfig['spotlight']>; labelKey: string }> = [
+  { value: 'off', labelKey: 'inspector.spotlightOff' },
+  { value: 'ratio', labelKey: 'inspector.spotlightRatio' },
+  { value: 'dim', labelKey: 'inspector.spotlightDim' },
+]
+
+/** 每一侧当前生效的预设 id（没有预设时为空：那是用户自定义的颜色） */
+function sidePreset(sideId: SideId): string {
+  return sides.value.find((side) => side.id === sideId)?.accentPreset ?? ''
+}
+
+/** 预设色板里某个色块在当前主题下的样子（色板本身也要跟着主题深浅走） */
+function swatchColor(presetId: string): string {
+  return presetColor(presetId, theme.value) ?? 'var(--accent-500)'
+}
+
+/** 当前侧的颜色（用于"自定义色"那块的取色器初值） */
+function sideColor(sideId: SideId): string {
+  const side = sides.value.find((item) => item.id === sideId)
+  return side ? resolveAccent(side, theme.value) || '#a78bfa' : '#a78bfa'
+}
+
+/**
+ * 选中某个预设。
+ *
+ * 同时写 preset 与 hex：preset 是真源（按主题解析），
+ * hex 是给不认预设的路径（导出预览、旧代码）留一个始终可用的具体值。
+ */
+function pickPreset(sideId: SideId, presetId: string): void {
+  store.setSideField(sideId, {
+    accentPreset: presetId,
+    accent: presetColor(presetId, theme.value),
+  })
+}
+
+/** 自定义颜色：清掉预设，只认 hex */
+function pickCustom(sideId: SideId, event: Event): void {
+  const value = (event.target as HTMLInputElement).value
+  store.setSideField(sideId, { accent: value, accentPreset: undefined })
+}
+
+const fontSizeMax = 64
 </script>
 
 <template>
-  <aside v-if="layout" class="inspector" :aria-label="t('inspector.title')">
-    <header class="inspector__head">
-      <span class="inspector__title">{{ t('inspector.title') }}</span>
+  <aside v-if="layout" class="config" :aria-label="t('inspector.title')">
+    <header class="config__head">
+      <AppIcon name="options" :size="14" class="config__icon" />
+      <span class="config__title">{{ t('inspector.title') }}</span>
       <button
-        class="inspector__close"
+        class="config__close"
         type="button"
         :title="t('inspector.close')"
         :aria-label="t('inspector.close')"
@@ -52,103 +114,262 @@ const densities: Array<{ value: LayoutConfig['density']; labelKey: string }> = [
       </button>
     </header>
 
-    <div class="inspector__body u-scroll-y">
-      <p class="inspector__group">{{ t('inspector.layout') }}</p>
+    <div class="config__body u-scroll-y">
+      <!-- ——————————————— 布局 ——————————————— -->
+      <section class="group">
+        <h3 class="group__title">{{ t('inspector.groupLayout') }}</h3>
 
-      <label class="field">
-        <span class="field__label">{{ t('inspector.gutter') }}</span>
-        <input
-          class="field__range"
-          type="range"
-          min="8"
-          max="96"
-          step="4"
-          :value="layout.gutter"
-          @input="patch({ gutter: Number(($event.target as HTMLInputElement).value) })"
-        />
-        <span class="field__value">{{ layout.gutter }}</span>
-      </label>
+        <label class="field">
+          <span class="field__label">{{ t('inspector.gutter') }}</span>
+          <input
+            class="field__range"
+            type="range"
+            min="8"
+            max="96"
+            step="4"
+            :value="layout.gutter"
+            @input="patch({ gutter: Number(($event.target as HTMLInputElement).value) })"
+          />
+          <span class="field__value">{{ layout.gutter }}</span>
+        </label>
 
-      <label class="field">
-        <span class="field__label">{{ t('inspector.maxWidth') }}</span>
-        <input
-          class="field__range"
-          type="range"
-          min="720"
-          max="1920"
-          step="40"
-          :value="layout.maxWidth"
-          @input="patch({ maxWidth: Number(($event.target as HTMLInputElement).value) })"
-        />
-        <span class="field__value">{{ layout.maxWidth }}</span>
-      </label>
+        <label class="field">
+          <span class="field__label">{{ t('inspector.maxWidth') }}</span>
+          <input
+            class="field__range"
+            type="range"
+            min="720"
+            max="1920"
+            step="40"
+            :value="layout.maxWidth"
+            @input="patch({ maxWidth: Number(($event.target as HTMLInputElement).value) })"
+          />
+          <span class="field__value">{{ layout.maxWidth }}</span>
+        </label>
 
-      <label class="field field--switch">
-        <span class="field__label">{{ t('inspector.showAxis') }}</span>
-        <input
-          type="checkbox"
-          :checked="layout.showAxis"
-          @change="patch({ showAxis: ($event.target as HTMLInputElement).checked })"
-        />
-      </label>
+        <label class="field field--stack">
+          <span class="field__label">{{ t('inspector.density') }}</span>
+          <select
+            class="field__select"
+            :value="layout.density"
+            @change="
+              patch({ density: ($event.target as HTMLSelectElement).value as LayoutConfig['density'] })
+            "
+          >
+            <option v-for="item in densities" :key="item.value" :value="item.value">
+              {{ t(item.labelKey) }}
+            </option>
+          </select>
+        </label>
 
-      <label class="field field--stack">
-        <span class="field__label">{{ t('inspector.background') }}</span>
-        <select
-          class="field__select"
-          :value="layout.background"
-          @change="patch({ background: ($event.target as HTMLSelectElement).value as LayoutConfig['background'] })"
-        >
-          <option v-for="item in backgrounds" :key="item.value" :value="item.value">
+        <label class="field field--switch">
+          <span class="field__label">{{ t('inspector.showAxis') }}</span>
+          <input
+            type="checkbox"
+            :checked="layout.showAxis"
+            @change="patch({ showAxis: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+      </section>
+
+      <!-- ——————————————— 配色 ——————————————— -->
+      <section class="group">
+        <h3 class="group__title">{{ t('inspector.groupAccent') }}</h3>
+        <p class="group__hint">{{ t('inspector.accentHint') }}</p>
+
+        <div v-for="(side, index) in sides" :key="side.id" class="accent">
+          <span class="accent__name">
+            {{ index === 0 ? t('compare.sideA') : t('compare.sideB') }}
+          </span>
+          <div class="accent__swatches" role="radiogroup" :aria-label="t('inspector.groupAccent')">
+            <button
+              v-for="preset in ACCENT_PRESETS"
+              :key="preset.id"
+              class="swatch"
+              type="button"
+              role="radio"
+              :aria-checked="sidePreset(side.id) === preset.id"
+              :class="{ 'swatch--active': sidePreset(side.id) === preset.id }"
+              :style="{ background: swatchColor(preset.id) }"
+              :title="t(preset.labelKey)"
+              :aria-label="t(preset.labelKey)"
+              @click="pickPreset(side.id, preset.id)"
+            />
+            <!-- 自定义色：预设之外还想微调时的出口 -->
+            <label
+              class="swatch swatch--custom"
+              :class="{ 'swatch--active': sidePreset(side.id) === '' }"
+              :title="t('inspector.accentCustom')"
+            >
+              <AppIcon name="palette" :size="12" />
+              <input
+                class="swatch__input"
+                type="color"
+                :value="sideColor(side.id)"
+                :aria-label="t('inspector.accentCustom')"
+                @change="pickCustom(side.id, $event)"
+              />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- ——————————————— 序号 ——————————————— -->
+      <section class="group">
+        <h3 class="group__title">{{ t('inspector.groupNumber') }}</h3>
+        <label class="field field--switch">
+          <span class="field__label">{{ t('inspector.showNumbers') }}</span>
+          <input
+            type="checkbox"
+            :checked="layout.showRowNumbers === true"
+            @change="patch({ showRowNumbers: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+        <p class="group__hint">{{ t('inspector.showNumbersHint') }}</p>
+      </section>
+
+      <!-- ——————————————— 背景 ——————————————— -->
+      <section class="group">
+        <h3 class="group__title">{{ t('inspector.groupBackground') }}</h3>
+
+        <label class="field field--stack">
+          <span class="field__label">{{ t('inspector.background') }}</span>
+          <select
+            class="field__select"
+            :value="layout.background"
+            @change="
+              patch({
+                background: ($event.target as HTMLSelectElement).value as LayoutConfig['background'],
+              })
+            "
+          >
+            <option v-for="item in backgrounds" :key="item.value" :value="item.value">
+              {{ t(item.labelKey) }}
+            </option>
+          </select>
+        </label>
+
+        <label class="field field--stack">
+          <span class="field__label">{{ t('inspector.backgroundFill') }}</span>
+          <select
+            class="field__select"
+            :value="layout.backgroundFill ?? 'pattern'"
+            @change="
+              patch({
+                backgroundFill: ($event.target as HTMLSelectElement)
+                  .value as NonNullable<LayoutConfig['backgroundFill']>,
+              })
+            "
+          >
+            <option value="pattern">{{ t('inspector.fillPattern') }}</option>
+            <option value="solid">{{ t('inspector.fillSolid') }}</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field__label">{{ t('inspector.backgroundScale') }}</span>
+          <input
+            class="field__range"
+            type="range"
+            min="8"
+            :max="fontSizeMax"
+            step="2"
+            :value="layout.backgroundScale ?? 32"
+            @input="patch({ backgroundScale: Number(($event.target as HTMLInputElement).value) })"
+          />
+          <span class="field__value">{{ layout.backgroundScale ?? 32 }}</span>
+        </label>
+
+        <div class="field">
+          <span class="field__label">{{ t('inspector.backgroundTint') }}</span>
+          <div class="tint">
+            <button
+              class="tint__auto"
+              type="button"
+              :class="{ 'tint__auto--active': !layout.backgroundTint }"
+              @click="patch({ backgroundTint: undefined })"
+            >
+              {{ t('inspector.tintAuto') }}
+            </button>
+            <input
+              class="tint__input"
+              type="color"
+              :value="layout.backgroundTint ?? '#a78bfa'"
+              :aria-label="t('inspector.backgroundTint')"
+              @input="patch({ backgroundTint: ($event.target as HTMLInputElement).value })"
+            />
+          </div>
+        </div>
+
+        <label class="field field--switch">
+          <span class="field__label">{{ t('inspector.backgroundInPresent') }}</span>
+          <input
+            type="checkbox"
+            :checked="layout.backgroundInPresent === true"
+            @change="patch({ backgroundInPresent: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+        <p class="group__hint">{{ t('inspector.backgroundInPresentHint') }}</p>
+      </section>
+
+      <!-- ——————————————— 聚光灯 ——————————————— -->
+      <section class="group">
+        <h3 class="group__title">{{ t('inspector.groupSpotlight') }}</h3>
+        <div class="segmented" role="radiogroup" :aria-label="t('inspector.groupSpotlight')">
+          <button
+            v-for="item in spotlights"
+            :key="item.value"
+            class="segmented__item"
+            type="button"
+            role="radio"
+            :aria-checked="(layout.spotlight ?? 'off') === item.value"
+            :class="{ 'segmented__item--active': (layout.spotlight ?? 'off') === item.value }"
+            @click="patch({ spotlight: item.value })"
+          >
             {{ t(item.labelKey) }}
-          </option>
-        </select>
-      </label>
-
-      <label class="field field--stack">
-        <span class="field__label">{{ t('inspector.density') }}</span>
-        <select
-          class="field__select"
-          :value="layout.density"
-          @change="patch({ density: ($event.target as HTMLSelectElement).value as LayoutConfig['density'] })"
-        >
-          <option v-for="item in densities" :key="item.value" :value="item.value">
-            {{ t(item.labelKey) }}
-          </option>
-        </select>
-      </label>
+          </button>
+        </div>
+        <p class="group__hint">{{ t('inspector.spotlightHint') }}</p>
+      </section>
     </div>
   </aside>
 </template>
 
 <style scoped>
-.inspector {
+.config {
   display: flex;
+  flex: none;
   flex-direction: column;
-  width: 240px;
+  width: var(--config-width, 280px);
   height: 100%;
   overflow: hidden;
   background: var(--bg-surface);
   border-left: 1px solid var(--border-subtle);
 }
 
-.inspector__head {
+.config__head {
   display: flex;
+  flex: none;
+  gap: var(--sp-2);
   align-items: center;
-  justify-content: space-between;
   padding: var(--sp-3);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.inspector__title {
+.config__icon {
+  color: var(--accent-500);
+}
+
+.config__title {
+  flex: 1;
   font-size: var(--fs-xs);
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.inspector__close {
+.config__close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -158,23 +379,41 @@ const densities: Array<{ value: LayoutConfig['density']; labelKey: string }> = [
   border-radius: var(--radius-sm);
 }
 
-.inspector__close:hover {
+.config__close:hover {
   color: var(--text-primary);
   background: var(--bg-hover);
 }
 
-.inspector__body {
+.config__body {
   flex: 1;
   min-height: 0;
   padding: var(--sp-3);
 }
 
-.inspector__group {
-  margin-bottom: var(--sp-3);
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
+/* —— 分组 —— */
+.group + .group {
+  padding-top: var(--sp-4);
+  margin-top: var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
 }
 
+.group__title {
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.group__hint {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-disabled);
+}
+
+/* —— 字段 —— */
 .field {
   display: flex;
   gap: var(--sp-2);
@@ -201,12 +440,47 @@ const densities: Array<{ value: LayoutConfig['density']; labelKey: string }> = [
 .field__range {
   flex: 1;
   min-width: 0;
-  accent-color: var(--accent-600);
+  height: 16px;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+/* 自绘轨道与滑块，理由见 SideEditorDialog：Chromium 的 accent-color
+   会把未填充的轨道画成近黑色，在浅色主题下像一根黑条 */
+.field__range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--bg-active);
+  border-radius: var(--radius-full);
+}
+
+.field__range::-moz-range-track {
+  height: 4px;
+  background: var(--bg-active);
+  border-radius: var(--radius-full);
+}
+
+.field__range::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  appearance: none;
+  background: var(--accent-500);
+  border: none;
+  border-radius: var(--radius-full);
+}
+
+.field__range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent-500);
+  border: none;
+  border-radius: var(--radius-full);
 }
 
 .field__value {
   flex: none;
-  width: 40px;
+  width: 36px;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--text-secondary);
@@ -219,5 +493,127 @@ const densities: Array<{ value: LayoutConfig['density']; labelKey: string }> = [
   background: var(--bg-surface-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-xs);
+}
+
+/* —— 配色色板 —— */
+.accent {
+  margin-bottom: var(--sp-3);
+}
+
+.accent__name {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.accent__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.swatch {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.swatch:hover {
+  transform: scale(1.08);
+}
+
+/* 选中：外圈用正文色描一圈，任何底色上都看得出来 */
+.swatch--active {
+  border-color: var(--text-primary);
+}
+
+.swatch--custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--bg-surface-2);
+  cursor: pointer;
+}
+
+.swatch__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  opacity: 0;
+}
+
+/* —— 背景颜色 —— */
+.tint {
+  display: flex;
+  flex: 1;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.tint__auto {
+  flex: 1;
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xs);
+}
+
+.tint__auto--active {
+  color: var(--accent-500);
+  border-color: var(--accent-500);
+}
+
+.tint__input {
+  flex: none;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xs);
+}
+
+/* —— 分段控件（聚光灯） —— */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.segmented__item {
+  flex: 1;
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  border-radius: var(--radius-xs);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.segmented__item:hover {
+  color: var(--text-primary);
+}
+
+/* 选中态与项目列表里被选中的那一项同源（浅色底 + 主题色前景） */
+.segmented__item--active,
+.segmented__item--active:hover {
+  color: var(--accent-500);
+  background: var(--accent-soft);
 }
 </style>

@@ -10,12 +10,16 @@
  * 实现取舍：用 `position: fixed` 的独立遮罩层，而不是把编辑视图"变灰"。
  * 这样能保证只读性由结构保证，而不是靠逐个禁用交互来维持。
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
+import AppLogo from '@/components/common/AppLogo.vue'
 import CompareCanvas from '@/components/compare/CompareCanvas.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { isPresentable } from '@/modules/visibility'
+import { useResolvedTheme } from '@/composables/useResolvedTheme'
+import { resolveAccent } from '@/data/accentPresets'
+import { APP } from '@/app.config'
 import type { Project } from '@/types/project'
 
 const props = defineProps<{ project: Project }>()
@@ -39,10 +43,11 @@ const hasContent = computed(() =>
   ),
 )
 
-/** 两侧的强调色（用于中轴光带与工具栏点缀） */
+/** 两侧的强调色（用于中轴光带与工具栏点缀）；预设按当前主题解析 */
+const accentTheme = useResolvedTheme()
 const sideColors = computed(() => [
-  props.project.sheet.sides[0]?.accent ?? 'var(--side-a)',
-  props.project.sheet.sides[1]?.accent ?? 'var(--side-b)',
+  resolveAccent(props.project.sheet.sides[0] ?? {}, accentTheme.value) || 'var(--side-a)',
+  resolveAccent(props.project.sheet.sides[1] ?? {}, accentTheme.value) || 'var(--side-b)',
 ])
 
 const rootStyle = computed(() => ({
@@ -86,16 +91,42 @@ function onFullscreenChange(): void {
   isFullscreen.value = document.fullscreenElement !== null
 }
 
-/** 鼠标移到顶部才显示工具栏，3 秒后自动淡出（录屏时不出鼠标） */
+/**
+ * 工具栏的显隐（M8 按用户实测反馈改）。
+ *
+ *   普通展示态 → **常驻显示**。用户明确要求"常态显示"：
+ *     自动淡出会让人找不到退出按钮，而演示时鼠标本来就停在画面上。
+ *   全屏态     → 鼠标移到顶部才出现，3 秒后淡出。
+ *     全屏是为了投屏/录屏，一条常驻的工具栏会一直挡在成稿上方。
+ *
+ * 关键是"进全屏"这个动作本身要立刻收起工具栏：刚进全屏时鼠标往往还在
+ * 顶部附近，如果只靠 mousemove 触发，工具栏会赖着不走。
+ */
 let hideTimer: ReturnType<typeof setTimeout> | null = null
 
-function revealToolbar(): void {
-  toolbarVisible.value = true
+function scheduleHide(): void {
   if (hideTimer) clearTimeout(hideTimer)
+  if (!isFullscreen.value) return
   hideTimer = setTimeout(() => {
     toolbarVisible.value = false
   }, 3000)
 }
+
+function revealToolbar(): void {
+  toolbarVisible.value = true
+  scheduleHide()
+}
+
+watch(isFullscreen, (full) => {
+  // 退出全屏 → 工具栏常驻；进入全屏 → 先亮出来，随后按空闲计时收起
+  if (!full) {
+    if (hideTimer) clearTimeout(hideTimer)
+    hideTimer = null
+    toolbarVisible.value = true
+    return
+  }
+  revealToolbar()
+})
 
 function onKeydown(event: KeyboardEvent): void {
   switch (event.key) {
@@ -148,15 +179,21 @@ defineExpose({ zoom, hasContent })
       :style="rootStyle"
       @mousemove.passive="revealToolbar"
     >
-      <!-- 悬浮工具栏：仅展示用，导出长图时必须排除 -->
+      <!--
+        悬浮工具栏：仅展示用，导出长图时必须排除。
+        结构（M8 按用户实测反馈重排）：
+          左：对奏 LOGO + 名称（**去掉返回按钮**——退出走 Esc 或右侧的编辑按钮）
+          右：缩放组（减 / 百分比 / 加）· 切换到编辑视图 · 全屏
+      -->
       <header
         class="present__bar no-export"
         :class="{ 'present__bar--hidden': !toolbarVisible }"
       >
-        <button class="present__btn" type="button" @click="exit">
-          <AppIcon name="chevron-left" :size="15" />
-          {{ t('nav.switchToEdit') }}
-        </button>
+        <div class="present__brand">
+          <AppLogo :size="20" />
+          <span class="present__brand-zh">{{ t('app.name') }}</span>
+          <span class="present__brand-en">{{ APP.nameEn }}</span>
+        </div>
 
         <span class="present__title u-truncate">{{ project.title }}</span>
 
@@ -168,7 +205,8 @@ defineExpose({ zoom, hasContent })
             :aria-label="t('present.zoomOut')"
             @click="setZoom(zoom - 0.1)"
           >
-            <AppIcon name="close" :size="14" />
+            <!-- 缩小就该是一个减号；此前用了一个叉号，看着像"关闭" -->
+            <AppIcon name="minus" :size="15" />
           </button>
           <button
             class="present__zoom"
@@ -185,9 +223,22 @@ defineExpose({ zoom, hasContent })
             :aria-label="t('present.zoomIn')"
             @click="setZoom(zoom + 0.1)"
           >
-            <AppIcon name="plus" :size="14" />
+            <AppIcon name="plus" :size="15" />
           </button>
         </div>
+
+        <span class="present__divider" aria-hidden="true" />
+
+        <button
+          class="present__icon"
+          type="button"
+          :title="t('nav.switchToEdit')"
+          :aria-label="t('nav.switchToEdit')"
+          @click="exit"
+        >
+          <!-- 铅笔：去的是"编辑"这个状态，不是一个"上一页" -->
+          <AppIcon name="toEdit" :size="16" />
+        </button>
 
         <button
           class="present__icon"
@@ -197,7 +248,8 @@ defineExpose({ zoom, hasContent })
           :aria-pressed="isFullscreen"
           @click="toggleFullscreen"
         >
-          <AppIcon name="present" :size="15" />
+          <!-- 全屏 / 退出全屏用两个图标，避免同一个图标表示相反动作 -->
+          <AppIcon :name="isFullscreen ? 'minimize' : 'maximize'" :size="16" />
         </button>
       </header>
 
@@ -211,7 +263,7 @@ defineExpose({ zoom, hasContent })
             <AppIcon name="comment" :size="22" />
             <p class="present__empty-title">{{ t('compare.nothingToPresent') }}</p>
             <p class="present__empty-hint">{{ t('compare.nothingToPresentHint') }}</p>
-            <button class="present__btn present__btn--primary" type="button" @click="exit">
+            <button class="present__cta" type="button" @click="exit">
               {{ t('nav.switchToEdit') }}
             </button>
           </div>
@@ -252,6 +304,27 @@ defineExpose({ zoom, hasContent })
   pointer-events: none;
 }
 
+.present__brand {
+  display: flex;
+  flex: none;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.present__brand-zh {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+}
+
+.present__brand-en {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .present__title {
   flex: 1;
   min-width: 0;
@@ -260,8 +333,18 @@ defineExpose({ zoom, hasContent })
   text-align: center;
 }
 
+/* 缩放组与右侧两个动作之间的分隔线：避免"减号"和"编辑"看起来是一组 */
+.present__divider {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--sp-1);
+  background: var(--border-default);
+}
+
 .present__group {
   display: inline-flex;
+  flex: none;
   gap: 2px;
   align-items: center;
   padding: 2px;
@@ -269,34 +352,26 @@ defineExpose({ zoom, hasContent })
   border-radius: var(--radius-full);
 }
 
-.present__btn {
-  display: inline-flex;
-  gap: var(--sp-2);
-  align-items: center;
-  padding: var(--sp-1) var(--sp-3);
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-strong);
+/* 空状态里的主行动按钮：实心强调面 + 白字（走语义化 token，见 tokens.css） */
+.present__cta {
+  padding: var(--sp-2) var(--sp-5);
+  font-size: var(--fs-sm);
+  color: var(--accent-fg);
+  background: var(--accent-solid);
+  border: 1px solid var(--accent-solid);
   border-radius: var(--radius-full);
 }
 
-.present__btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-
-.present__btn--primary {
-  color: var(--accent-fg);
-  background: var(--accent-600);
-  border-color: var(--accent-600);
+.present__cta:hover {
+  background: var(--accent-solid-hover);
 }
 
 .present__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   color: var(--text-secondary);
   border-radius: var(--radius-full);
 }

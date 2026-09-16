@@ -110,6 +110,36 @@ export function useAudioClock(sideId: string) {
   return { currentMs, durationMs, playing }
 }
 
+/**
+ * 订阅某个对比方的播放状态（**与组件生命周期无关**，供画布级逻辑使用）。
+ *
+ * 与 useAudioClock 的区别：那个返回 ref 并绑定组件生命周期，适合
+ * "一个组件盯着一侧"；这个只给回调，适合"一块画布同时盯住两侧"——
+ * 聚光灯需要判断"哪一侧正在播放"，而侧的数量是动态的，
+ * 没法在 setup 里写死几次 useAudioClock 调用。
+ *
+ * 订阅瞬间会先推一次当前值，避免首帧停在"都没在播"的默认态。
+ *
+ * @returns 退订函数
+ */
+export function subscribeAudioState(sideId: string, listener: (state: AudioClockState) => void): () => void {
+  let set = listeners.get(sideId)
+  if (!set) {
+    set = new Set()
+    listeners.set(sideId, set)
+  }
+  set.add(listener)
+
+  listener(getAudioState(sideId))
+
+  return () => {
+    const current = listeners.get(sideId)
+    if (!current) return
+    current.delete(listener)
+    if (current.size === 0) listeners.delete(sideId)
+  }
+}
+
 // ——————————————————————————————————————————————————————————
 // 引擎接管（同步路径）
 // —————————————————————————————————————————————————————————

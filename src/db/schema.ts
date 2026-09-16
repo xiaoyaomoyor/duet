@@ -8,6 +8,7 @@
  */
 
 import { SCHEMA_VERSION } from '@/types'
+import { presetIdOfColor } from '@/data/accentPresets'
 
 /** 对象存储名（常量在此集中，避免各处拼写漂移） */
 export const STORE = {
@@ -170,7 +171,64 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    to: 4,
+    /**
+     * v3 → v4：把两侧"烧死的 hex"认回配色预设（M8）。
+     *
+     * 背景：v3 及更早的工程把左右配色存成一个具体的 hex，而那个 hex 是照着
+     * **深色背景**挑的浅色。用户切到亮色主题后，浅紫浅青压在白底上几乎看不见。
+     * 现在预设会按当前主题解析（浅色主题取深一档），因此要把老工程的 hex 认回预设 id。
+     *
+     * 认不出来的一律**原样保留**：那说明用户当初选的是自定义颜色，
+     * 我们无权替他改掉——他至少还能在「对比配置」里自己重新选一个预设。
+     *
+     * 迁移是幂等的：已经带 accentPreset 的侧不再处理。
+     */
+    run: (_db, tx) => {
+      const store = tx.objectStore(STORE.projects)
+      const cursorReq = store.openCursor()
+
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result
+        if (!cursor) return
+
+        const project = cursor.value as {
+          schemaVersion?: number
+          sheet?: { sides?: Array<Record<string, unknown>> }
+        }
+
+        const sheet = project.sheet
+        if (!sheet?.sides) {
+          cursor.continue()
+          return
+        }
+
+        cursor.update({
+          ...project,
+          schemaVersion: 4,
+          sheet: { ...sheet, sides: sheet.sides.map(migrateSideAccent) },
+        })
+
+        cursor.continue()
+      }
+    },
+  },
 ]
+
+/**
+ * 单个对比方的 v3→v4 改写（导出是为了能直接单测）。
+ *
+ * 只做一件事：hex → 预设 id。不改色值本身——
+ * 深色主题下预设解析出来的颜色与旧 hex 完全相同，浅色主题下才会取深一档，
+ * 所以这次迁移在紫夜主题上是**零视觉变化**的。
+ */
+export function migrateSideAccent(side: Record<string, unknown>): Record<string, unknown> {
+  if (typeof side.accentPreset === 'string' && side.accentPreset) return side
+
+  const id = presetIdOfColor(typeof side.accent === 'string' ? side.accent : undefined)
+  return id ? { ...side, accentPreset: id } : side
+}
 
 /**
  * 单个模块的 v2→v3 改写（见上面迁移的说明）。

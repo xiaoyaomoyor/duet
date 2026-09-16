@@ -339,7 +339,7 @@ function close(): void {
 
 .option input {
   margin-top: 2px;
-  accent-color: var(--accent-600);
+  accent-color: var(--accent-solid);
 }
 
 .option__text {

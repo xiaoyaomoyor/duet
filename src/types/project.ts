@@ -16,7 +16,7 @@
  *   这是**破坏性**变更：旧 type 的实现已从注册表删除，
  *   不迁移就会命中"模块类型未注册"分支、表现为内容消失。
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 // ——————————————————————————————————————————————————————————
 // 工具（生产源）
@@ -112,8 +112,17 @@ export type ModuleTypeId = string
 export interface Side {
   id: SideId
   toolRef: ToolRef
-  /** 主题色 hex，默认左紫右青 */
+  /**
+   * 主题色 hex。
+   *
+   * M8 起它降级为**回退值**：正常情况下应该是 `accentPreset` 生效
+   * （见 data/accentPresets.ts —— 预设会按当前主题解析成深浅两套色值，
+   * 而 hex 是死的，切到亮色主题就会变成"浅色压白底"）。
+   * 保留它是为了兼容 v3 及更早的工程，以及将来可能的"自定义颜色"。
+   */
   accent: string
+  /** 配色预设 id（violet / cyan / pink …）；有值时优先于 accent */
+  accentPreset?: string
   /** 覆盖工具名，如「可灵 · 1.6 大师版」 */
   labelOverride?: string
   /** 模型子名称/版本号 */
@@ -195,6 +204,58 @@ export interface LayoutConfig {
   showAxis: boolean
   background: 'solid' | 'grid' | 'dots'
   maxWidth: number
+
+  // ————————————————————————————————————————————————————————
+  // M8 新增（对比配置面板）
+  //
+  // 全部可选：旧工程文件里没有这些字段，**省略即取默认值**。
+  // 这样 v0.2.5 的 .duet 不需要迁移就能打开（migrate 只在字段被改写过时才动）。
+  // ————————————————————————————————————————————————————————
+
+  /**
+   * 是否在行/模块左上角显示序号（行 = 1、2、3…；模块 = 2.1、2.2…）。
+   *
+   * 默认关：默认新建的对比页大多是两三条内容，序号是噪音；
+   * 而"十几行的长对比"才是它的用武之地——用户自己开。
+   */
+  showRowNumbers?: boolean | undefined
+
+  /**
+   * 展示视图里是否保留背景图案。
+   *
+   * 默认**关**：成稿要的是内容本身，编辑器里的网格/圆点是"对齐辅助线"，
+   * 出现在成稿里只会显得脏。开着是为了做"整页填充"那种视觉稿。
+   */
+  backgroundInPresent?: boolean | undefined
+
+  /** 图案密度：格子/点的边长 px（8 ~ 96） */
+  backgroundScale?: number | undefined
+
+  /**
+   * 图案颜色。
+   *
+   * 留空 = 跟随主题（用 --border-subtle / --border-default）；
+   * 有值 = 用户指定的 hex。存 hex 而不是 token 名，
+   * 是因为它要跟着工程文件走，而 token 名会随主题定义变化。
+   *
+   * 写成 `| undefined` 是刻意的：`layout/patch` 的命令类型是
+   * `Partial<LayoutConfig>`，而 exactOptionalPropertyTypes 下
+   * "把这一项恢复成默认"就是显式传 undefined，不允许的话
+   * 面板上那个"跟随主题"按钮根本写不回来。
+   */
+  backgroundTint?: string | undefined
+
+  /** 填充形式：图案铺满（默认）或整页实心填充 */
+  backgroundFill?: 'pattern' | 'solid' | undefined
+
+  /**
+   * 聚光灯：只有一侧在播放时，如何让"正在听的那一边"更突出。
+   *
+   *   off   关闭——两侧完全一样
+   *   ratio 比例强调——正在播放的一侧占据更大比例（在用户设的比例上加权）
+   *   dim   色彩弱化——没在播放的一侧降低不透明度、去饱和
+   */
+  spotlight?: 'off' | 'ratio' | 'dim' | undefined
 }
 
 export interface Sheet {
@@ -272,6 +333,13 @@ export interface AppSettings {
   mediaImportMode: 'ask' | 'mirror' | 'link'
   maxMirrorSizeMB: number
   sidebarWidth: number
+  /**
+   * 对比配置面板宽度（px）。
+   *
+   * 与 sidebarWidth 同源的做法：分界处可拖拽调节，松手才落盘。
+   * 上限比侧栏大一些——配置项里有配色色板与滑块，太窄会挤成两行。
+   */
+  inspectorWidth: number
   /** 编辑视图是否显示空模块占位 */
   editorShowEmptyModules: boolean
   exportScale: 1 | 2
@@ -297,6 +365,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   mediaImportMode: 'mirror',
   maxMirrorSizeMB: 200,
   sidebarWidth: 260,
+  inspectorWidth: 280,
   editorShowEmptyModules: true,
   exportScale: 2,
   reducedMotion: 'auto',

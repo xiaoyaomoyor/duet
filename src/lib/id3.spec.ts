@@ -25,6 +25,26 @@ function ascii(text: string): number[] {
 /** 一张假的 JPEG（只要 MIME 是 image/* 就会被收下，内容本应用不解码） */
 const FAKE_JPEG = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0xff, 0xd9]
 
+/** 普通 big-endian uint32（v2.3 的帧长与扩展头长度用它） */
+function uint32(size: number): number[] {
+  return [(size >> 24) & 0xff, (size >> 16) & 0xff, (size >> 8) & 0xff, size & 0xff]
+}
+
+/**
+ * 去同步编码：每个 0xFF 后面补一个 0x00。
+ * 这是 ID3 为了"数据里不出现帧同步字"而做的转义，解析时必须还原。
+ */
+function unsynchronise(bytes: number[]): number[] {
+  const out: number[] = []
+  bytes.forEach((byte, index) => {
+    out.push(byte)
+    if (byte === 0xff) out.push(0x00)
+    // 原数据里 0xFF 后面本来就是 0x00 的，编码时会写成 0xFF 0x00 0x00
+    else if (byte === 0x00 && bytes[index - 1] === 0xff) out.push(0x00)
+  })
+  return out
+}
+
 interface BuildOptions {
   version?: 3 | 4
   /** 描述串的编码字节：0=ISO-8859-1, 1=UTF-16+BOM, 3=UTF-8 */
@@ -34,10 +54,16 @@ interface BuildOptions {
   picture?: number[]
   /** 插一个非 APIC 帧在前面，验证游标能正确跳过 */
   leadingFrame?: boolean
-  /** 是否追加扩展头 */
+  /** 是否追加扩展头（按版本用各自正确的编码与长度语义） */
   extendedHeader?: boolean
   /** 用普通 uint32 而非 synchsafe 写 v2.4 的帧长（模拟损坏文件） */
   brokenFrameSize?: boolean
+  /** v2.3：置标签级去同步标志（0x80），并真的对标签体做去同步编码 */
+  unsynchronised?: boolean
+  /** v2.4：置**帧级**去同步标志（格式标志 0x02），并真的对该帧做去同步编码 */
+  frameUnsynchronised?: boolean
+  /** 强行写入一个谎报的标签长度（用于构造"长度与内容不符"的坏文件） */
+  tagSizeOverride?: number
 }
 
 /** 拼出一个最小但结构合法的 ID3v2 标签 */
@@ -51,17 +77,18 @@ function buildId3(options: BuildOptions = {}): ArrayBuffer {
     leadingFrame = false,
     extendedHeader = false,
     brokenFrameSize = false,
+    unsynchronised = false,
+    frameUnsynchronised = false,
+    tagSizeOverride,
   } = options
 
   const frames: number[] = []
 
-  const frameHeader = (id: string, size: number): number[] => {
+  const frameHeader = (id: string, size: number, formatFlags = 0): number[] => {
     const sizeBytes =
-      version === 4 && !brokenFrameSize
-        ? synchsafe(size)
-        : [(size >> 24) & 0xff, (size >> 16) & 0xff, (size >> 8) & 0xff, size & 0xff]
+      version === 4 && !brokenFrameSize ? synchsafe(size) : uint32(size)
     // 帧头 10 字节：id(4) + size(4) + flags(2)
-    return [...ascii(id), ...sizeBytes, 0, 0]
+    return [...ascii(id), ...sizeBytes, 0, formatFlags]
   }
 
   // 一个 TIT2 文本帧，用来验证"跳过非 APIC 帧"
@@ -84,27 +111,42 @@ function buildId3(options: BuildOptions = {}): ArrayBuffer {
   }
 
   apic.push(...picture)
-  frames.push(...frameHeader('APIC', apic.length), ...apic)
 
-  // 扩展头（v2.4）：4 字节 synchsafe 尺寸 + 内容
+  if (frameUnsynchronised) {
+    // v2.4 帧级去同步：只转义这一帧的载荷，帧长按**转义后**的长度写
+    const encoded = unsynchronise(apic)
+    frames.push(...frameHeader('APIC', encoded.length, 0x02), ...encoded)
+  } else {
+    frames.push(...frameHeader('APIC', apic.length), ...apic)
+  }
+
+  /*
+   * 扩展头。两个版本的语义**完全不同**，构造器必须跟着分叉，
+   * 否则测的就不是真实文件了：
+   *   v2.4：synchsafe 长度，且该值包含长度字段自身（本例共 6 字节）
+   *   v2.3：普通 uint32 长度，且该值**不含**长度字段自身 → 总长 4 + 6 = 10
+   */
   const ext: number[] = []
   if (extendedHeader) {
-    ext.push(...synchsafe(6), 1, 0)
+    if (version === 4) ext.push(...synchsafe(6), 1, 0)
+    else ext.push(...uint32(6), 0, 0, 0, 0, 0, 0)
   }
 
   const tagBody = [...ext, ...frames]
+  const encodedBody = unsynchronised ? unsynchronise(tagBody) : tagBody
+  const bodySize = tagSizeOverride ?? encodedBody.length
 
   // 头部 10 字节：ID3 + 版本(2) + flags(1) + synchsafe 尺寸(4)
-  const flags = extendedHeader ? 0x40 : 0x00
+  const flags = (extendedHeader ? 0x40 : 0x00) | (unsynchronised ? 0x80 : 0x00)
   const header = [
     ...ascii('ID3'),
     version,
     0,
     flags,
-    ...synchsafe(tagBody.length),
+    ...synchsafe(bodySize),
   ]
 
-  return new Uint8Array([...header, ...tagBody]).buffer
+  return new Uint8Array([...header, ...encodedBody]).buffer
 }
 
 // ——————————————————————————————————————————————————————————
@@ -147,8 +189,38 @@ describe('parseId3Cover', () => {
     expect([...(cover?.data ?? [])]).toEqual(FAKE_JPEG)
   })
 
-  it('支持带扩展头的标签', () => {
-    const cover = parseId3Cover(buildId3({ extendedHeader: true }))
+  /*
+   * 扩展头：两个版本的**长度语义完全不同**，而早先的代码对两者都按 synchsafe 读，
+   * 结果带扩展头的 v2.3 文件整段错位、静默返回 null——用户看到的就是
+   * "Windows 有封面、对奏没有"。下面两条分别把两个版本钉住。
+   */
+  it('支持带扩展头的标签（v2.4：synchsafe 长度，含自身）', () => {
+    const cover = parseId3Cover(buildId3({ version: 4, extendedHeader: true }))
+    expect([...(cover?.data ?? [])]).toEqual(FAKE_JPEG)
+  })
+
+  it('支持带扩展头的标签（v2.3：普通 uint32 长度，不含自身）', () => {
+    const cover = parseId3Cover(buildId3({ version: 3, extendedHeader: true }))
+    expect([...(cover?.data ?? [])]).toEqual(FAKE_JPEG)
+  })
+
+  /*
+   * 去同步（unsynchronisation）：编码时给每个 0xFF 后面补一个 0x00。
+   * 不还原**不会报错**，只会得到一张字节被污染的图——
+   * 比"没有封面"更难查（实测落库的是 ff 00 d8 ff 00 e0 …）。
+   */
+  it('还原标签级去同步（v2.3 标志位 0x80），字节与原始完全一致', () => {
+    const cover = parseId3Cover(buildId3({ version: 3, unsynchronised: true }))
+    expect([...(cover?.data ?? [])]).toEqual(FAKE_JPEG)
+  })
+
+  it('还原帧级去同步（v2.4 格式标志 0x02）', () => {
+    const cover = parseId3Cover(buildId3({ version: 4, frameUnsynchronised: true }))
+    expect([...(cover?.data ?? [])]).toEqual(FAKE_JPEG)
+  })
+
+  it('去同步 + 扩展头同时出现也能解出来', () => {
+    const cover = parseId3Cover(buildId3({ version: 3, extendedHeader: true, unsynchronised: true }))
     expect([...(cover?.data ?? [])]).toEqual(FAKE_JPEG)
   })
 
@@ -189,8 +261,31 @@ describe('parseId3Cover', () => {
     expect(parseId3Cover(buffer)).toBeNull()
   })
 
-  it('非图片 MIME 的 APIC 被拒绝（宁可没有封面也不要坏数据）', () => {
-    expect(parseId3Cover(buildId3({ mime: 'text/plain' }))).toBeNull()
+  /*
+   * MIME 字段是文件**自己声称**的，可以撒谎、也可以为空；能解码的只有字节本身。
+   * 因此判据是**魔数**而不是 MIME：
+   *   · 声称 text/plain 但字节是合法 JPEG → 收下（图是真的，标签写错了而已）
+   *   · 声称 image/jpeg 但字节是垃圾   → 拒绝（宁可没有封面，也不要把坏 blob 塞进库）
+   */
+  it('MIME 撒谎但字节是合法图片时，以字节为准收下', () => {
+    const cover = parseId3Cover(buildId3({ mime: 'text/plain' }))
+    expect([...(cover?.data ?? [])]).toEqual(FAKE_JPEG)
+  })
+
+  it('MIME 为空时按魔数补全（老工具常导出空 MIME）', () => {
+    const cover = parseId3Cover(buildId3({ mime: '' }))
+    expect(cover?.mime).toBe('image/jpeg')
+  })
+
+  it('声称是图片但字节不是图片时被拒绝（不让坏 blob 进库）', () => {
+    // 既不是 JPEG / PNG / GIF / BMP / WEBP 的任意字节
+    expect(parseId3Cover(buildId3({ picture: [0x00, 0x01, 0x02, 0x03, 0x04] }))).toBeNull()
+  })
+
+  it('去同步没被还原的坏字节会被魔数挡下来（回归：曾经会照常落库）', () => {
+    // 手工构造"该去同步但没去"的载荷：JPEG 魔数被 0x00 隔开
+    const corrupted = [0xff, 0x00, 0xd8, 0xff, 0x00, 0xe0, 0x00, 0x10, 0x4a, 0x46]
+    expect(parseId3Cover(buildId3({ picture: corrupted }))).toBeNull()
   })
 
   it('空图片数据被拒绝', () => {

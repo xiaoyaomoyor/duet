@@ -8,6 +8,7 @@
 import { uuid } from '@/lib/id'
 import { deepClone } from '@/lib/clone'
 import { moduleTitle } from '@/i18n/helper'
+import { presetIdOfColor } from '@/data/accentPresets'
 import {
   SCHEMA_VERSION,
   type Cell,
@@ -25,6 +26,17 @@ export type AccentPair = [string, string]
 
 /** 默认配色（左紫右青，与 §11.2 的 --side-a / --side-b 一致） */
 export const DEFAULT_ACCENT_PAIR: AccentPair = ['#a78bfa', '#22d3ee']
+
+/**
+ * 由 hex 反查出预设 id，包成可以直接展开进 Side 的字面量。
+ *
+ * 抽成函数是为了让"颜色 → 预设"这条规则只有一处：
+ * 模板实例化与 v3→v4 迁移都要用它，两处各写一遍迟早会不一致。
+ */
+function presetField(color: string): { accentPreset?: string } {
+  const id = presetIdOfColor(color)
+  return id ? { accentPreset: id } : {}
+}
 
 /** 更多成对配色：两侧色相分离明显，保证"一眼能分清左右" */
 export const ACCENT_PAIRS: ReadonlyArray<{ name: string; colors: AccentPair }> = [
@@ -167,16 +179,24 @@ export function instantiateTemplate(
   const sideAId = uuid()
   const sideBId = uuid()
 
+  /*
+   * 两侧同时写入 preset 与 hex：
+   *   preset 是**真源**（按当前主题解析成深浅两套色值），
+   *   hex 只是给不认预设的老代码 / 老文件一个始终可用的回退值。
+   * 认不出预设的（用户自定义色）就只写 hex，行为与 M8 之前一致。
+   */
   const sides: [Side, Side] = [
     {
       id: sideAId,
       toolRef: { kind: 'inline', name: '工具 A' },
       accent: accent[0],
+      ...presetField(accent[0]),
     },
     {
       id: sideBId,
       toolRef: { kind: 'inline', name: '工具 B' },
       accent: accent[1],
+      ...presetField(accent[1]),
     },
   ]
 

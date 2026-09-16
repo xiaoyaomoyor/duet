@@ -268,15 +268,25 @@ test.describe('M2 模块系统', () => {
     await expect(rows.nth(1).locator('.module-view__title').first()).toHaveText(secondTitle ?? '')
   })
 
-  test('属性面板可调整布局参数并持久化', async ({ page }) => {
+  test('对比配置面板可调整布局参数并持久化', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /空白对比/)
 
-    await page.getByRole('button', { name: '属性', exact: true }).click()
-    const inspector = page.getByRole('complementary', { name: '属性' })
-    await expect(inspector).toBeVisible()
+    // 顶栏按钮叫「对比配置」（M8 从「属性」改名）
+    await page.getByRole('button', { name: '对比配置', exact: true }).click()
+    const config = page.getByRole('complementary', { name: '对比配置' })
+    await expect(config).toBeVisible()
 
-    await inspector.locator('select').first().selectOption('grid')
+    /*
+     * 面板必须挂在**对比页内部**（工具条之下），而不是外壳的第三列——
+     * 否则标签栏与工具条会被它截断，看上去像换了一整页。
+     * 这一条同时钉住了"它属于对比页"这个设计决定。
+     */
+    await expect(page.locator('.compare-toolbar')).toBeVisible()
+    await expect(page.locator('.compare .compare__main')).toContainText('对比配置')
+
+    // 第一个下拉是「背景样式」（分组顺序：布局 → 配色 → 序号 → 背景 → 聚光灯）
+    await config.locator('select').nth(1).selectOption('grid')
     await expect(page.locator('.canvas')).toHaveClass(/canvas--bg-grid/)
 
     await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })

@@ -80,7 +80,8 @@ test.describe('M1 项目生命周期', () => {
     await expect(tabbar.locator('.tabbar__tab')).toHaveCount(2)
 
     // 关闭当前标签后应回落到另一个标签，且画布仍在（项目未被删除）
-    await tabbar.locator('.tabbar__tab--active .tabbar__close').click()
+    // 选中态类名是 .u-selected（M8 统一色彩风格后，与项目列表选中项同源）
+    await tabbar.locator('.tabbar__tab.u-selected .tabbar__close').click()
     await expect(tabbar.locator('.tabbar__tab')).toHaveCount(1)
     await expect(page.locator('.canvas')).toBeVisible()
 

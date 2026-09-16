@@ -27,6 +27,10 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarWidth = ref<number>(APP.sidebar.defaultWidth)
   const sidebarDragging = ref(false)
 
+  /** 对比配置面板宽度；同样是"拖拽中放这里、松手才落盘" */
+  const inspectorWidth = ref<number>(APP.inspector.defaultWidth)
+  const inspectorDragging = ref(false)
+
   // —— 弹窗与提示 ——
   const toasts = ref<Toast[]>([])
   const activeDialog = ref<string | null>(null)
@@ -50,6 +54,13 @@ export const useUiStore = defineStore('ui', () => {
 
   function setSidebarWidth(width: number): void {
     sidebarWidth.value = Math.min(APP.sidebar.max, Math.max(APP.sidebar.min, Math.round(width)))
+  }
+
+  function setInspectorWidth(width: number): void {
+    inspectorWidth.value = Math.min(
+      APP.inspector.max,
+      Math.max(APP.inspector.min, Math.round(width)),
+    )
   }
 
   function toggleInspector(): void {
@@ -107,6 +118,8 @@ export const useUiStore = defineStore('ui', () => {
     sidebarCollapsed,
     sidebarWidth,
     sidebarDragging,
+    inspectorWidth,
+    inspectorDragging,
     inspectorOpen,
     toasts,
     activeDialog,
@@ -116,6 +129,7 @@ export const useUiStore = defineStore('ui', () => {
     compactShell,
     toggleSidebar,
     setSidebarWidth,
+    setInspectorWidth,
     toggleInspector,
     openDialog,
     closeDialog,

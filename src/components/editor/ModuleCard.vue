@@ -14,6 +14,12 @@
  *   现在卡片直接呈现结果，需要改细节时再打开弹窗——
  *   版式立刻清爽，且所见即所得。
  *
+ * 拖动方式（M8 按用户实测反馈改）：
+ *   去掉左侧那个悬浮才出现的拖拽手柄，改为**整张卡片的空白处都可以拖**。
+ *   手柄的问题是它又小又只在悬浮时出现，用户根本不知道那里能抓；
+ *   而卡片本来就是一块独立的、可排序的东西，直接拖它才符合直觉。
+ *   卡片内部的按钮 / 输入框 / 链接由 SortableJS 的 filter 排除，不会误触发。
+ *
  * 空模块例外：内容为空时没有东西可渲染，卡片会退化成"点击填写"的虚线框，
  * 否则用户将面对一个看不见也点不到的卡片。
  */
@@ -34,6 +40,8 @@ const props = defineProps<{
   readonly?: boolean
   /** 是否显示拖拽手柄（展示视图不显示） */
   draggable?: boolean
+  /** 子序号（2.1 / 2.2），由 CanvasRow 算好后透传给 ModuleView */
+  number?: string | undefined
 }>()
 
 const emit = defineEmits<{
@@ -69,15 +77,6 @@ function forwardProps(patch: Record<string, unknown>): void {
 
 <template>
   <article class="card" :class="{ 'card--hidden': module.hidden }" :style="{ '--accent': accent }">
-    <!-- 拖拽手柄：贴在左边缘，悬浮时才明显 -->
-    <span
-      v-if="draggable && !readonly"
-      class="card__grip module-drag-handle"
-      :title="t('module.dragHandle')"
-    >
-      <AppIcon name="grip" :size="13" />
-    </span>
-
     <!-- 右上角操作区：悬浮或键盘聚焦时出现 -->
     <div v-if="!readonly" class="card__actions">
       <button
@@ -125,7 +124,13 @@ function forwardProps(patch: Record<string, unknown>): void {
       空模块时用 #body 插槽换成"点击填写"的占位框——
       标题仍然由 ModuleView 渲染，两种状态下的标题结构因此完全一致。
     -->
-    <ModuleView :module="module" :side-id="sideId" :accent="accent" :readonly="false">
+    <ModuleView
+      :module="module"
+      :side-id="sideId"
+      :accent="accent"
+      :number="number"
+      :readonly="false"
+    >
       <template v-if="empty" #body>
         <button class="card__empty" type="button" :disabled="readonly" @click="editing = true">
           <AppIcon :name="definition?.meta.icon ?? 'text'" :size="15" />
@@ -153,7 +158,11 @@ function forwardProps(patch: Record<string, unknown>): void {
 .card {
   position: relative;
   padding: var(--sp-3);
-  padding-left: calc(var(--sp-3) + 6px);
+  /*
+   * 整卡可拖：给一个"可以抓"的鼠标指针。
+   * 只加在卡片本身，卡片内的按钮/输入框用自己的指针覆盖掉它。
+   */
+  cursor: grab;
   /*
    * 背景着色与工具卡片（SideHeader）对齐 —— 用户实测反馈：
    * "工具卡片有颜色，下面的模块卡片却是白板，看着不像一套东西"。
@@ -172,6 +181,40 @@ function forwardProps(patch: Record<string, unknown>): void {
     border-color var(--dur-fast) var(--ease-out);
 }
 
+.card:active {
+  cursor: grabbing;
+}
+
+/*
+ * 卡片内一切可交互的东西都恢复成"可点"，而不是"可抓"。
+ *
+ * ⚠️ 这里刻意写 `[contenteditable]` 而**不带值**：导出只读 HTML 时会内联
+ * 整份样式表，而 E2E 断言"导出稿里不含 contenteditable"正是按字符串查的
+ * （怕富文本编辑器漏进成稿）。带值写会让样式表里出现这个字符串，
+ * 断言就会因为一条**样式**而失败。属性存在性判断本来也更准确。
+ */
+.card button,
+.card input,
+.card textarea,
+.card select,
+.card a,
+.card [contenteditable] {
+  cursor: auto;
+}
+
+.card button,
+.card a {
+  cursor: pointer;
+}
+
+/*
+ * 空模块的占位框本身就是"点我填写"，整卡可拖之后它必须排除，
+ * 否则点击会被当成拖拽的起点。（类名已在 SortableJS 的 filter 里同步排除。）
+ */
+.card__empty {
+  cursor: pointer;
+}
+
 .card:hover {
   border-color: var(--border-default);
   border-left-color: var(--accent, var(--accent-500));
@@ -179,28 +222,6 @@ function forwardProps(patch: Record<string, unknown>): void {
 
 .card--hidden {
   opacity: 0.55;
-}
-
-/* —— 拖拽手柄 —— */
-.card__grip {
-  position: absolute;
-  top: 50%;
-  left: 3px;
-  display: flex;
-  color: var(--text-disabled);
-  cursor: grab;
-  opacity: 0;
-  transform: translateY(-50%);
-  transition: opacity var(--dur-fast) var(--ease-out);
-}
-
-.card:hover .card__grip,
-.card__grip:focus-visible {
-  opacity: 1;
-}
-
-.card__grip:active {
-  cursor: grabbing;
 }
 
 /* —— 右上角操作区 —— */
