@@ -119,6 +119,40 @@ test.describe('M4 同步播放', () => {
     await expect(page.locator('.syncbar')).toHaveCount(0)
   })
 
+  /**
+   * M8 聚光灯：「色彩弱化」。
+   *
+   * 为什么必须在**展示视图里**按播放：进入展示视图会重新挂载整块画布
+   * （编辑态那份不渲染），音频元素是新的、播放状态自然归零。
+   * 真实用法也正是这样——用户在展示视图里点某一侧的播放键试听。
+   */
+  test('聚光灯：只有一侧在播放时，另一侧在展示视图被弱化', async ({ page }) => {
+    await page.goto('/')
+    await createFromTemplate(page, /音乐对比/)
+    await importBothTracks(page)
+
+    // 先把聚光灯调到「色彩弱化」（面板只在编辑态出现，所以要提前设好）
+    await page.getByRole('button', { name: '对比配置', exact: true }).click()
+    await page.getByRole('radio', { name: '色彩弱化' }).click()
+
+    await page.getByRole('button', { name: '进入展示视图' }).click()
+    await expect(page.locator('.present')).toBeVisible()
+
+    const root = page.locator('[data-present-root]')
+    const dimmed = root.locator('.row__cell--dimmed')
+    // 还没播放时两侧应当完全一样
+    await expect(dimmed).toHaveCount(0)
+
+    // 只让左侧那一条音轨播放（原生控件，直接调 play 即可；
+    // 此时页面上早已有过大量用户交互，Chromium 的自动播放策略会放行）
+    await root.locator('audio').first().evaluate((el) => (el as HTMLAudioElement).play())
+
+    await expect(dimmed.first()).toBeVisible({ timeout: 10_000 })
+    // 被弱化的只应当是一部分格子，而不是整页
+    const total = await root.locator('.row__cell').count()
+    expect(await dimmed.count()).toBeLessThan(total)
+  })
+
   test('Solo 与静音按钮可切换且状态可见', async ({ page }) => {
     await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
