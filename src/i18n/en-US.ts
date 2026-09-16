@@ -67,7 +67,7 @@ export default {
     pinned: 'Pinned',
     recent: 'Recent',
     noProjects: 'No comparisons yet',
-    noProjectsHint: 'Pick a template above to start',
+    noProjectsHint: 'Click “+” in the top-left to start from a template',
     emptySearch: 'No matching projects',
     count: '{n} projects',
     rightClickHint: 'Right-click a project to pin / rename / duplicate / delete',
@@ -451,11 +451,13 @@ export default {
   template: {
     sectionTitle: 'Start from a template',
     musicName: 'Music',
-    musicDesc: 'Cover, lyrics, audio and progress — built for Suno-style tools',
+    // "Cover" was merged into the Image module (§21.11) — keep the wording in step
+    // with the module chips shown on the same card.
+    musicDesc: 'Image, lyrics, audio and progress — built for Suno-style tools',
     imageName: 'Image',
-    imageDesc: 'Cover, image and specs — built for Midjourney-style tools',
+    imageDesc: 'Two images and specs — built for Midjourney-style tools',
     videoName: 'Video',
-    videoDesc: 'Cover, video and specs — built for video generation tools',
+    videoDesc: 'Image, video and specs — built for video generation tools',
     blankName: 'Blank',
     blankDesc: 'Start from scratch and add the modules you need',
   },

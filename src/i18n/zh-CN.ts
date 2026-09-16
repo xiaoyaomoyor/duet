@@ -67,7 +67,7 @@ export default {
     pinned: '置顶',
     recent: '最近',
     noProjects: '还没有对比项目',
-    noProjectsHint: '从上方选一个模板开始',
+    noProjectsHint: '点左上角的「＋」，从模板开始',
     emptySearch: '没有匹配的项目',
     count: '共 {n} 个项目',
     rightClickHint: '右键项目可置顶 / 重命名 / 复制 / 删除',
@@ -445,11 +445,13 @@ export default {
   template: {
     sectionTitle: '从模板开始',
     musicName: '音乐对比',
-    musicDesc: '封面 · 歌词 · 音频 · 进度条，适合 Suno 与 Lyria 这类音乐生成工具',
+    // 「封面」已并入「图片」模块（§21.11），描述里的用词必须跟着改——
+    // 否则卡片上写着"封面 · 歌词…"、下面的模块标签却是"图片"，两处对不上
+    musicDesc: '图片 · 歌词 · 音频 · 进度条，适合 Suno 与 Lyria 这类音乐生成工具',
     imageName: '图片对比',
-    imageDesc: '封面 · 图片 · 参数，适合 Midjourney 与 SD 这类生图工具',
+    imageDesc: '图片 · 图片 · 参数，适合 Midjourney 与 SD 这类生图工具',
     videoName: '视频对比',
-    videoDesc: '封面 · 视频 · 参数，适合可灵与即梦这类视频生成工具',
+    videoDesc: '图片 · 视频 · 参数，适合可灵与即梦这类视频生成工具',
     blankName: '空白对比',
     blankDesc: '从零开始，自行添加需要的模块',
   },

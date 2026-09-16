@@ -392,10 +392,59 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   color: var(--text-muted);
 }
 
+/*
+ * 滑块：自己画轨道与滑块，**不用 accent-color**。
+ *
+ * 实测（Chromium，同一个页面上三种写法并排对比）：
+ *   · 不设 accent-color        → 蓝色填充 + 浅灰轨道（蓝色和任何一套主题都不搭）
+ *   · 只设 accent-color        → 紫色填充 + **近黑的轨道**（Chromium 把未填充那一段
+ *                                画成了深色，在浅色主题下像一根黑色进度条）
+ *   · appearance:none 自绘      → 浅灰轨道 + 主题色滑块（干净，且完全走 token）
+ * 顺手排掉一个错误的猜想：给 input 设 `color` **完全不影响**轨道——
+ * 设成红色后截图与原来逐字节相同。所以这里没有"改个颜色就好"的捷径。
+ *
+ * 代价：自绘之后没有"左半段已填充"的视觉，值只由右侧的百分比数字表达。
+ * 这个交换是划算的——数字本来就在旁边，而一根黑色横条是实打实的观感问题。
+ * WebKit 与 Firefox 各有一套伪元素，必须分别写。
+ */
 .scale__range {
   flex: 1;
   min-width: 0;
-  accent-color: var(--accent, var(--accent-500));
+  height: 16px;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+.scale__range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--bg-active);
+  border-radius: var(--radius-full);
+}
+
+.scale__range::-moz-range-track {
+  height: 4px;
+  background: var(--bg-active);
+  border-radius: var(--radius-full);
+}
+
+.scale__range::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  /* (轨道 4px − 滑块 12px) / 2：让滑块压在轨道中心 */
+  margin-top: -4px;
+  appearance: none;
+  background: var(--accent, var(--accent-500));
+  border: none;
+  border-radius: var(--radius-full);
+}
+
+.scale__range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent, var(--accent-500));
+  border: none;
+  border-radius: var(--radius-full);
 }
 
 /* 百分比定宽等宽字体：拖动时数字位数变化不会把滑块挤来挤去 */
