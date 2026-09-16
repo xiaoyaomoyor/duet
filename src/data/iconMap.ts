@@ -17,6 +17,7 @@
 
 import {
   Activity,
+  BetweenHorizontalStart,
   Box,
   Check,
   ChevronDown,
@@ -85,9 +86,21 @@ export const ICONS: Record<string, LucideIcon> = {
   edit: Pencil,
   undo: Undo2,
   redo: Redo2,
-  import: Upload,
-  export: Download,
+  /*
+   * 导入 / 导出。
+   *
+   * ⚠️ M7 修正：这两个图标此前是反的（import=Upload、export=Download）。
+   * 判断依据是**文件相对于应用的移动方向**，不是箭头本身的朝向：
+   *   导入 = 把外面的文件拿进来 → 箭头朝下、落进托盘（Download）
+   *   导出 = 把内容送出去成文件 → 箭头朝上、离开托盘（Upload）
+   * 实测反馈里用户第一眼就说"这两个反了"，说明按箭头朝向硬记是行不通的。
+   */
+  import: Download,
+  export: Upload,
   grip: GripVertical,
+  // "在上方插入行"。刻意与 plus 区分：plus 是"往这一行里加模块"，
+  // insertRow 是"在行与行之间插入一整行"，两者语义完全不同。
+  insertRow: BetweenHorizontalStart,
   'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,
   'chevron-down': ChevronDown,

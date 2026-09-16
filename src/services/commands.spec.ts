@@ -136,6 +136,53 @@ describe('行操作', () => {
     expect(next.sheet.rows[next.sheet.rows.length - 1]?.id).toBe('row-last')
   })
 
+  /*
+   * 通用模块行（kind: 'full'）。
+   *
+   * 它的模块存在**第一侧**的格子里——`cells` 的类型是 Record<SideId, Cell>，
+   * 为通用行另造存储位置会让命令层、校验、导出全都多一条分支；
+   * 复用第一侧则一行命令都不用改。下面两条把这个约定钉住：
+   * 一旦有人"顺手"把它挪到别处，这里会立刻红。
+   */
+  it('row/add 可以一次带上通用模块（一整行 + 其中的模块 = 一条命令）', () => {
+    const project = makeProject()
+    const [sideA, sideB] = project.sheet.sides
+    const cell = createEmptyCell()
+    cell.modules.push(createModule({ type: 'text', title: '同一套提示词', data: { text: 'hi' } }))
+
+    const row = {
+      id: 'row-common',
+      kind: 'full' as const,
+      cells: { [sideA!.id]: cell, [sideB!.id]: createEmptyCell() },
+      collapsed: false,
+    }
+
+    const next = applyCommand(project, { t: 'row/add', row, at: 2 })
+
+    expect(next.sheet.rows[2]?.kind).toBe('full')
+    expect(next.sheet.rows[2]?.cells[sideA!.id]?.modules).toHaveLength(1)
+    expect(next.sheet.rows[2]?.cells[sideB!.id]?.modules).toHaveLength(0)
+  })
+
+  it('row/remove 能把"带模块的通用行"整行撤销掉（撤销依赖命令层可逆）', () => {
+    const project = makeProject()
+    const [sideA, sideB] = project.sheet.sides
+    const cell = createEmptyCell()
+    cell.modules.push(createModule({ type: 'text', title: '总体评价', data: { text: 'ok' } }))
+    const row = {
+      id: 'row-common',
+      kind: 'full' as const,
+      cells: { [sideA!.id]: cell, [sideB!.id]: createEmptyCell() },
+      collapsed: false,
+    }
+
+    const added = applyCommand(project, { t: 'row/add', row, at: 1 })
+    const removed = applyCommand(added, { t: 'row/remove', rowId: 'row-common' })
+
+    expect(removed.sheet.rows).toHaveLength(project.sheet.rows.length)
+    expect(removed.sheet.rows.some((item) => item.id === 'row-common')).toBe(false)
+  })
+
   it('row/remove 删除指定行', () => {
     const project = makeProject()
     const target = firstRowId(project)

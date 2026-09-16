@@ -149,6 +149,8 @@
   /* —— 结构尺寸（JS 侧不重复定义，直接读这里） —— */
   --size-topbar: 52px;
   --size-tabbar: 40px;
+  /* 对比页工具条：与标签栏等高，视觉上合成"页头两行" */
+  --size-toolbar: 40px;
   --size-sidebar: 260px;
   --size-sidebar-collapsed: 48px;
   --size-content-max: 1440px;

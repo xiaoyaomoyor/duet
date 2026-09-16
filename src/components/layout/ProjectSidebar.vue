@@ -2,23 +2,30 @@
 /**
  * 项目侧栏（Obsidian 式项目列表，§9.1）
  *
- * 结构：头部操作 → 模板选择 → 搜索 → 置顶分组 → 最近分组 → 底部统计
+ * 结构：头部操作 → 搜索 → 置顶分组 → 最近分组 → 底部统计
  * 交互：点击打开、右键菜单（置顶/重命名/复制/删除）、删除后 10 秒可撤销
+ *
+ * M7（用户实测反馈）：
+ *   1. 头部的 ＋ 不再就地展开模板列表，而是把**主区**切回"从一次对比开始"。
+ *      侧栏只有 260px 宽，四个模板挤进去只能各显示一行小字，
+ *      而画廊里的卡片有名字、说明和组成模块——信息明明有地方放，没必要挤。
+ *      折叠态的图标条同理（此前那个 ＋ 甚至只是把侧栏展开，连新建都没做）。
+ *   2. 删掉条目右侧悬浮出现的六点图标。它长得像拖拽手柄，实际只是右键菜单的
+ *      另一个入口，语义与外形对不上。菜单改为**只**由右键唤出（与 Obsidian 一致）。
  */
 import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import AppIcon from '@/components/common/AppIcon.vue'
 import AppDialog from '@/components/common/AppDialog.vue'
 import { useUiStore } from '@/stores/useUiStore'
 import { useProjectsStore } from '@/stores/useProjectsStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-import { BUILTIN_TEMPLATES } from '@/services/templateService'
-import { t as translate } from '@/i18n/helper'
 import { formatRelative } from '@/lib/time'
-import { getModuleMeta } from '@/modules/meta'
 
 const { t, locale } = useI18n()
+const router = useRouter()
 const ui = useUiStore()
 const projects = useProjectsStore()
 const store = useProjectStore()
@@ -28,29 +35,19 @@ const collapsed = computed(() => ui.sidebarCollapsed)
 const currentLocale = computed(() => (locale.value === 'en-US' ? 'en-US' : 'zh-CN'))
 
 // ————————————————————————————————————————————————————————
-// 新建：模板选择
+// 新建：回到"从一次对比开始"
 // ————————————————————————————————————————————————————————
 
-const showTemplates = ref(false)
-
-const templates = computed(() =>
-  BUILTIN_TEMPLATES.map((template) => ({
-    id: template.id,
-    name: translate(template.nameKey),
-    desc: translate(template.descKey),
-    accent: template.accent,
-    icon: getModuleMeta(template.fields[0]?.field.type ?? 'text')?.icon ?? 'text',
-  })),
-)
-
-async function createFrom(templateId: string, name: string): Promise<void> {
-  showTemplates.value = false
-  const result = await store.create({ templateId, name })
-  if (result.ok) {
-    ui.notify(t('toast.projectCreated', { title: result.value.title }), 'success')
-  } else {
-    ui.notify(t('errors.projectLoad', { message: result.error }), 'danger')
-  }
+/**
+ * 点 ＋ ＝ 去空状态选模板。
+ *
+ * 先切路由再清 current：反过来的话 CompareView 里那个"current 变 null → 退回
+ * #/compare"的 watcher 会先跑，路由与状态各更新一半，中间那一帧画廊和画布都可能在。
+ */
+async function startNew(): Promise<void> {
+  menuFor.value = null
+  if (router.currentRoute.value.name !== 'compare') await router.replace({ name: 'compare' })
+  await store.startNewComparison()
 }
 
 // ————————————————————————————————————————————————————————
@@ -142,7 +139,7 @@ function rowCount(projectId: string): number {
         type="button"
         :title="t('sidebar.newProject')"
         :aria-label="t('sidebar.newProject')"
-        @click="ui.toggleSidebar()"
+        @click="startNew"
       >
         <AppIcon name="plus" :size="18" />
       </button>
@@ -153,7 +150,7 @@ function rowCount(projectId: string): number {
         :aria-label="t('nav.toggleSidebar')"
         @click="ui.toggleSidebar()"
       >
-        <AppIcon name="search" :size="18" />
+        <AppIcon name="sidebar" :size="18" />
       </button>
     </div>
 
@@ -165,32 +162,11 @@ function rowCount(projectId: string): number {
           type="button"
           :title="t('sidebar.newProject')"
           :aria-label="t('sidebar.newProject')"
-          :aria-expanded="showTemplates"
-          @click="showTemplates = !showTemplates"
+          @click="startNew"
         >
-          <AppIcon :name="showTemplates ? 'close' : 'plus'" :size="16" />
+          <AppIcon name="plus" :size="16" />
         </button>
       </div>
-
-      <ul v-if="showTemplates" class="sidebar__templates">
-        <li v-for="template in templates" :key="template.id">
-          <button class="template-card" type="button" @click="createFrom(template.id, template.name)">
-            <span
-              class="template-card__mark"
-              :style="{
-                background: `linear-gradient(135deg, ${template.accent[0]}, ${template.accent[1]})`,
-              }"
-              aria-hidden="true"
-            >
-              <AppIcon :name="template.icon" :size="13" />
-            </span>
-            <span class="template-card__text">
-              <span class="template-card__name">{{ template.name }}</span>
-              <span class="template-card__desc">{{ template.desc }}</span>
-            </span>
-          </button>
-        </li>
-      </ul>
 
       <div class="sidebar__search">
         <AppIcon name="search" :size="14" class="sidebar__search-icon" />
@@ -252,16 +228,6 @@ function rowCount(projectId: string): number {
                       {{ t('compare.rows', { n: rowCount(project.id) }) }}
                     </span>
                   </span>
-                  <span
-                    class="sidebar__item-more"
-                    role="button"
-                    tabindex="0"
-                    :aria-label="t('common.more')"
-                    @click.stop="toggleMenu(project.id)"
-                    @keydown.enter.stop="toggleMenu(project.id)"
-                  >
-                    <AppIcon name="grip" :size="14" />
-                  </span>
                 </button>
 
                 <ul v-if="menuFor === project.id" class="ctx-menu">
@@ -298,6 +264,12 @@ function rowCount(projectId: string): number {
 
       <div class="sidebar__foot">
         <span class="sidebar__hint">{{ t('sidebar.count', { n: projects.items.length }) }}</span>
+        <!--
+          菜单只由右键唤出（六点图标已按实测反馈删除），
+          因此这里必须留一句提示——否则"能置顶/重命名/删除"这件事
+          对新用户来说完全不可见。
+        -->
+        <span class="sidebar__hint sidebar__hint--dim">{{ t('sidebar.rightClickHint') }}</span>
       </div>
     </template>
 
@@ -358,60 +330,6 @@ function rowCount(projectId: string): number {
 .sidebar__icon-btn:hover {
   color: var(--text-primary);
   background: var(--bg-hover);
-}
-
-.sidebar__templates {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  padding: 0 var(--sp-3) var(--sp-2);
-  margin-bottom: var(--sp-2);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.template-card {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: center;
-  width: 100%;
-  padding: var(--sp-2);
-  text-align: left;
-  border-radius: var(--radius-md);
-  transition: background var(--dur-fast) var(--ease-out);
-}
-
-.template-card:hover {
-  background: var(--bg-hover);
-}
-
-.template-card__mark {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  color: var(--text-inverse);
-  border-radius: var(--radius-sm);
-}
-
-.template-card__text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.template-card__name {
-  font-size: var(--fs-sm);
-}
-
-.template-card__desc {
-  overflow: hidden;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .sidebar__search {
@@ -507,17 +425,6 @@ function rowCount(projectId: string): number {
   white-space: nowrap;
 }
 
-.sidebar__item-more {
-  flex: none;
-  color: var(--text-disabled);
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
-}
-
-.sidebar__item:hover .sidebar__item-more {
-  opacity: 1;
-}
-
 .sidebar__rename {
   width: 100%;
   padding: var(--sp-2) var(--sp-3);
@@ -566,6 +473,9 @@ function rowCount(projectId: string): number {
 }
 
 .sidebar__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding: var(--sp-2) var(--sp-3);
   border-top: 1px solid var(--border-subtle);
 }
@@ -573,5 +483,10 @@ function rowCount(projectId: string): number {
 .sidebar__hint {
   font-size: var(--fs-xs);
   color: var(--text-disabled);
+}
+
+.sidebar__hint--dim {
+  color: var(--text-disabled);
+  opacity: 0.8;
 }
 </style>

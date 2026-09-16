@@ -11,6 +11,15 @@
  * 版权纪律（§10.2）：仓库内**不内置任何第三方品牌 Logo**。
  * 第 1 级是用户自己在本机拉取的，第 2 级是用户自己上传的，
  * 两者都不随仓库分发。
+ *
+ * M7 修掉的一个真 bug：品牌 LOGO 改用 **CSS mask** 上色，而不是当图片铺上去。
+ *   品牌 LOGO 是单色路径，而抓下来的文件填的是纯白（脚本当时特意传了 /ffffff）。
+ *   白字形 + 浅色主题的浅灰底 = **完全看不见**，用户实测反馈
+ *   "内置的几个 LOGO 在亮色主题下根本看不清"说的就是这个。
+ *   现在把 SVG 当"形状"用（mask-image），颜色取 --text-primary，
+ *   于是四个主题下都自动是"深底白字 / 浅底黑字"，再也不会消失。
+ *   顺带解决了两件事：文件里的填色不再重要（重新抓取换了颜色也不会坏），
+ *   以及不必再为"给图标垫一层底"而内缩。
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { proceduralIconDataUri } from '@/lib/icons'
@@ -66,30 +75,57 @@ const fallbackSrc = computed(() => {
 /** 本地品牌 LOGO 的地址；没有则 null */
 const brandLogo = computed(() => (logosReady.value ? localLogoUrl(props.logoKey) : null))
 
-const src = computed(() => customUrl.value ?? brandLogo.value ?? fallbackSrc.value)
+/** 用户上传的图标优先于品牌 LOGO；两者都没有才走程序化图标 */
+const src = computed(() => customUrl.value ?? fallbackSrc.value)
 const label = computed(() => props.name)
 const size = computed(() => props.size ?? 32)
 
-/** 是否正在显示本地品牌 LOGO（用于切换样式与内缩） */
+/** 是否正在显示本地品牌 LOGO（决定用 mask 渲染还是 img 渲染） */
 const usingBrandLogo = computed(() => brandLogo.value !== null && customUrl.value === null)
 
 /**
- * 品牌 LOGO 的内缩量（px）。
+ * 品牌 LOGO 的样式：把 SVG 当遮罩，用背景色填出图形。
  *
- * 刻意用**计算出的像素值**而不是百分比 padding：
- * 百分比 padding 解析的是**包含块的宽度**（这里是整条 chip），而不是图标自身，
- * 所以同一个 16% 在 20px 与 72px 的图标上得到的内缩完全不同——
- * 实测它把 20px 的图标撑到了 30px，把旁边的工具名挤成了省略号。
- * 按 size 直接算就没有这种不确定性。
+ * 同时写 `mask-*` 与 `WebkitMask*`：Safari 15.4 之前只认带前缀的那套，
+ * 而 Vue 的 :style 不会自动补前缀。写两份的成本远低于"某些浏览器上图标不见了"。
+ *
+ * 内缩用 `mask-size: 72%` 表达，**不用 padding**：
+ * 百分比 padding 解析的是**包含块**的宽度，而这个方块的包含块是整条卡片行，
+ * 于是同一个 14% 在 20px 与 72px 的图标上得到完全不同的内缩
+ * （上一版正是这么把 20px 的图标撑到 30px 的）。mask-size 没有这个问题。
  */
-const brandInset = computed(() => Math.round(size.value * 0.16))
+const brandStyle = computed(() => {
+  const url = `url("${brandLogo.value}")`
+  const px = `${size.value}px`
+  return {
+    width: px,
+    height: px,
+    maskImage: url,
+    WebkitMaskImage: url,
+    maskSize: '72% 72%',
+    WebkitMaskSize: '72% 72%',
+    maskRepeat: 'no-repeat',
+    WebkitMaskRepeat: 'no-repeat',
+    maskPosition: 'center',
+    WebkitMaskPosition: 'center',
+  }
+})
 </script>
 
 <template>
+  <!-- 品牌 LOGO：用 mask 上色，见脚本顶部关于浅色主题的说明 -->
+  <span
+    v-if="usingBrandLogo"
+    class="tool-icon tool-icon--brand"
+    :style="brandStyle"
+    role="img"
+    :aria-label="label"
+    :title="label"
+  />
+
   <img
+    v-else
     class="tool-icon"
-    :class="{ 'tool-icon--brand': usingBrandLogo }"
-    :style="usingBrandLogo ? { padding: `${brandInset}px` } : undefined"
     :src="src"
     :width="size"
     :height="size"
@@ -108,13 +144,19 @@ const brandInset = computed(() => Math.round(size.value * 0.16))
 }
 
 /*
- * 品牌 LOGO 是单色路径、没有底板，直接铺满会显得又平又小。
- * 给一层浅底 + 内缩（内缩量在 JS 里按 size 算，见 brandInset），
- * 让它在与程序化图标并排时不显得突兀。
+ * 品牌 LOGO 没有自己的底板（Simple Icons 是纯轮廓），
+ * 因此用当前主题的**正文色**填出图形：深色主题下是白字形、
+ * 浅色主题下是黑字形，四个主题都保证可见。
+ *
+ * 这里刻意不再垫一层 --bg-surface-2 的方块：
+ * (1) 已经有正文色兜底，底板不再承担"让图形可见"的职责；
+ * (2) 单色轮廓 + 一块实心方底，和旁边"彩色渐变小方块"的程序化图标
+ *     放在一起反而更不统一。
  */
 .tool-icon--brand {
-  box-sizing: border-box;
-  background: var(--bg-surface-2);
-  object-fit: contain;
+  display: inline-block;
+  background-color: var(--text-primary);
+  border-radius: 22%;
 }
 </style>
+

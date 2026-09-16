@@ -111,6 +111,21 @@ function poll(): void {
     attach()
   }
 
+  /*
+   * 还没装配成功就继续重试。
+   *
+   * 早先只在"就绪集合变了"时试一次，问题是装配需要**两个**前提，
+   * 而它们的到达时间并不一致：
+   *   · durationMs > 0 —— 媒体元素触发 loadedmetadata
+   *   · element 已登记 —— AudioRenderer 注册（它刻意延后一个 tick）
+   * 进入展示视图时旧画布卸载会把 element 置空、durationMs 却还留着，
+   * 于是第一轮 poll 看到"两侧就绪"、却一个 element 都拿不到 → no-tracks；
+   * 而就绪集合此后再没变过，attach 也就再没被调用，
+   * 控制栏永久停在"两侧都需要有音频"的降级态（实测就是这个现象）。
+   * attach() 自带幂等保护（成功后再调直接 return），因此这里的重试是空转成本。
+   */
+  if (!attached.value && readySideIds.value.length >= 2) attach()
+
   if (!attached.value) return
 
   const state = getAudioState(first.id)

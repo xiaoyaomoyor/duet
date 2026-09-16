@@ -12,8 +12,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import TemplateGallery from '@/components/compare/TemplateGallery.vue'
 import CompareCanvas from '@/components/compare/CompareCanvas.vue'
+import CompareToolbar from '@/components/compare/CompareToolbar.vue'
 import PresentOverlay from '@/components/present/PresentOverlay.vue'
-import SyncPlayerBar from '@/components/present/SyncPlayerBar.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useProjectsStore } from '@/stores/useProjectsStore'
 import { useUiStore } from '@/stores/useUiStore'
@@ -81,20 +81,27 @@ function onPresentExit(): void {
     <div v-if="loading" class="compare__loading">{{ t('common.loading') }}</div>
 
     <template v-else-if="store.current">
-      <!-- 同步播放控制栏：两侧都有音轨时才出现（条件在组件内部判断） -->
-      <SyncPlayerBar :project="store.current" />
+      <!--
+        对比页工具条：保存状态 / 切视图 / 属性 / 导入 / 导出。
+        它是**对比页的第一行**，因此放在这里而不是 AppShell —— 空状态
+        （还没打开任何项目）下这一行整个不该存在，而空状态是这个视图的分支。
+      -->
+      <CompareToolbar />
 
       <!--
-        画布在两种视图态下都渲染，但形态不同：
-          编辑态 → readonly=false，带编辑器与增删
-          展示态 → readonly=true，只渲染展示态渲染器；外层由 PresentOverlay 呈现
-        展示态保留画布的原因：只读导出（长图/HTML）需要 [data-present-root] 这个节点，
-        它就在 PresentOverlay 里。把画布抽掉会让导出拿不到根节点。
+        编辑态才渲染主区画布。
 
-        "绝对只读"由两件事共同保证：readonly 分支不渲染任何输入元素 +
-        PresentOverlay 覆盖在上层（编辑态下遮罩层根本不存在）。
+        M7 之前两种视图态都渲染：展示态下这里也挂着画布，同时
+        PresentOverlay 里还有一份只读画布，于是**同一个项目同时存在两套画布**。
+        在同步播放上这不是"多花点性能"，而是真的坏掉：
+          1. AudioRenderer 按 sideId 向全局时钟登记音轨，两套画布的同名音轨
+             会互相覆盖；展示态一挂载，编辑态那几个 element 的 loadedmetadata
+             还没到，登记表就被清空，控制栏随即退化成"两侧都需要有音频"。
+          2. SyncPlayerBar 的两份实例会互相 attach / detach 同一个同步引擎。
+        展示态本来就被遮罩层完全盖住，把那块画布去掉既修掉了上面的问题，
+        也顺带省掉一半的渲染与内存。
       -->
-      <CompareCanvas :project="store.current" :readonly="isPresent" />
+      <CompareCanvas v-if="!isPresent" :project="store.current" />
     </template>
 
     <TemplateGallery v-else />

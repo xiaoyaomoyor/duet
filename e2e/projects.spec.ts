@@ -8,15 +8,14 @@ import { expect, test, type Page } from '@playwright/test'
  */
 
 /**
- * 通过侧栏模板卡新建一个项目。
+ * 通过主区模板卡新建一个项目。
  *
- * 必须限定在 <aside>（complementary）内：空状态下主区的模板画廊
- * 也会渲染同名的模板卡片，不限定会撞上 strict mode。
+ * M7 起模板卡片只在主区渲染（侧栏的 ＋ 会先把主区切回画廊），
+ * 因此不再需要"限定在 <aside> 内"那层防 strict mode 的保护。
  */
 async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
-  const sidebar = page.getByRole('complementary')
-  await sidebar.getByRole('button', { name: '新建对比' }).click()
-  await sidebar.getByRole('button', { name }).click()
+  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
+  await page.getByRole('main').getByRole('button', { name }).click()
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
@@ -39,8 +38,8 @@ test.describe('M1 项目生命周期', () => {
     await expect(main.getByText('工具 A')).toBeVisible()
     await expect(main.getByText('工具 B')).toBeVisible()
 
-    // 模板预置的四行模块
-    for (const moduleName of ['封面图', '音频', '歌词', '进度条']) {
+    // 模板预置的四行模块（M7 起「封面图」已并入「图片」模块，见构造总案 §21.11）
+    for (const moduleName of ['图片', '音频', '歌词', '进度条']) {
       await expect(main.getByText(moduleName, { exact: true }).first()).toBeVisible()
     }
 
@@ -136,7 +135,7 @@ test.describe('M1 项目生命周期', () => {
 
     await expect(head).toContainText('可灵 1.6')
     // 保存指示最终回到"已保存"
-    await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })
 
     await page.reload()
     await expect(page.getByRole('main').locator('.side-head').first()).toContainText('可灵 1.6')
@@ -146,7 +145,7 @@ test.describe('M1 项目生命周期', () => {
 test.describe('M1 设置面板', () => {
   test('七个分组都可打开且渲染出内容', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
 
     const panels: Array<[string, string | RegExp]> = [
       ['外观', '主题'],
@@ -166,7 +165,7 @@ test.describe('M1 设置面板', () => {
 
   test('行为设置可改并持久化', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '行为', exact: true }).click()
 
     const autosave = page.locator('input[type="number"]')
@@ -179,19 +178,20 @@ test.describe('M1 设置面板', () => {
 
   test('语言切换为英文并持久化', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '语言', exact: true }).click()
     await page.getByRole('button', { name: 'English' }).click()
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'en-US')
 
     await page.reload()
-    await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible()
+    // 设置入口在顶栏，是一个 RouterLink（渲染成 <a>）而不是 button
+    await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible()
   })
 
   test('工具库可停用内置工具，且统计随之更新', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '工具库', exact: true }).click()
 
     await expect(page.getByText(/内置 \d+ 个 · 自定义 0 个 · 停用 0 个/)).toBeVisible()
@@ -205,7 +205,7 @@ test.describe('M1 设置面板', () => {
     await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
 
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '数据与存储', exact: true }).click()
 
     await expect(page.getByRole('progressbar')).toBeVisible()
@@ -217,7 +217,7 @@ test.describe('M1 设置面板', () => {
     await page.goto('/')
     await createFromTemplate(page, /音乐对比/)
 
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '数据与存储', exact: true }).click()
     await page.getByRole('button', { name: '清空所有数据' }).click()
 

@@ -13,9 +13,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { addedCard, editModule, fillModuleText, renameModule } from './helpers'
 
 async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
-  const sidebar = page.getByRole('complementary')
-  await sidebar.getByRole('button', { name: '新建对比' }).click()
-  await sidebar.getByRole('button', { name }).click()
+  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
+  await page.getByRole('main').getByRole('button', { name }).click()
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
@@ -171,7 +170,7 @@ test.describe('M5 代码对比模块', () => {
 test.describe('M5 设置面板：备份与恢复', () => {
   /** 打开设置 → 数据与存储（沿用既有 E2E 的选择器约定） */
   async function openStoragePanel(page: Page): Promise<void> {
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '数据与存储', exact: true }).click()
   }
 
@@ -195,7 +194,7 @@ test.describe('M5 设置面板：备份与恢复', () => {
     // 改个标题，便于恢复后识别
     const card = leftCell(page, 0).locator('.card').first()
     await renameModule(page, card, '备份标记')
-    await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })
 
     // —— 导出备份 ——
     await openStoragePanel(page)
@@ -229,7 +228,7 @@ test.describe('M5 设置面板：备份与恢复', () => {
 test.describe('M5 关于面板', () => {
   test('提供安装入口，并列出仓库与许可', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '关于', exact: true }).click()
 
     await expect(page.getByRole('button', { name: '安装' })).toBeVisible()

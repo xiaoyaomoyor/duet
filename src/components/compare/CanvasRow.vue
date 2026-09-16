@@ -42,6 +42,8 @@ provide('duet:projectId', computed(() => props.projectId ?? ''))
 
 const emit = defineEmits<{
   insert: [index: number]
+  /** 在指定位置新建一个通用模块行（横跨两栏） */
+  addCommon: [index: number]
   remove: [row: Row]
   /** 行标题变化（与模块无关，单独一个事件，避免复用 patchModule 造成语义混乱） */
   relabel: [rowId: string, label: string]
@@ -118,6 +120,20 @@ function modulesOf(sideId: SideId): ModuleInstance[] {
 }
 
 /**
+ * 该行是不是「通用模块行」（横跨左右两栏）。
+ *
+ * 通用模块的数据存在**第一侧**的格子里（`cells[sides[0].id]`），
+ * `kind: 'full'` 只是告诉渲染层"别分栏"。
+ * 这样做的原因：`cells` 的类型是 `Record<SideId, Cell>`，
+ * 为通用行另造一个存储位置会让命令层、校验、导出全都多一条分支；
+ * 而复用第一侧的格子则一行命令都不用改。
+ */
+const isFullRow = computed(() => props.row.kind === 'full')
+
+/** 实际参与渲染的"格"：通用行只有一个 */
+const renderSides = computed(() => (isFullRow.value ? props.sides.slice(0, 1) : props.sides))
+
+/**
  * 展示视图下该格应渲染的模块（§7.4 三态规则的落点）。
  *
  *   空模块（isEmpty）→ 不渲染
@@ -137,6 +153,16 @@ function moduleRef(sideId: SideId, moduleId: string): ModuleRef {
 }
 
 function cellStyle(side: Side): Record<string, string> {
+  /*
+   * 通用行不属于任何一侧，因此不套用某一边的主题色（否则会误导"这是左边的"）。
+   *
+   * 注意这里**不写** --accent-soft：留空即可回落到 :root 上那层主题紫的淡底。
+   * 早先版本把它设成 transparent，结果通用行里的卡片背景被叠成完全透明，
+   * 与两侧的卡片一眼就能看出不是同一种东西。
+   */
+  if (isFullRow.value) {
+    return { '--accent': 'var(--accent-500)' }
+  }
   return { '--accent': side.accent, '--accent-soft': hexToSoft(side.accent, 8) }
 }
 
@@ -174,12 +200,27 @@ defineExpose({ rowHasContent })
       />
 
       <div class="row__tools">
+        <!--
+          「在上方插入行」用插入类图标（↤ 带加号意味的 insert），
+          而**不再用纯加号**——纯加号另有用途：添加通用模块。
+          两者都是"加东西"，但加的对象完全不同，图标必须能区分。
+        -->
         <button
           class="row__tool"
           type="button"
           :title="t('row.insertAbove')"
           :aria-label="t('row.insertAbove')"
           @click="emit('insert', rowIndex)"
+        >
+          <AppIcon name="insertRow" :size="13" />
+        </button>
+        <!-- 加号：在本行下方新建一个「通用模块行」（横跨两栏） -->
+        <button
+          class="row__tool"
+          type="button"
+          :title="t('row.addCommon')"
+          :aria-label="t('row.addCommon')"
+          @click="emit('addCommon', rowIndex + 1)"
         >
           <AppIcon name="plus" :size="12" />
         </button>
@@ -221,10 +262,11 @@ defineExpose({ rowHasContent })
     <div
       ref="cellsEl"
       class="row__cells canvas__cells"
+      :class="{ 'row__cells--full': isFullRow }"
       :style="row.height ? { minHeight: `${row.height}px` } : undefined"
     >
       <div
-        v-for="side in sides"
+        v-for="side in renderSides"
         :key="side.id"
         class="row__cell canvas__cell"
         :style="cellStyle(side)"
@@ -393,12 +435,20 @@ defineExpose({ rowHasContent })
   align-items: start;
 }
 
+/* 通用模块行：只有一格，横跨两栏（宽度比在整行内容面前没有意义） */
+.row__cells--full {
+  grid-template-columns: 1fr;
+}
+
 /*
  * 行高拖拽手柄：横跨整行、贴在下边缘。
  * 平时完全透明，鼠标进入行时淡淡显形——常驻会把版面切得很碎。
+ *
+ * M7：厚度从 8px 收到 4px。它是整行宽，8px 高的实心条显形时像一道粗横杠，
+ * 比它要调的那点行高还抢眼。（中轴手柄同样收细，理由见 CompareCanvas。）
  */
 .row__height-handle {
-  height: 8px;
+  height: 4px;
   margin: 0 calc(var(--sp-2) * -1);
   cursor: row-resize;
   border-radius: var(--radius-full);

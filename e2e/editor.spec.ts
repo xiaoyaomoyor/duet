@@ -57,9 +57,8 @@ const WAV_FILE = {
 // ——————————————————————————————————————————————————————————
 
 async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
-  const sidebar = page.getByRole('complementary')
-  await sidebar.getByRole('button', { name: '新建对比' }).click()
-  await sidebar.getByRole('button', { name }).click()
+  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
+  await page.getByRole('main').getByRole('button', { name }).click()
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
@@ -103,7 +102,7 @@ test.describe('M2 模块系统', () => {
     await expect(cell.locator('.module-view')).toContainText('¥99 / 月')
 
     // 自动保存
-    await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })
 
     // 刷新后内容仍在（"保持位置"会重新打开该项目）
     await page.reload()
@@ -156,11 +155,16 @@ test.describe('M2 模块系统', () => {
     await cell.locator('.card').first().locator('[aria-label="删除模块"]').click()
     await expect(cell.locator('.card')).toHaveCount(before - 1)
 
-    await page.getByRole('button', { name: '撤销' }).click()
+    /*
+     * M7 起顶栏不再有撤销/重做按钮，改走键盘。
+     * 这也顺带验证了快捷键真的接上了——撤按钮之前先补快捷键，
+     * 否则"有 Ctrl+Z 就够了"会变成"没有任何办法撤销"。
+     */
+    await page.keyboard.press('Control+z')
     await expect(cell.locator('.card')).toHaveCount(before)
 
     // 重做
-    await page.getByRole('button', { name: '重做' }).click()
+    await page.keyboard.press('Control+Shift+z')
     await expect(cell.locator('.card')).toHaveCount(before - 1)
   })
 
@@ -169,7 +173,8 @@ test.describe('M2 模块系统', () => {
     await createFromTemplate(page, /图片对比/)
 
     const cell = leftCell(page, 0)
-    await expect(cell.locator('.card').first().locator('.module-view__title')).toHaveText('封面图')
+    // M7 起「封面图」已并入「图片」模块：同一个渲染器、同一份选项，只是默认比例不同
+    await expect(cell.locator('.card').first().locator('.module-view__title')).toHaveText('图片')
 
     // 媒体选择器在模块编辑弹窗内
     const dialog = await openModuleEditor(page, moduleCard(page, 0, 0))
@@ -187,7 +192,7 @@ test.describe('M2 模块系统', () => {
     expect(src?.startsWith('blob:')).toBe(true)
 
     // 自动保存后刷新仍能显示（说明资源真的落到了 IndexedDB）
-    await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })
     await page.reload()
     await expect(leftCell(page, 0).locator('.module-view img').first()).toBeVisible()
   })
@@ -256,8 +261,8 @@ test.describe('M2 模块系统', () => {
     await expect(rows).toHaveCount(5)
     await expect(rows.nth(2).locator('.card')).toHaveCount(0)
 
-    // 单条命令 = 一步撤销：撤销后行数与内容都回到原样
-    await page.getByRole('button', { name: '撤销' }).click()
+    // 单条命令 = 一步撤销：撤销后行数与内容都回到原样（快捷键见 useGlobalShortcuts）
+    await page.keyboard.press('Control+z')
     await expect(rows).toHaveCount(4)
     await expect(rows.nth(0).locator('.module-view__title').first()).toHaveText(firstTitle ?? '')
     await expect(rows.nth(1).locator('.module-view__title').first()).toHaveText(secondTitle ?? '')
@@ -274,7 +279,7 @@ test.describe('M2 模块系统', () => {
     await inspector.locator('select').first().selectOption('grid')
     await expect(page.locator('.canvas')).toHaveClass(/canvas--bg-grid/)
 
-    await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })
     await page.reload()
     await expect(page.locator('.canvas')).toHaveClass(/canvas--bg-grid/)
   })

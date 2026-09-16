@@ -245,9 +245,20 @@ export const useProjectStore = defineStore('project', () => {
     const project = projects.byId(id) ?? (await loadFromDb(id))
     if (!project) return err('项目不存在，可能已被删除')
 
-    // 记忆打开顺序：已打开则提到最前，未打开则加入并裁剪
-    const rest = openIds.value.filter((item) => item !== id)
-    openIds.value = [id, ...rest].slice(0, MAX_OPEN_TABS)
+    /*
+     * 标签顺序：**新开的追加到末尾，已打开的一动不动**。
+     *
+     * 早先版本把最近使用的标签提到第一位。问题是顺序会自己变：
+     * 用户刚记住"第三个标签是我在改的那个"，点一下它就跑到别处去了，
+     * 肌肉记忆完全失效。现在"哪个是当前的"由选中态（紫色底）表达，
+     * 位置只表示"我是第几个打开的"，这是两件互不干扰的事。
+     *
+     * 超出软上限时丢**队首**（最早打开的），而不是丢刚打开的这个——
+     * 否则上限一到，新标签会静默打不开。
+     */
+    if (!openIds.value.includes(id)) {
+      openIds.value = [...openIds.value, id].slice(-MAX_OPEN_TABS)
+    }
 
     current.value = deepClone(project)
     history.clear()
@@ -287,6 +298,21 @@ export const useProjectStore = defineStore('project', () => {
     openIds.value = []
     current.value = null
     history.clear()
+  }
+
+  /**
+   * 回到"从一次对比开始"空状态（侧栏 ＋ 的落点）。
+   *
+   * 只清 current，**不关标签页**：
+   * 用户点 ＋ 的意图是"再开一次对比"，不是"把已经打开的全都关掉"。
+   * 关掉的话，那个正在改的项目会连同标签一起消失，只能去侧栏里翻回来。
+   * current 变成 null 之后，CompareView 会自己把路由退回 #/compare 并显示画廊。
+   */
+  async function startNewComparison(): Promise<void> {
+    await flush()
+    current.value = null
+    history.clear()
+    lastError.value = null
   }
 
   /** 重命名项目 */
@@ -485,6 +511,60 @@ export const useProjectStore = defineStore('project', () => {
    * 违反"一次用户操作 = 一步撤销"。
    */
   function insertRowAt(index: number): Result<Project, string> {
+    return insertRow(index, 'paired')
+  }
+
+  /**
+   * 插入一个**通用模块行**（横跨左右两栏）。
+   *
+   * 通用模块的数据存在第一侧的格子里（见 CanvasRow 的说明）：
+   * `cells` 的类型是 `Record<SideId, Cell>`，为通用行另造存储位置
+   * 会让命令层、校验、导出全都多一条分支，而复用第一侧则一行都不用改。
+   * 第二侧的格子仍然建出来（保持 `Row.cells` 的形状一致），只是不渲染。
+   */
+  function insertCommonRowAt(index: number): Result<Project, string> {
+    return insertRow(index, 'full')
+  }
+
+  /**
+   * 插入一个通用模块行，并**直接带上**用户刚选中的模块。
+   *
+   * 为什么不写成 insertCommonRowAt + addModuleAt 两步：
+   *   用户的心智是"点一次加号 = 加了一个通用模块"，而两步会留下两条历史记录，
+   *   撤销一次只退一半（行还在，模块没了）。这里把模块预先放进 Row 里，
+   *   一次 dispatch 完成；附带的好处是选择器中途取消不会留下空行。
+   */
+  function insertCommonRowWithModuleAt(
+    index: number,
+    type: string,
+    title: string,
+  ): Result<Project, string> {
+    const project = current.value
+    if (!project) return err('当前没有打开的项目')
+
+    const [sideA, sideB] = project.sheet.sides
+    if (!sideA || !sideB) return err('对比页缺少对比方')
+
+    const definition = getModule(type)
+    if (!definition) return err(`未知的模块类型：${type}`)
+
+    const first = createEmptyCell()
+    first.modules.push(createModule({ type, title, data: definition.schema.create() }))
+
+    const row: Row = {
+      id: uuid(),
+      kind: 'full',
+      cells: { [sideA.id]: first, [sideB.id]: createEmptyCell() },
+      collapsed: false,
+    }
+
+    const at = Number.isFinite(index) ? Math.max(0, Math.trunc(index)) : undefined
+    return dispatch(at === undefined ? { t: 'row/add', row } : { t: 'row/add', row, at }, {
+      label: '添加通用模块',
+    })
+  }
+
+  function insertRow(index: number, kind: Row['kind']): Result<Project, string> {
     const project = current.value
     if (!project) return err('当前没有打开的项目')
 
@@ -493,14 +573,14 @@ export const useProjectStore = defineStore('project', () => {
 
     const row: Row = {
       id: uuid(),
-      kind: 'paired',
+      kind,
       cells: { [sideA.id]: createEmptyCell(), [sideB.id]: createEmptyCell() },
       collapsed: false,
     }
 
     const at = Number.isFinite(index) ? Math.max(0, Math.trunc(index)) : undefined
     return dispatch(at === undefined ? { t: 'row/add', row } : { t: 'row/add', row, at }, {
-      label: '添加行',
+      label: kind === 'full' ? '添加通用模块行' : '添加行',
     })
   }
 
@@ -548,6 +628,7 @@ export const useProjectStore = defineStore('project', () => {
     open,
     closeTab,
     closeAllTabs,
+    startNewComparison,
     rename,
     togglePinned,
     duplicate,
@@ -575,6 +656,8 @@ export const useProjectStore = defineStore('project', () => {
     setMode,
     addRow,
     insertRowAt,
+    insertCommonRowAt,
+    insertCommonRowWithModuleAt,
     flush,
     dispose,
   }

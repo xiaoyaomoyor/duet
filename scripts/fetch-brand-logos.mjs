@@ -36,6 +36,17 @@ const OUT_DIR = resolve(ROOT, 'public/brand-local')
  * 例如 openai / adobe / microsoft 目前都已下架）。
  * 表里没有的品牌会继续用生成的几何图标，这不是缺陷。
  * slug 可在 https://simpleicons.org 查询后补进来。
+ *
+ * M7 补充的判据（用户实测反馈"其他品牌的 LOGO 为什么还是默认的"）：
+ *   Simple Icons **根本没有收录**中文 AI 产品（可灵 / 即梦 / 海绵音乐 /
+ *   天工 / Tripo3D / Meshy / IndexTTS / GPT-SoVITS 全部 404），
+ *   这不是脚本的问题，补多少行都变不出来。
+ *   能做的是把**同一主体的母品牌**登记进去——可灵是快手的、
+ *   Kimi 是月之暗面的、海螺与 MiniMax Speech 是 MiniMax 的。
+ *   卡片上仍然显示产品名，所以看到快手/月之暗面的标记不会被误读成
+ *   "这就是可灵"，反而比一个字母方块更有信息量。
+ * 不做的事：拿一个"看起来像"的 slug 硬凑（比如用 flux 的 CD 项目图标
+ *   冒充 Black Forest Labs 的 FLUX）。图标错了比没有图标更糟。
  */
 const SLUGS = {
   suno: 'suno',
@@ -46,6 +57,13 @@ const SLUGS = {
   huggingface: 'huggingface',
   ollama: 'ollama',
   elevenlabs: 'elevenlabs',
+  // —— M7 新增（均经实测确认存在）——
+  kimi: 'moonshotai',
+  qwen: 'qwen',
+  kling: 'kuaishou',
+  hailuo: 'minimax',
+  'minimax-speech': 'minimax',
+  'fish-audio': 'fishaudio',
   github: 'github',
   figma: 'figma',
   notion: 'notion',
@@ -89,9 +107,16 @@ for (const key of keys) {
     continue
   }
 
-  // 用白色前景：抓下来的 SVG 是纯色路径，由界面按需着色；
-  // 白色便于在深色背景上直接查看文件本身
-  const url = `https://cdn.simpleicons.org/${slug}/ffffff`
+  /*
+   * 不带颜色参数：拿默认色。
+   *
+   * M7 之前这里写的是 `/ffffff`（纯白），结果是**浅色主题下 LOGO 完全看不见**
+   * ——白字形画在浅灰底上。真正的问题不在这个参数，而在于当时把 SVG
+   * 当成普通图片铺在底色上；界面现在改用 CSS mask（见 ToolIcon.vue），
+   * 只取图形的**轮廓**、颜色一律用当前主题的文字色，因此文件里是什么颜色
+   * 已经无所谓。既然无所谓，就取默认色，至少单独打开文件时看得清。
+   */
+  const url = `https://cdn.simpleicons.org/${slug}`
 
   try {
     const response = await fetch(url, { redirect: 'follow' })

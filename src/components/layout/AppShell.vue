@@ -8,8 +8,14 @@
  * M6：侧栏宽度可拖拽调节（像 Obsidian 那样拖中缝）。
  *   拖拽中的实时值放在 ui store（不落盘，避免每一帧都写数据库），
  *   松手时才持久化到设置里。
+ *
+ * M7：
+ *   1. 全局快捷键在这里注册一次（撤回/重做/切视图/命令面板）。
+ *   2. 导出对话框的开关搬进 ui store —— 触发点在对比页工具条上，
+ *      与对话框之间隔着 RouterView，事件传不上来。
+ *   3. 右下角显示版本号：用户报 bug 时能直接念出来，不用去设置里翻。
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import TopBar from './TopBar.vue'
@@ -21,6 +27,7 @@ import AppToasts from '@/components/common/AppToasts.vue'
 import { useUiStore } from '@/stores/useUiStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
+import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts'
 import { applySidebarWidth } from '@/lib/theme'
 import { APP } from '@/app.config'
 
@@ -30,14 +37,16 @@ const ui = useUiStore()
 const project = useProjectStore()
 const settings = useSettingsStore()
 
+useGlobalShortcuts()
+
 /** 设置界面不显示对比标签页 */
 const showTabs = computed(() => route.meta.layout !== 'settings')
 
 /** 属性面板只在对比界面、且存在打开的项目时出现 */
 const showInspector = computed(() => showTabs.value && ui.inspectorOpen && project.hasProject)
 
-/** 导出对话框（由顶栏触发） */
-const exportOpen = ref(false)
+/** 版本徽标文案（如 "DUET: v0.2.5"） */
+const versionLabel = computed(() => `${APP.nameEn.toUpperCase()}: v${APP.version}`)
 
 /** 路由级别的标题（供侧栏与顶栏共享的语义区域使用） */
 const sectionTitle = computed(() => (showTabs.value ? t('nav.compare') : t('nav.settings')))
@@ -131,7 +140,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="shell" :class="{ 'shell--compact': ui.sidebarCollapsed }">
-    <TopBar class="shell__topbar" @export="exportOpen = true" />
+    <TopBar class="shell__topbar" />
 
     <ProjectSidebar class="shell__sidebar" :aria-label="sectionTitle" />
 
@@ -167,9 +176,16 @@ onBeforeUnmount(() => {
 
     <InspectorPanel v-if="showInspector" class="shell__inspector" />
 
-    <ExportDialog :open="exportOpen" @close="exportOpen = false" />
+    <ExportDialog :open="ui.exportOpen" @close="ui.closeExport()" />
 
     <AppToasts />
+
+    <!--
+      版本徽标：固定在窗口右下角。
+      pointer-events: none —— 它是一个标识，不该挡住底下的内容；
+      写 bug 报告时能直接念出来，不必先去设置里翻。
+    -->
+    <span class="shell__version" data-testid="app-version">{{ versionLabel }}</span>
   </div>
 </template>
 
@@ -243,5 +259,23 @@ onBeforeUnmount(() => {
 
 .shell__inspector {
   grid-area: inspector;
+}
+
+/*
+ * 版本徽标。
+ * 用 --text-disabled 这一级最弱的文字：它永远在场，但不该抢任何东西的注意力。
+ * z-index 低于 toast：提示冒出来时要压在它上面。
+ */
+.shell__version {
+  position: fixed;
+  right: var(--sp-3);
+  bottom: var(--sp-2);
+  z-index: var(--z-sticky);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-disabled);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  user-select: none;
 }
 </style>

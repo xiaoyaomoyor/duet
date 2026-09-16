@@ -37,10 +37,28 @@ const WAV_A = { name: 'a.wav', mimeType: 'audio/wav', buffer: silentWav(1.5) }
 const WAV_B = { name: 'b.wav', mimeType: 'audio/wav', buffer: silentWav(2.5) }
 
 async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
-  const sidebar = page.getByRole('complementary')
-  await sidebar.getByRole('button', { name: '新建对比' }).click()
-  await sidebar.getByRole('button', { name }).click()
+  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
+  await page.getByRole('main').getByRole('button', { name }).click()
   await expect(page.locator('.canvas')).toBeVisible()
+}
+
+/**
+ * 加一个「音频控制台」通用模块。
+ *
+ * M7 起同步控制栏**不再自动出现**（用户的选择是"完全手动"）：
+ * 它现在是一块普通内容，横跨两栏、可以排序、可以改标题、能随项目一起导出。
+ * 因此每个需要控制栏的用例都必须自己把它加上——这也顺带覆盖了
+ * "通用模块行"这条新路径：行标题的 ＋ → 只列通用模块的选择器 → 建出一整行。
+ */
+async function addAudioConsole(page: Page): Promise<void> {
+  const picker = page.getByRole('dialog', { name: '选择模块类型' })
+  await page
+    .locator('.canvas__row')
+    .last()
+    .locator('[aria-label="在下方添加通用模块（横跨两栏）"]')
+    .click()
+  await picker.getByRole('button', { name: '音频控制台' }).click()
+  await expect(picker).toBeHidden()
 }
 
 /**
@@ -50,6 +68,9 @@ async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
  * （立刻关窗会把 MediaPicker 卸载在异步导入中途，且不报错）。
  */
 async function importBothTracks(page: Page): Promise<void> {
+  // 先加控制台：它插在**最后一行之后**，因此不会挪动下面按索引定位的音频行
+  await addAudioConsole(page)
+
   const row = page.locator('.canvas__row').nth(1)
 
   await importMedia(page, row.locator('.canvas__cell').nth(0).locator('.card').first(), WAV_A)
@@ -131,10 +152,15 @@ test.describe('M4 同步播放', () => {
     await createFromTemplate(page, /音乐对比/)
     await importBothTracks(page)
 
-    // 控制栏位于画布上方，属于主内容区；展示视图是独立遮罩层
-    // 这里只验证进入/退出展示视图不会让控制栏或页面出错
+    /*
+     * M7 起控制栏是**画布里的一个通用模块行**（不再吸在画布上方），
+     * 因此它理所当然会出现在展示视图里——而且必须能出现在成稿里，
+     * 这也正是"完全手动"这个选择的意义所在。
+     */
     await page.getByRole('button', { name: '进入展示视图' }).click()
     await expect(page.locator('.present')).toBeVisible()
+    await expect(page.locator('[data-present-root] .syncbar')).toBeVisible()
+
     await page.keyboard.press('Escape')
     await expect(page.locator('.present')).toBeHidden()
     await expect(page.locator('.canvas')).toBeVisible()
@@ -151,7 +177,7 @@ test.describe('M4 动效开关', () => {
     await expect(cell.locator('.module-view')).toContainText('动效测试')
 
     // 设置：动效始终开启
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '外观', exact: true }).click()
     await page.locator('select').first().selectOption('never')
     await backToCompare(page)
@@ -168,7 +194,7 @@ test.describe('M4 动效开关', () => {
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, '关闭动效')
 
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '外观', exact: true }).click()
     await page.locator('select').first().selectOption('always')
     await backToCompare(page)

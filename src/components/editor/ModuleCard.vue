@@ -154,7 +154,16 @@ function forwardProps(patch: Record<string, unknown>): void {
   position: relative;
   padding: var(--sp-3);
   padding-left: calc(var(--sp-3) + 6px);
-  background: var(--bg-surface);
+  /*
+   * 背景着色与工具卡片（SideHeader）对齐 —— 用户实测反馈：
+   * "工具卡片有颜色，下面的模块卡片却是白板，看着不像一套东西"。
+   *
+   * 两层写法：先铺不透明的 --bg-surface，再叠一层本侧主题色的极淡底。
+   * 不能只写 `background: var(--accent-soft)` —— 那是半透明的，
+   * 画布底纹会透上来，和工具卡片（它叠在 surface 上）就不是同一个颜色了。
+   */
+  background-color: var(--bg-surface);
+  background-image: linear-gradient(var(--accent-soft), var(--accent-soft));
   border: 1px solid var(--border-subtle);
   border-left: 2px solid var(--accent, var(--accent-500));
   border-radius: var(--radius-md);

@@ -7,6 +7,12 @@
  *
  * M6：移除了此处的"＋ 新建"按钮——左侧项目列表已有同样入口（且更靠近项目本身），
  * 顶栏再放一个是重复的（用户实测反馈）。
+ *
+ * M7：当前项目改为**紫色背景 + 白字**，不再靠"移到第一位"表示。
+ *   靠位置表示选中是错的：点一下标签，整排顺序就重排，
+ *   用户刚建立的"第三个是我在改的那个"立刻失效。
+ *   现在顺序只表示打开先后（追加在末尾、不再重排），
+ *   选中与否由颜色表达——这是两件互不干扰的事。
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -114,8 +120,18 @@ async function close(id: string): Promise<void> {
 }
 
 .tabbar__tab--active {
-  color: var(--text-primary);
-  background: var(--bg-surface-2);
+  color: var(--accent-fg);
+  background: var(--accent-700);
+}
+
+.tabbar__tab--active:hover {
+  color: var(--accent-fg);
+  background: var(--accent-700);
+}
+
+/* 选中态里那个小圆点要换成"白底"，否则紫点上叠紫点等于没有 */
+.tabbar__tab--active .tabbar__dot {
+  background: var(--accent-fg);
 }
 
 .tabbar__dot {

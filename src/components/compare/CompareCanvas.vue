@@ -165,20 +165,49 @@ function insertRowAt(index: number): void {
 // 模块
 // ————————————————————————————————————————————————————————
 
-/** 当前正在选择模块的目标格 */
-const pickerTarget = ref<CellRef | null>(null)
+/**
+ * 选择器的落点。两种情形合并成一个状态机：
+ *   - 'cell'   ：往已有格子里加模块（普通行加一侧，通用行加整行）
+ *   - 'common' ：行标题的"+"。**先选模块再建行**——中途取消不会留下空行，
+ *                选中后由 store 一次性建出"通用模块行 + 其中的模块"，
+ *                因此这次操作仍然只占一步撤销。
+ */
+type PickerState =
+  | { kind: 'cell'; ref: CellRef; scope: 'side' | 'common' }
+  | { kind: 'common'; at: number }
+
+const picker = ref<PickerState | null>(null)
+
+/** 传给选择器的过滤条件：通用行只列通用模块，普通行只列可放一侧的模块 */
+const pickerScope = computed<'side' | 'common'>(() =>
+  picker.value?.kind === 'cell' ? picker.value.scope : 'common',
+)
 
 function openPicker(row: Row, sideId: SideId): void {
-  pickerTarget.value = { rowId: row.id, sideId }
+  picker.value = {
+    kind: 'cell',
+    ref: { rowId: row.id, sideId },
+    // 通用行横跨两栏，往里放"只管一侧"的模块没有意义
+    scope: row.kind === 'full' ? 'common' : 'side',
+  }
+}
+
+/** 行标题的"+"：在该行下方插入一个通用模块行 */
+function openCommonPicker(index: number): void {
+  picker.value = { kind: 'common', at: index }
 }
 
 function onPickModule(type: string): void {
-  const target = pickerTarget.value
-  pickerTarget.value = null
+  const target = picker.value
+  picker.value = null
   if (!target) return
 
   const title = moduleTitle(type)
-  const result = store.addModuleAt(target, type, title)
+  const result =
+    target.kind === 'common'
+      ? store.insertCommonRowWithModuleAt(target.at, type, title)
+      : store.addModuleAt(target.ref, type, title)
+
   if (result.ok) ui.notify(t('toast.moduleAdded', { title }), 'success')
   else ui.notify(result.error, 'danger')
 }
@@ -275,6 +304,7 @@ function onDuplicateModule(ref: ModuleRef): void {
             :sides="sides"
             :project-id="project.id"
             @insert="insertRowAt"
+            @add-common="openCommonPicker"
             @remove="removeRow"
             @relabel="onRelabel"
             @resize-height="store.setRowHeight"
@@ -339,9 +369,10 @@ function onDuplicateModule(ref: ModuleRef): void {
     </div>
 
     <ModulePicker
-      :open="pickerTarget !== null"
+      :open="picker !== null"
+      :scope="pickerScope"
       @pick="onPickModule"
-      @close="pickerTarget = null"
+      @close="picker = null"
     />
   </div>
 </template>
@@ -363,6 +394,12 @@ function onDuplicateModule(ref: ModuleRef): void {
  * 定位公式复现了格子的 fr 分配：内容宽度减去中缝后按 --col-frac 切分，
  * 再加上半个中缝就是真正的中线。这样无论比例怎么变，
  * 手柄都精确压在视觉中缝上，而不是画布正中。
+ *
+ * M7（用户实测反馈"手柄太宽了"）：把**看得见的线**和**抓得到的范围**拆开——
+ * 元素本身仍有 12px 宽（保证好抓、好按），真正画出来的那条线只有 3px，
+ * 由 ::after 居中绘制。
+ * 直接把这个 div 改窄到 3px 也能满足"细"，但那样鼠标要精确对准 3px
+ * 才拖得动，是把手感换成了好看。两者可以都要。
  */
 .canvas__axis-resizer {
   position: absolute;
@@ -370,18 +407,32 @@ function onDuplicateModule(ref: ModuleRef): void {
   bottom: var(--sp-12);
   left: calc(
     (100% - var(--canvas-gutter, 32px)) * var(--col-frac, 0.5) +
-      var(--canvas-gutter, 32px) / 2 - 4px
+      var(--canvas-gutter, 32px) / 2 - 6px
   );
   z-index: 2;
-  width: 8px;
+  width: 12px;
   cursor: col-resize;
+}
+
+.canvas__axis-resizer::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  content: '';
+  background: transparent;
   border-radius: var(--radius-full);
   transition: background var(--dur-fast) var(--ease-out);
 }
 
-.canvas__axis-resizer:hover,
-.canvas__axis-resizer:focus-visible {
+.canvas__axis-resizer:hover::after,
+.canvas__axis-resizer:focus-visible::after {
   background: var(--accent-500);
+}
+
+.canvas__axis-resizer:focus-visible {
   outline: none;
 }
 

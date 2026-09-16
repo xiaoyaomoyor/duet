@@ -8,6 +8,8 @@
  *   ③ 备注
  *   ④ 替换图标（存为本侧专属的资源，不污染工具库）
  *   ⑤ 图标 / 名称 / 版本 / 备注 各自是否显示
+ *   ⑥ 名称 / 版本的字号（M7 新增：工具名长度差异极大，
+ *      "MJ" 和"可灵 · 1.6 大师版"用同一个字号必然有一边不合适）
  *
  * 与模块编辑弹窗一致：改动即时保存，底部只有"完成"。
  */
@@ -17,6 +19,7 @@ import AppIcon from '@/components/common/AppIcon.vue'
 import MediaPicker from '@/components/media/MediaPicker.vue'
 import ToolPicker from './ToolPicker.vue'
 import { useToolsStore } from '@/stores/useToolsStore'
+import { clampScale, SCALE_MAX, SCALE_MIN, SCALE_STEP } from './sideScale'
 import type { Side, ToolRef } from '@/types/project'
 
 const props = defineProps<{
@@ -70,6 +73,27 @@ function onNoteChange(event: Event): void {
 
 function onToggle(key: string, value: boolean): void {
   emit('patch', { [key]: value })
+}
+
+/** 名称 / 版本的字号倍率（1 = 默认；越界一律夹回区间） */
+const nameScale = computed(() => clampScale(props.side.nameScale ?? 1))
+const versionScale = computed(() => clampScale(props.side.versionScale ?? 1))
+
+/**
+ * 滑块拖动写回。
+ *
+ * 用 input 而不是 change：字号是**所见即所得**的参数，
+ * 必须一边拖一边看卡片上的字变大变小，松手才生效等于盲拖。
+ * 撤销栈不会因此爆掉——setSideField 带了 coalesceKey，
+ * 同一侧的连续改动会在时间窗内合并成一步。
+ */
+function onScale(key: 'nameScale' | 'versionScale', event: Event): void {
+  const raw = Number((event.target as HTMLInputElement).value)
+  emit('patch', { [key]: clampScale(raw) })
+}
+
+function resetScale(key: 'nameScale' | 'versionScale'): void {
+  emit('patch', { [key]: undefined })
 }
 
 /*
@@ -137,6 +161,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               />
             </label>
 
+            <!-- 字号：紧跟在它要调的那个字段下面，而不是另起一节 -->
+            <div class="scale">
+              <span class="scale__label">{{ t('compare.nameSize') }}</span>
+              <input
+                class="scale__range"
+                type="range"
+                :min="SCALE_MIN"
+                :max="SCALE_MAX"
+                :step="SCALE_STEP"
+                :value="nameScale"
+                :aria-label="t('compare.nameSize')"
+                @input="onScale('nameScale', $event)"
+              />
+              <span class="scale__value">{{ Math.round(nameScale * 100) }}%</span>
+              <button
+                class="scale__reset"
+                type="button"
+                :title="t('common.reset')"
+                :aria-label="t('common.reset')"
+                :disabled="side.nameScale === undefined"
+                @click="resetScale('nameScale')"
+              >
+                <AppIcon name="undo" :size="12" />
+              </button>
+            </div>
+
             <label class="field">
               <span class="field__label">{{ t('compare.version') }}</span>
               <input
@@ -147,6 +197,31 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 @change="onVersionChange"
               />
             </label>
+
+            <div class="scale">
+              <span class="scale__label">{{ t('compare.versionSize') }}</span>
+              <input
+                class="scale__range"
+                type="range"
+                :min="SCALE_MIN"
+                :max="SCALE_MAX"
+                :step="SCALE_STEP"
+                :value="versionScale"
+                :aria-label="t('compare.versionSize')"
+                @input="onScale('versionScale', $event)"
+              />
+              <span class="scale__value">{{ Math.round(versionScale * 100) }}%</span>
+              <button
+                class="scale__reset"
+                type="button"
+                :title="t('common.reset')"
+                :aria-label="t('common.reset')"
+                :disabled="side.versionScale === undefined"
+                @click="resetScale('versionScale')"
+              >
+                <AppIcon name="undo" :size="12" />
+              </button>
+            </div>
 
             <label class="field">
               <span class="field__label">{{ t('compare.note') }}</span>
@@ -301,6 +376,57 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   background: var(--bg-surface-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
+}
+
+/* —— 字号调节行：标签 · 滑块 · 百分比 · 复位 —— */
+.scale {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.scale__label {
+  flex: none;
+  min-width: 60px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.scale__range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent, var(--accent-500));
+}
+
+/* 百分比定宽等宽字体：拖动时数字位数变化不会把滑块挤来挤去 */
+.scale__value {
+  flex: none;
+  width: 40px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.scale__reset {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+  border-radius: var(--radius-xs);
+}
+
+.scale__reset:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.scale__reset:disabled {
+  color: var(--text-disabled);
+  opacity: 0.4;
 }
 
 .toggle {

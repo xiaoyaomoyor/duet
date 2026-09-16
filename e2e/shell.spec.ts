@@ -58,7 +58,7 @@ test.describe('应用外壳（M0）', () => {
   test('切换到设置界面并改动语言即时生效', async ({ page }) => {
     await page.goto('/')
 
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await expect(page.getByRole('heading', { name: '设置', level: 2 })).toBeVisible()
 
     // 语言面板 → English
@@ -86,7 +86,7 @@ test.describe('应用外壳（M0）', () => {
   test('无障碍基线：键盘可达设置入口且焦点可见', async ({ page }) => {
     await page.goto('/')
 
-    const settingsButton = page.getByRole('button', { name: '设置' })
+    const settingsButton = page.getByRole('link', { name: '设置' })
     await settingsButton.focus()
     await expect(settingsButton).toBeFocused()
 

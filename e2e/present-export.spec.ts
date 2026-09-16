@@ -16,13 +16,12 @@ const RED_PNG_BASE64 =
 void RED_PNG_BASE64
 
 async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
-  const sidebar = page.getByRole('complementary')
-  await sidebar.getByRole('button', { name: '新建对比' }).click()
-  await sidebar.getByRole('button', { name }).click()
+  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
+  await page.getByRole('main').getByRole('button', { name }).click()
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
-/** 进入展示视图（顶栏按钮） */
+/** 进入展示视图（对比页工具条上的按钮） */
 async function enterPresent(page: Page): Promise<void> {
   await page.getByRole('button', { name: '进入展示视图' }).click()
   await expect(page.locator('.present')).toBeVisible()
@@ -233,7 +232,7 @@ test.describe('M3 导出', () => {
 
     const cell = page.locator('.canvas__row').first().locator('.canvas__cell').first()
     await fillModuleText(page, cell, '往返内容标记')
-    await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout: 5000 })
 
     await page.getByRole('button', { name: '导出' }).click()
     const downloadPromise = page.waitForEvent('download')
@@ -249,7 +248,7 @@ test.describe('M3 导出', () => {
 
     // 清空所有数据
     await page.getByRole('dialog', { name: '导出' }).getByRole('button', { name: '关闭' }).click()
-    await page.getByRole('button', { name: '设置' }).click()
+    await page.getByRole('link', { name: '设置' }).click()
     await page.getByRole('button', { name: '数据与存储', exact: true }).click()
     await page.getByRole('button', { name: '清空所有数据' }).click()
     const confirmDialog = page.getByRole('alertdialog')

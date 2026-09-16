@@ -35,6 +35,7 @@ const data = computed(() => props.module.data as MediaData)
 const audioProps = computed<AudioProps>(() => ({
   showWaveform: props.module.props.showWaveform !== false,
   reportClock: props.module.props.reportClock !== false,
+  showCover: props.module.props.showCover !== false,
 }))
 
 const source = computed(() => {
@@ -176,15 +177,29 @@ onBeforeUnmount(() => {
 <template>
   <div class="audio" :class="{ 'audio--playing': playing }">
     <div class="audio__head">
-      <MediaImage
-        v-if="coverAssetId"
-        class="audio__cover"
-        :asset-id="coverAssetId"
-        :alt="data.name ?? ''"
-        fit="cover"
-        ratio="1/1"
-        :rounded="false"
-      />
+      <!--
+        封面三态：
+          有内嵌封面        → 渲染它
+          没有但开关开着    → 音乐图标占位（**必须占位**：
+                              否则左右两栏一个有一块图、一个没有，
+                              标题的起始位置就对不齐了）
+          开关关掉          → 整个不渲染，也不留空位
+      -->
+      <template v-if="audioProps.showCover">
+        <MediaImage
+          v-if="coverAssetId"
+          class="audio__cover"
+          :asset-id="coverAssetId"
+          :alt="data.name ?? ''"
+          fit="cover"
+          ratio="1/1"
+          :rounded="false"
+        />
+        <span v-else class="audio__cover audio__cover--placeholder" aria-hidden="true">
+          <AppIcon name="music" :size="20" />
+        </span>
+      </template>
+
       <div class="audio__info">
         <span class="audio__name u-truncate">{{ data.name ?? t('media.untitled') }}</span>
         <span class="audio__duration">
@@ -254,6 +269,15 @@ onBeforeUnmount(() => {
   width: 48px;
   height: 48px;
   border-radius: var(--radius-sm);
+}
+
+.audio__cover--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-disabled);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
 }
 
 .audio__info {

@@ -137,6 +137,16 @@ export interface Side {
   showName?: boolean
   showVersion?: boolean
   showNote?: boolean
+  /**
+   * 名称 / 版本的字号倍率（1 = 默认）。
+   *
+   * 为什么用倍率而不是像素：工具名长度差异极大（"MJ" 与
+   * "可灵 · 1.6 大师版"），同一个像素值在一侧合适、另一侧就溢出。
+   * 倍率让用户按"我这边的名字有多长"来调，而不是去猜 px。
+   * 上下限在 SideHeader 里夹取（0.6 ~ 2），越界的数据不会撑破版面。
+   */
+  nameScale?: number
+  versionScale?: number
 }
 
 export interface ModuleInstance {

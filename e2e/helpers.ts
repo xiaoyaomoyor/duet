@@ -14,11 +14,17 @@
  */
 import { expect, type Locator, type Page } from '@playwright/test'
 
-/** 从模板新建一个对比（侧栏「新建对比」→ 选模板） */
+/**
+ * 从模板新建一个对比。
+ *
+ * M7 起流程变了：侧栏的 ＋ 不再就地展开一个小列表，
+ * 而是把主区切回"从一次对比开始"（模板画廊），模板卡片只在**主区**渲染。
+ * 这让本助手反而更简单了——以前得把选择器限定在 <aside> 里，
+ * 否则会同时命中侧栏和主区两组同名卡片（strict mode 报错）。
+ */
 export async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
-  const sidebar = page.getByRole('complementary')
-  await sidebar.getByRole('button', { name: '新建对比' }).click()
-  await sidebar.getByRole('button', { name }).click()
+  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
+  await page.getByRole('main').getByRole('button', { name }).click()
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
@@ -117,9 +123,14 @@ export async function renameModule(page: Page, target: Locator, title: string): 
   await closeDialog(page)
 }
 
-/** 等待自动保存完成（顶栏出现"已保存"） */
+/**
+ * 等待自动保存完成。
+ *
+ * M7 起保存状态从顶栏搬到了**对比页工具条**（.compare-toolbar__save），
+ * 因为它描述的是"当前这份对比存没存"，跟着对比页走才对。
+ */
 export async function waitSaved(page: Page, timeout = 5000): Promise<void> {
-  await expect(page.locator('.topbar__save--saved')).toBeVisible({ timeout })
+  await expect(page.locator('.compare-toolbar__save--saved')).toBeVisible({ timeout })
 }
 
 /** setInputFiles 能接受的载荷 */

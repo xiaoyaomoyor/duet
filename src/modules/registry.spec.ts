@@ -176,6 +176,48 @@ describe('模块定义契约', () => {
       expect(definition?.isEmpty({ sourceUrl: 'https://x/y.png' }, {})).toBe(false)
     }
   })
+
+  /*
+   * scope 决定"这个模块能放到哪"：'side' 只能进左右某一栏、
+   * 'common' 只能进横跨两栏的通用行、'both' 两边都行。
+   *
+   * 为什么值得单独钉住：ModulePicker 按它过滤选项，而**真源在模块实现里**
+   * （meta.ts 刻意不重复声明）。写错一个 scope 不会报任何错，
+   * 只会让某个模块在选择器里莫名消失——正是那种"上线了才发现"的问题。
+   */
+  it('音频控制台是纯通用模块，没有内容却永远可见', () => {
+    const definition = getModule('audioConsole')
+    expect(definition?.scope).toBe('common')
+
+    // 它是用户主动放进成稿的一块内容，因此没有任何"未填写"状态；
+    // 真正没准备好时（只有一侧有音轨）由组件内部说明原因。
+    expect(definition?.isEmpty({}, {})).toBe(false)
+
+    /*
+     * 刻意**没有**任何选项：控制台的播放/独听/静音是即时操作，
+     * 不是"呈现选项"，塞进模块选项反而会被误解成"设置后要重开才生效"。
+     * 这条断言同时也防止有人"顺手"把音频模块的 showCover 复制过来。
+     */
+    expect(definition?.options ?? []).toHaveLength(0)
+  })
+
+  it('音频模块的封面开关默认开启，关掉时不留空位', () => {
+    const definition = getModule('audio')
+    const option = (definition?.options ?? []).find((item) => item.key === 'showCover')
+    expect(option?.type).toBe('boolean')
+    expect((definition?.defaultProps as Record<string, unknown>)?.showCover).toBe(true)
+  })
+
+  it('两侧都能用的模块声明为 both；纯通用模块不能落进单侧', () => {
+    expect(getModule('text')?.scope).toBe('both')
+    expect(getModule('divider')?.scope).toBe('both')
+    expect(getModule('placeholder')?.scope).toBe('both')
+
+    // 其余模块未声明 scope，等同于 'side'（ModulePicker 会按此回退）
+    const sideOnly = allModules().filter((definition) => definition.scope === undefined)
+    expect(sideOnly.length).toBeGreaterThan(0)
+    expect(sideOnly.map((definition) => definition.type)).toContain('image')
+  })
 })
 
 describe('注册表行为', () => {

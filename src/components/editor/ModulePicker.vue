@@ -10,12 +10,19 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { groupModuleMeta, MODULE_META, type ModuleCategory } from '@/modules/meta'
-import { registeredTypes } from '@/modules/registry'
+import { getModule, registeredTypes } from '@/modules/registry'
 import { normalizeForSearch } from '@/lib/text'
 import { t as translate } from '@/i18n/helper'
 
 const props = defineProps<{
   open: boolean
+  /**
+   * 放置位置，决定哪些模块可选：
+   *   'side'   —— 放进左右某一侧（默认）：排除纯通用模块（如音频控制台，
+   *               它要同时操纵两侧，放进一侧没有意义）
+   *   'common' —— 放进通用行（横跨两栏）：只保留通用模块
+   */
+  scope?: 'side' | 'common'
 }>()
 
 const emit = defineEmits<{
@@ -38,8 +45,24 @@ const available = computed(() => new Set(registeredTypes()))
 
 const groups = computed(() => {
   const q = normalizeForSearch(query.value)
+  const wanted = props.scope ?? 'side'
+
+  /**
+   * 按放置位置过滤。
+   *
+   * scope 取自**模块实现**（getModule(type).scope）而不是 meta.ts：
+   * 同一件事只该有一个真源，而"这个模块能不能横跨两栏"是实现的属性。
+   * 未注册的类型（理论上不会出现）按 'side' 处理，宁可多显示也不要漏。
+   */
+  const fitsHere = (type: string): boolean => {
+    const scope = getModule(type)?.scope ?? 'side'
+    if (wanted === 'common') return scope === 'common' || scope === 'both'
+    // 放进某一侧时排除"只能整行"的模块；'both' 与 'side' 都允许
+    return scope !== 'common'
+  }
 
   const filtered = MODULE_META.filter((meta) => {
+    if (!fitsHere(meta.type)) return false
     if (!q) return true
     const haystack = [
       meta.type,

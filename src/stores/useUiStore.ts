@@ -30,6 +30,14 @@ export const useUiStore = defineStore('ui', () => {
   // —— 弹窗与提示 ——
   const toasts = ref<Toast[]>([])
   const activeDialog = ref<string | null>(null)
+  /**
+   * 导出对话框是否打开。
+   *
+   * 之所以放在 store 而不是由某个组件持有：触发点在**对比页工具条**里，
+   * 而对话框本身挂在 AppShell 上（要盖住整个外壳）。两者隔着 RouterView，
+   * 事件传不上来，用一个布尔量通信是最省事也最不容易写错的做法。
+   */
+  const exportOpen = ref(false)
 
   // —— 命令面板（M3 使用，M0 先留出状态位） ——
   const commandPaletteOpen = ref(false)
@@ -46,6 +54,14 @@ export const useUiStore = defineStore('ui', () => {
 
   function toggleInspector(): void {
     inspectorOpen.value = !inspectorOpen.value
+  }
+
+  function openExport(): void {
+    exportOpen.value = true
+  }
+
+  function closeExport(): void {
+    exportOpen.value = false
   }
 
   function openDialog(id: string): void {
@@ -94,6 +110,7 @@ export const useUiStore = defineStore('ui', () => {
     inspectorOpen,
     toasts,
     activeDialog,
+    exportOpen,
     commandPaletteOpen,
     hasToasts,
     compactShell,
@@ -102,6 +119,8 @@ export const useUiStore = defineStore('ui', () => {
     toggleInspector,
     openDialog,
     closeDialog,
+    openExport,
+    closeExport,
     toggleCommandPalette,
     notify,
     dismissToast,

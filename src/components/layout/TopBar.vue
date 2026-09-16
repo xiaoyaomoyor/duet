@@ -1,128 +1,48 @@
 <script setup lang="ts">
 /**
- * 顶栏：品牌 / 撤销重做 / 视图切换 / 导入导出 / 设置
+ * 顶栏：品牌 + 两个一级入口
  *
- * M1 可用：撤销重做、保存状态、导入、设置。
- * M3 启用：视图切换（展示视图）与导出。
- * M6 调整（用户实测反馈）：**移除可见的全局搜索框**——
- *   它与左侧项目列表的搜索完全重复，占着顶栏最显眼的位置却不提供额外能力。
- *   Ctrl/Cmd + K 仍然保留，改为直接打开命令面板（能搜项目，也能执行命令）。
+ * M7 大幅瘦身（用户实测反馈"顶栏挤了一排图标，分不清哪个是哪个"）：
+ *   移除 —— 撤回/重做（改由 Ctrl+Z / Ctrl+Shift+Z，见 useGlobalShortcuts）
+ *          保存状态、属性、进入展示视图、导入、导出
+ *   保留 —— 品牌，以及**对比 / 设置**这两个页面级入口
+ *
+ * 被移除的那一组的去处：对比页工具条（CompareToolbar）——
+ * 它们全都作用于"当前这份对比"，跟着对比页走比钉在全局顶栏上更符合语义。
+ *
+ * 选中态用**圆角矩形紫底**而不是下划线：这两个按钮代表"我现在在哪个页面"，
+ * 是一个状态而不是一次操作，实心色块比一根细线更容易一眼扫到。
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
-import { useProjectStore } from '@/stores/useProjectStore'
-import { useProjectsStore } from '@/stores/useProjectsStore'
 import { useUiStore } from '@/stores/useUiStore'
-import { importDuet } from '@/services/exportService'
-import { persistProject } from '@/services/projectService'
 import { APP } from '@/app.config'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
-const project = useProjectStore()
-const projects = useProjectsStore()
 
-/** 导出由外壳统一托管（对话框挂在 AppShell 上） */
-const emit = defineEmits<{ export: [] }>()
-
-const fileInput = ref<HTMLInputElement | null>(null)
-const importing = ref(false)
-
-const saveState = computed<'saved' | 'saving' | 'dirty'>(() => {
-  if (project.saving) return 'saving'
-  if (project.dirty) return 'dirty'
-  return 'saved'
-})
-
-const saveLabel = computed(() =>
-  saveState.value === 'saving'
-    ? t('compare.saving')
-    : saveState.value === 'dirty'
-      ? t('compare.unsaved')
-      : t('compare.saved'),
+/**
+ * 当前页面。
+ *
+ * 用路由 meta.layout 判断而不是 path 前缀：设置页的路径将来可能变，
+ * 而"这页是不是设置"这个语义不会变。
+ */
+const activePage = computed<'compare' | 'settings'>(() =>
+  route.meta.layout === 'settings' ? 'settings' : 'compare',
 )
 
-const undoDisabled = computed(() => !project.canUndo)
-const redoDisabled = computed(() => !project.canRedo)
-
-/** 是否处于展示视图（由当前项目的视图态决定） */
-const isPresent = computed(() => project.current?.ui.mode === 'present')
-
-function togglePresent(): void {
-  if (!project.current) return
-  project.setMode(isPresent.value ? 'edit' : 'present')
+function goCompare(): void {
+  void router.push({ name: 'compare' })
 }
 
-function openSettings(): void {
+function goSettings(): void {
   void router.push({ name: 'settings' })
 }
-
-// —— 导入工程文件 ——
-
-function triggerImport(): void {
-  fileInput.value?.click()
-}
-
-async function onFilePicked(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-
-  importing.value = true
-  try {
-    const text = await file.text()
-    // 统一走 exportService 的导入实现：它会先落媒体再落项目，
-    // 并返回缺失媒体与警告信息，而不是静默吞掉问题
-    const result = await importDuet(text)
-    if (!result.ok) {
-      ui.notify(t('export.failed', { message: result.error }), 'danger')
-      return
-    }
-
-    for (const item of result.value.projects) {
-      const saved = await persistProject(item)
-      if (!saved.ok) {
-        ui.notify(saved.error, 'danger')
-        return
-      }
-      projects.upsert(saved.value)
-    }
-
-    ui.notify(t('export.importDone', { n: result.value.projects.length }), 'success')
-
-    const notes = [...result.value.warnings]
-    if (result.value.missingAssets.length > 0) {
-      notes.push(t('export.missingAssets', { n: result.value.missingAssets.length }))
-    }
-    if (notes.length > 0) ui.notify(notes.join('；'), 'warning')
-
-    await projects.load()
-  } catch (error) {
-    ui.notify(error instanceof Error ? error.message : String(error), 'danger')
-  } finally {
-    importing.value = false
-  }
-}
-
-// —— 快捷键：Ctrl/Cmd + K 打开命令面板 ——
-
-function onKeydown(event: KeyboardEvent): void {
-  const meta = event.ctrlKey || event.metaKey
-  if (meta && event.key.toLowerCase() === 'k') {
-    event.preventDefault()
-    // 可见的搜索框已经移除，Ctrl+K 改为直接打开命令面板：
-    // 它同样能搜项目，还多了执行命令的能力，是原搜索框能力的超集。
-    ui.toggleCommandPalette()
-  }
-}
-
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -139,6 +59,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <AppIcon name="sidebar" :size="18" />
       </button>
 
+      <!--
+        品牌：中文名与英文名**紧挨着**排。
+        M6 之前英文名被包在一个描边胶囊里，看上去像一个可点击的标签/按钮，
+        实测反馈是"这两个字为什么有个气泡框"。它只是名字的另一半写法，
+        因此不加边框、不加背景，只靠字重与字距区分主次。
+      -->
       <RouterLink class="topbar__brand" to="/compare" data-testid="nav-compare">
         <AppLogo :size="22" />
         <span class="topbar__brand-zh">{{ t('app.name') }}</span>
@@ -146,100 +72,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </RouterLink>
     </div>
 
-    <div class="topbar__group topbar__group--end">
-      <span class="topbar__save" :class="`topbar__save--${saveState}`">{{ saveLabel }}</span>
-
-      <button
-        class="topbar__icon-btn"
-        type="button"
-        :disabled="undoDisabled"
-        :title="project.undoLabel ? `${t('nav.undo')} · ${project.undoLabel}` : t('nav.undo')"
-        :aria-label="t('nav.undo')"
-        @click="project.undo()"
+    <nav class="topbar__group topbar__group--end" :aria-label="t('nav.pages')">
+      <RouterLink
+        class="topbar__nav"
+        :class="{ 'topbar__nav--active': activePage === 'compare' }"
+        :to="{ name: 'compare' }"
+        data-testid="nav-compare-page"
+        @click="goCompare"
       >
-        <AppIcon name="undo" :size="18" />
-      </button>
-      <button
-        class="topbar__icon-btn"
-        type="button"
-        :disabled="redoDisabled"
-        :title="project.redoLabel ? `${t('nav.redo')} · ${project.redoLabel}` : t('nav.redo')"
-        :aria-label="t('nav.redo')"
-        @click="project.redo()"
+        <AppIcon name="compare" :size="16" />
+        <span>{{ t('nav.compare') }}</span>
+      </RouterLink>
+
+      <RouterLink
+        class="topbar__nav"
+        :class="{ 'topbar__nav--active': activePage === 'settings' }"
+        :to="{ name: 'settings' }"
+        data-testid="nav-settings-page"
+        @click="goSettings"
       >
-        <AppIcon name="redo" :size="18" />
-      </button>
-
-      <span class="topbar__divider" aria-hidden="true" />
-
-      <button
-        class="topbar__icon-btn"
-        type="button"
-        :disabled="!project.hasProject"
-        :title="t('inspector.title')"
-        :aria-label="t('inspector.title')"
-        :aria-pressed="ui.inspectorOpen"
-        @click="ui.toggleInspector()"
-      >
-        <!--
-          属性面板用 options（滑杆）而不是 settings（齿轮）：
-          之前两者共用一个图标，用户反馈"属性和设置长得一个样"。
-        -->
-        <AppIcon name="options" :size="18" />
-      </button>
-
-      <button
-        class="topbar__icon-btn"
-        type="button"
-        :disabled="!project.hasProject"
-        :title="isPresent ? t('present.exit') : t('present.enter')"
-        :aria-label="isPresent ? t('present.exit') : t('present.enter')"
-        :aria-pressed="isPresent"
-        @click="togglePresent"
-      >
-        <AppIcon name="present" :size="18" />
-      </button>
-
-      <button
-        class="topbar__icon-btn"
-        type="button"
-        :disabled="importing"
-        :title="t('nav.import')"
-        :aria-label="t('nav.import')"
-        @click="triggerImport"
-      >
-        <AppIcon name="import" :size="18" />
-      </button>
-
-      <button
-        class="topbar__icon-btn"
-        type="button"
-        :disabled="!project.hasProject"
-        :title="t('export.menu')"
-        :aria-label="t('export.menu')"
-        @click="emit('export')"
-      >
-        <AppIcon name="export" :size="18" />
-      </button>
-
-      <button
-        class="topbar__icon-btn"
-        type="button"
-        :title="t('nav.settings')"
-        :aria-label="t('nav.settings')"
-        @click="openSettings"
-      >
-        <AppIcon name="settings" :size="18" />
-      </button>
-    </div>
-
-    <input
-      ref="fileInput"
-      class="u-visually-hidden"
-      type="file"
-      :accept="`.${APP.fileExt},application/json`"
-      @change="onFilePicked"
-    />
+        <AppIcon name="settings" :size="16" />
+        <span>{{ t('nav.settings') }}</span>
+      </RouterLink>
+    </nav>
   </header>
 </template>
 
@@ -256,7 +111,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 .topbar__group {
   display: flex;
-  flex: none;
   gap: var(--sp-1);
   align-items: center;
 }
@@ -284,66 +138,49 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   letter-spacing: 0.04em;
 }
 
+/*
+ * 英文名紧跟中文名，不做任何"气泡化"处理。
+ * 用 --text-muted 而不是 --text-disabled：后者是"不可用"语义，
+ * 而这个名字是正常内容，只是层级更低。
+ */
 .topbar__brand-en {
-  padding: 1px 6px;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   color: var(--text-muted);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
 }
 
-.topbar__search {
-  position: relative;
-  display: flex;
-  flex: 1;
+.topbar__nav {
+  display: inline-flex;
   gap: var(--sp-2);
   align-items: center;
-  max-width: 380px;
+  height: 32px;
   padding: 0 var(--sp-3);
-  margin: 0 auto;
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border-default);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
   border-radius: var(--radius-md);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
-.topbar__search-icon {
-  color: var(--text-muted);
+.topbar__nav:hover {
+  color: var(--text-primary);
+  text-decoration: none;
+  background: var(--bg-hover);
 }
 
-.topbar__search-input {
-  width: 100%;
-  height: 30px;
-  background: none;
-  border: none;
-  outline: none;
-}
-
-.topbar__search-input::placeholder {
-  color: var(--text-disabled);
-}
-
-.topbar__save {
-  padding: 0 var(--sp-2);
-  font-size: var(--fs-xs);
-  color: var(--text-disabled);
-  transition: color var(--dur-base) var(--ease-out);
-}
-
-.topbar__save--saving {
-  color: var(--accent-500);
-}
-
-.topbar__save--dirty {
-  color: var(--warning);
-}
-
-.topbar__divider {
-  width: 1px;
-  height: 18px;
-  margin: 0 var(--sp-2);
-  background: var(--border-default);
+/*
+ * 选中态：紫底 + 白字。
+ * 用 --accent-700 而不是 --accent-500：后者在紫夜主题下偏亮，
+ * 白字压上去只有 4.2:1，不到 AA 的 4.5:1（浅色主题下 --accent-500
+ * 本身是深紫，两个主题的"同一个色号"明暗是反的，不能共用）。
+ */
+.topbar__nav--active,
+.topbar__nav--active:hover {
+  color: var(--accent-fg);
+  background: var(--accent-700);
 }
 
 .topbar__icon-btn {

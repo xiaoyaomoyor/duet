@@ -25,10 +25,11 @@ const definition: ModuleDefinition<MediaData, AudioProps> = {
     keywords: ['audio', '音频', '音乐', 'mp3', 'wav', 'song'],
   },
   schema: { create: createMediaData, isData: isMediaData },
-  defaultProps: { showWaveform: true, reportClock: true },
+  defaultProps: { showWaveform: true, reportClock: true, showCover: true },
   options: [
     { key: 'showWaveform', labelKey: 'moduleOption.showWaveform', type: 'boolean', default: true },
     { key: 'reportClock', labelKey: 'moduleOption.reportClock', type: 'boolean', default: true },
+    { key: 'showCover', labelKey: 'moduleOption.showCover', type: 'boolean', default: true },
   ],
   editor: defineAsyncComponent(() => import('./AudioEditor.vue')),
   renderer: defineAsyncComponent(() => import('./AudioRenderer.vue')),

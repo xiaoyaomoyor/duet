@@ -26,6 +26,7 @@ import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import ToolIcon from '@/components/common/ToolIcon.vue'
 import SideEditorDialog from './SideEditorDialog.vue'
+import { clampScale } from './sideScale'
 import { useToolsStore } from '@/stores/useToolsStore'
 import type { Side } from '@/types/project'
 
@@ -63,6 +64,13 @@ const versionLabel = computed(() => {
 const headerStyle = computed(() => ({
   '--accent': props.side.accent,
   '--accent-soft': `color-mix(in srgb, ${props.side.accent} 10%, transparent)`,
+  /*
+   * 字号倍率以 CSS 变量下发，由样式表里的 calc() 乘到基准字号上。
+   * 这样"默认字号"仍然只定义在 CSS 一处，JS 只负责给倍率，
+   * 不会出现"改样式表忘了改 JS 里的 px"的漂移。
+   */
+  '--name-scale': String(clampScale(props.side.nameScale ?? 1)),
+  '--version-scale': String(clampScale(props.side.versionScale ?? 1)),
 }))
 
 /** 三行都没内容时整块文本区不占位 */
@@ -174,7 +182,7 @@ function onPatch(patch: Record<string, unknown>): void {
 }
 
 .side-head__name {
-  font-size: var(--fs-2xl);
+  font-size: calc(var(--fs-2xl) * var(--name-scale, 1));
   font-weight: 700;
   line-height: var(--lh-tight);
   color: var(--text-primary);
@@ -183,7 +191,7 @@ function onPatch(patch: Record<string, unknown>): void {
 
 .side-head__version {
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: calc(var(--fs-sm) * var(--version-scale, 1));
   color: var(--text-secondary);
 }
 

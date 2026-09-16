@@ -10,8 +10,17 @@
  * 刻意不做成确认框语义：这里的每一次修改都**立即写回并自动保存**，
  * 没有"取消"的概念——底部只有一个"完成"。做成 确定/取消 会骗用户，
  * 因为中途的改动其实已经落库了。
+ *
+ * M7 紧凑化（用户实测反馈"编辑窗口太长，一屏放不下，每次都要滚"）：
+ *   1. 三块内容都能**折叠**。长弹窗的滚动成本主要来自"我已经改完了的那一块
+ *      还在占着半屏"，折叠把它交给用户自己决定。
+ *   2. 标题选项那一排用**并排 + 一排多个**：标题、各选项都是单行小控件，
+ *      原来一行一个、每行还带一段说明，六行才放得下三个下拉框。
+ *      现在标题独占一行（它需要宽度），选项走自适应多列网格。
+ *   3. 模块自己的编辑器保持**整宽**不参与并排——图集、参数表、代码对比
+ *      这类编辑器都需要横向空间，挤成半屏只会让人更想滚。
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { getModule } from '@/modules/registry'
@@ -35,6 +44,19 @@ const { t } = useI18n()
 
 const definition = computed(() => getModule(props.module.type))
 const hasOptions = computed(() => (definition.value?.options?.length ?? 0) > 0)
+
+/**
+ * 各分块的展开状态。
+ *
+ * 默认全开：折叠是"我觉得这块看够了"之后的动作，
+ * 一进来就藏起来会让用户以为功能没了。状态跨次打开保留，
+ * 因为"我每次都不看选项"这件事在一次会话里通常是稳定的。
+ */
+const sections = reactive({ basics: true, content: true, options: true })
+
+function toggleSection(key: keyof typeof sections): void {
+  sections[key] = !sections[key]
+}
 
 /** 标题用本地草稿 + 失焦提交：避免每敲一个字都进一次撤销栈 */
 const titleDraft = ref('')
@@ -129,94 +151,157 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </header>
 
         <div class="editor-dialog__body">
-          <label class="field">
-            <span class="field__label">{{ t('module.titleLabel') }}</span>
-            <input
-              ref="titleInput"
-              v-model="titleDraft"
-              class="field__control dialog__title-input"
-              type="text"
-              :placeholder="t('module.titlePlaceholder')"
-              @blur="commitTitle"
-              @keydown.enter.prevent="commitTitle"
-            />
-            <span class="field__hint">{{ t('module.titleHint') }}</span>
-          </label>
-
-          <!-- 模块自己的编辑器：来自注册表，因此新增模块类型时这里不用改 -->
-          <div class="editor-dialog__section">
-            <component
-              :is="definition?.editor"
-              v-if="definition"
-              :module="module"
-              :side-id="sideId"
-              :readonly="false"
-              :patch-data="forwardData"
-              :patch-props="forwardProps"
-            />
-          </div>
-
-          <!-- 呈现选项：由模块定义的 options 驱动，同样无需每个模块自己写表单 -->
-          <div v-if="hasOptions" class="editor-dialog__section">
-            <h3 class="editor-dialog__subtitle">{{ t('module.options') }}</h3>
-            <label v-for="option in definition?.options ?? []" :key="option.key" class="option">
-              <span class="option__label">{{ t(option.labelKey) }}</span>
-
-              <select
-                v-if="option.type === 'select'"
-                class="option__control"
-                :value="module.props[option.key] ?? option.default"
-                @change="
-                  emit('patchProps', { [option.key]: ($event.target as HTMLSelectElement).value })
-                "
-              >
-                <option
-                  v-for="value in option.values ?? []"
-                  :key="String(value.value)"
-                  :value="value.value"
-                >
-                  {{ t(value.labelKey) }}
-                </option>
-              </select>
-
-              <input
-                v-else-if="option.type === 'boolean'"
-                class="option__check"
-                type="checkbox"
-                :checked="module.props[option.key] !== false"
-                @change="
-                  emit('patchProps', {
-                    [option.key]: ($event.target as HTMLInputElement).checked,
-                  })
-                "
+          <!-- ① 基本：标题（单行，独占一行因为它需要宽度） -->
+          <section class="sec">
+            <button
+              class="sec__head"
+              type="button"
+              :aria-expanded="sections.basics"
+              @click="toggleSection('basics')"
+            >
+              <AppIcon
+                name="chevron-down"
+                :size="14"
+                class="sec__caret"
+                :class="{ 'sec__caret--folded': !sections.basics }"
               />
+              <span class="sec__title">{{ t('module.sectionBasics') }}</span>
+            </button>
 
-              <input
-                v-else-if="option.type === 'number'"
-                class="option__control"
-                type="number"
-                :min="option.min"
-                :max="option.max"
-                :step="option.step ?? 1"
-                :value="module.props[option.key] ?? option.default"
-                @change="
-                  emit('patchProps', {
-                    [option.key]: Number(($event.target as HTMLInputElement).value),
-                  })
-                "
-              />
+            <div v-show="sections.basics" class="sec__body">
+              <label class="field">
+                <span class="field__label">{{ t('module.titleLabel') }}</span>
+                <input
+                  ref="titleInput"
+                  v-model="titleDraft"
+                  class="field__control dialog__title-input"
+                  type="text"
+                  :placeholder="t('module.titlePlaceholder')"
+                  @blur="commitTitle"
+                  @keydown.enter.prevent="commitTitle"
+                />
+              </label>
+              <p class="field__hint">{{ t('module.titleHint') }}</p>
+            </div>
+          </section>
 
-              <input
-                v-else
-                class="option__control"
-                type="text"
-                :value="module.props[option.key] ?? option.default"
-                @change="
-                  emit('patchProps', { [option.key]: ($event.target as HTMLInputElement).value })
-                "
+          <!-- ② 内容：模块自己的编辑器，来自注册表，整宽不参与并排 -->
+          <section class="sec">
+            <button
+              class="sec__head"
+              type="button"
+              :aria-expanded="sections.content"
+              @click="toggleSection('content')"
+            >
+              <AppIcon
+                name="chevron-down"
+                :size="14"
+                class="sec__caret"
+                :class="{ 'sec__caret--folded': !sections.content }"
               />
-            </label>
-          </div>
+              <span class="sec__title">{{ t('module.sectionContent') }}</span>
+            </button>
+
+            <div v-show="sections.content" class="sec__body">
+              <component
+                :is="definition?.editor"
+                v-if="definition"
+                :module="module"
+                :side-id="sideId"
+                :readonly="false"
+                :patch-data="forwardData"
+                :patch-props="forwardProps"
+              />
+            </div>
+          </section>
+
+          <!-- ③ 呈现选项：由模块定义的 options 驱动，自适应多列 -->
+          <section v-if="hasOptions" class="sec">
+            <button
+              class="sec__head"
+              type="button"
+              :aria-expanded="sections.options"
+              @click="toggleSection('options')"
+            >
+              <AppIcon
+                name="chevron-down"
+                :size="14"
+                class="sec__caret"
+                :class="{ 'sec__caret--folded': !sections.options }"
+              />
+              <span class="sec__title">{{ t('module.options') }}</span>
+            </button>
+
+            <div v-show="sections.options" class="sec__body">
+              <!--
+                一排多个：选项都是"标签 + 一个控件"的窄行，
+                排成自适应网格后六行缩成两三行，且不必为每个选项留整行。
+              -->
+              <div class="options">
+                <label v-for="option in definition?.options ?? []" :key="option.key" class="option">
+                  <span class="option__label">{{ t(option.labelKey) }}</span>
+
+                  <select
+                    v-if="option.type === 'select'"
+                    class="option__control"
+                    :value="module.props[option.key] ?? option.default"
+                    @change="
+                      emit('patchProps', {
+                        [option.key]: ($event.target as HTMLSelectElement).value,
+                      })
+                    "
+                  >
+                    <option
+                      v-for="value in option.values ?? []"
+                      :key="String(value.value)"
+                      :value="value.value"
+                    >
+                      {{ t(value.labelKey) }}
+                    </option>
+                  </select>
+
+                  <input
+                    v-else-if="option.type === 'boolean'"
+                    class="option__check"
+                    type="checkbox"
+                    :checked="module.props[option.key] !== false"
+                    @change="
+                      emit('patchProps', {
+                        [option.key]: ($event.target as HTMLInputElement).checked,
+                      })
+                    "
+                  />
+
+                  <input
+                    v-else-if="option.type === 'number'"
+                    class="option__control"
+                    type="number"
+                    :min="option.min"
+                    :max="option.max"
+                    :step="option.step ?? 1"
+                    :value="module.props[option.key] ?? option.default"
+                    @change="
+                      emit('patchProps', {
+                        [option.key]: Number(($event.target as HTMLInputElement).value),
+                      })
+                    "
+                  />
+
+                  <input
+                    v-else
+                    class="option__control"
+                    type="text"
+                    :value="module.props[option.key] ?? option.default"
+                    @change="
+                      emit('patchProps', {
+                        [option.key]: ($event.target as HTMLInputElement).value,
+                      })
+                    "
+                  />
+                </label>
+              </div>
+            </div>
+          </section>
         </div>
 
         <footer class="editor-dialog__foot">
@@ -295,23 +380,64 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--sp-5);
-  padding: var(--sp-5);
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
   overflow-y: auto;
 }
 
-.editor-dialog__section {
+/* —— 可分块折叠的区段 —— */
+.sec {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
 }
 
-.editor-dialog__subtitle {
+.sec__head {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  width: 100%;
+  padding: var(--sp-1) 0;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.sec__head:hover {
+  color: var(--text-secondary);
+}
+
+.sec__caret {
+  flex: none;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+/* 折叠时把箭头转成"指向右"，这是折叠控件最省字的表达 */
+.sec__caret--folded {
+  transform: rotate(-90deg);
+}
+
+.sec__title {
   font-size: var(--fs-xs);
   font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sec__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/*
+ * 选项网格：一排多个。
+ * auto-fit + minmax 而不是固定两列：选项数量因模块而异，
+ * 固定列数在只有两个选项时会白白撑出一片空白。
+ */
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--sp-2) var(--sp-4);
 }
 
 .field {
@@ -338,29 +464,35 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   color: var(--text-muted);
 }
 
+/*
+ * 单个选项：标签在左、控件在右**并排**。
+ * 早先每个选项都是"标签一行、控件一行"，六个选项就是十二行。
+ */
 .option {
   display: flex;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   align-items: center;
+  min-width: 0;
   font-size: var(--fs-sm);
 }
 
 .option__label {
   flex: none;
-  min-width: 96px;
+  min-width: 60px;
   color: var(--text-secondary);
 }
 
 .option__control {
   flex: 1;
   min-width: 0;
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-1) var(--sp-2);
   background: var(--bg-surface-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
 }
 
 .option__check {
+  flex: none;
   width: 16px;
   height: 16px;
 }
