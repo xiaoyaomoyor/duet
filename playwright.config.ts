@@ -12,6 +12,11 @@ const BASE_URL = `http://localhost:${PORT}`
 
 export default defineConfig({
   testDir: './e2e',
+  /*
+   * 截屏用例不属于验收：它跑二十多秒（要造真实内容），而且会**改写**
+   * `docs/screenshots/`。单独用 `playwright.shots.config.ts` 跑（`npm run shots`）。
+   */
+  testIgnore: ['**/screenshots.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
