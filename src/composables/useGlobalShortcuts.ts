@@ -20,6 +20,7 @@
  *      用户会连自己刚才在改哪张卡片都找不到。
  */
 import { onBeforeUnmount, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUiStore } from '@/stores/useUiStore'
 
@@ -44,10 +45,12 @@ function hasOpenModal(): boolean {
 }
 
 export function useGlobalShortcuts(): void {
+  const route = useRoute()
   const project = useProjectStore()
   const ui = useUiStore()
 
   function onKeydown(event: KeyboardEvent): void {
+    if (route.meta.layout === 'showcase') return
     if (hasOpenModal()) return
     const mod = event.ctrlKey || event.metaKey
     if (!mod || event.altKey) return

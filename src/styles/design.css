@@ -1,0 +1,127 @@
+/* R1 展示与工作区基础组件。作用域独立于兼容画布的主题。 */
+[data-design-theme] {
+  --d-bg: #101414;
+  --d-surface: #191e1d;
+  --d-raised: #222927;
+  --d-text: #eeeae2;
+  --d-muted: #adb3ac;
+  --d-faint: #97a299;
+  --d-line: #37413c;
+  --d-accent: #d9bd91;
+  --d-accent-ink: #191b17;
+  --d-a: #d9bd91;
+  --d-b: #9bc6bc;
+  --d-danger: #f0a6a0;
+  --d-focus: #d9bd91;
+  --d-shadow: 0 24px 100px #0006;
+  --d-font: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --d-serif: Georgia, 'Noto Serif CJK SC', 'Songti SC', 'SimSun', serif;
+  --d-mono: 'Cascadia Code', Consolas, monospace;
+  --d-radius-control: 6px;
+  --d-radius-surface: 10px;
+  --d-radius-dialog: 14px;
+  --d-fast: 160ms;
+  --d-enter: 360ms;
+  --d-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  color: var(--d-text);
+  background: var(--d-bg);
+  font-family: var(--d-font);
+  font-synthesis: none;
+  color-scheme: dark;
+}
+
+[data-design-theme='paper'] {
+  --d-bg: #f2f0e9;
+  --d-surface: #fbf9f3;
+  --d-raised: #e7e6dc;
+  --d-text: #222c2c;
+  --d-muted: #59655e;
+  --d-faint: #58665c;
+  --d-line: #c6cdc2;
+  --d-accent: #6f512a;
+  --d-accent-ink: #fffaf0;
+  --d-a: #765329;
+  --d-b: #34695f;
+  --d-danger: #a03430;
+  --d-focus: #34695f;
+  --d-shadow: 0 24px 100px #27322820;
+  color-scheme: light;
+}
+
+[data-design-theme] :focus-visible {
+  outline: 2px solid var(--d-focus);
+  outline-offset: 4px;
+}
+
+.d-kicker {
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.18em;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--d-muted);
+}
+.d-muted {
+  color: var(--d-muted);
+}
+.d-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--d-text);
+}
+.d-field small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--d-muted);
+}
+.d-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius-control);
+  background: var(--d-bg);
+  color: var(--d-text);
+}
+.d-input::placeholder {
+  color: var(--d-faint);
+}
+.d-input[aria-invalid='true'] {
+  border-color: var(--d-danger);
+}
+.d-field .d-error {
+  color: var(--d-danger);
+}
+textarea.d-input {
+  resize: vertical;
+  min-height: 110px;
+  line-height: 1.7;
+}
+.d-check {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.d-check input {
+  margin-top: 5px;
+  accent-color: var(--d-accent);
+}
+.d-divider {
+  border: 0;
+  border-top: 1px solid var(--d-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-design-theme] {
+    --d-fast: 0ms;
+    --d-enter: 0ms;
+  }
+}
+[data-reduced-motion='always'] [data-design-theme] {
+  --d-fast: 0ms;
+  --d-enter: 0ms;
+}

@@ -58,13 +58,11 @@ async function pick(templateId: string, name: string): Promise<void> {
     <header class="gallery__head">
       <h2 class="gallery__title">{{ t('compare.emptyTitle') }}</h2>
       <p class="gallery__desc">{{ t('compare.emptyDesc') }}</p>
-
-      <button
-        class="gallery__import"
-        type="button"
-        :disabled="importing"
-        @click="triggerImport"
+      <RouterLink class="gallery__import" :to="{ name: 'showcase' }"
+        ><AppIcon name="palette" :size="14" />{{ t('showcase.entry') }} →</RouterLink
       >
+
+      <button class="gallery__import" type="button" :disabled="importing" @click="triggerImport">
         <AppIcon name="import" :size="14" />
         {{ t('export.importProject') }}
       </button>

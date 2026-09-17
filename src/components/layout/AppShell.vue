@@ -130,7 +130,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="shell" :class="{ 'shell--compact': ui.sidebarCollapsed }">
+  <RouterView v-if="route.meta.layout === 'showcase'" />
+  <div v-else class="shell" :class="{ 'shell--compact': ui.sidebarCollapsed }">
     <TopBar class="shell__topbar" />
 
     <ProjectSidebar class="shell__sidebar" :aria-label="sectionTitle" />

@@ -75,6 +75,13 @@ function togglePresent(): void {
     <nav class="topbar__group topbar__group--end" :aria-label="t('nav.pages')">
       <RouterLink
         class="topbar__nav"
+        :to="{ name: 'showcase' }"
+        :aria-label="t('showcase.entry')"
+        :title="t('showcase.entry')"
+        ><AppIcon name="palette" :size="17"
+      /></RouterLink>
+      <RouterLink
+        class="topbar__nav"
         :class="{ 'u-selected': activePage === 'compare' }"
         :to="{ name: 'compare' }"
         data-testid="nav-compare-page"

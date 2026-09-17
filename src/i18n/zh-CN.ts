@@ -3,7 +3,9 @@
  *
  * 纪律：所有 UI 文案集中在此；.vue 模板中禁止中文字面量（§14.3）。
  */
+import { showcaseZh } from './showcase'
 export default {
+  showcase: showcaseZh,
   app: {
     name: '对奏',
     tagline: '让两个工具，同台演奏同一道题',

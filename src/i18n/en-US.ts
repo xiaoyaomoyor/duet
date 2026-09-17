@@ -3,7 +3,9 @@
  *
  * 注意：内置工具名（Suno、Kling…）不做翻译，见 §14.3。
  */
+import { showcaseEn } from './showcase'
 export default {
+  showcase: showcaseEn,
   app: {
     name: 'Duet',
     tagline: 'Same prompt. Two tools. One stage',
