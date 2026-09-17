@@ -23,6 +23,7 @@ import AppIcon from '@/components/common/AppIcon.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useResolvedTheme } from '@/composables/useResolvedTheme'
 import { ACCENT_PRESETS, presetColor, resolveAccent } from '@/data/accentPresets'
+import { mixHex } from '@/lib/color'
 import type { LayoutConfig, SideId } from '@/types/project'
 
 const { t } = useI18n()
@@ -99,6 +100,19 @@ function sideColor(sideId: SideId): string {
   const side = sides.value.find((item) => item.id === sideId)
   return side ? resolveAccent(side, theme.value) || '#a78bfa' : '#a78bfa'
 }
+
+/**
+ * 通用色的"自动"到底是什么颜色——把它显示在取色器里。
+ *
+ * 否则用户看到的永远是一个与两侧都不像的默认色（`#a78bfa`），
+ * 而实际渲染用的是中点，两边对不上。
+ */
+const commonAccentPreview = computed(() =>
+  mixHex(
+    sides.value[0] ? resolveAccent(sides.value[0], theme.value) || '' : '',
+    sides.value[1] ? resolveAccent(sides.value[1], theme.value) || '' : '',
+  ),
+)
 
 /**
  * 选中某个预设。
@@ -235,6 +249,40 @@ const fontSizeMax = 64
                 :value="sideColor(side.id)"
                 :aria-label="t('inspector.accentCustom')"
                 @change="pickCustom(side.id, $event)"
+              />
+            </label>
+          </div>
+        </div>
+
+        <!--
+          通用模块的颜色（v0.5.7）。
+          通用行横跨两栏、不属于任何一侧，默认用两侧强调色的**中点**；
+          这里可以另指定一个颜色。留空即回到中点。
+        -->
+        <div class="accent">
+          <span class="accent__name">{{ t('inspector.commonAccent') }}</span>
+          <div class="accent__swatches">
+            <button
+              class="tint__auto"
+              type="button"
+              :class="{ 'tint__auto--active': !layout.commonAccent }"
+              data-testid="common-accent-auto"
+              @click="patch({ commonAccent: undefined })"
+            >
+              {{ t('inspector.commonAccentAuto') }}
+            </button>
+            <label
+              class="swatch swatch--custom"
+              :class="{ 'swatch--active': layout.commonAccent !== undefined }"
+              :title="t('inspector.commonAccent')"
+            >
+              <AppIcon name="palette" :size="12" />
+              <input
+                class="swatch__input"
+                type="color"
+                :value="layout.commonAccent ?? commonAccentPreview"
+                :aria-label="t('inspector.commonAccent')"
+                @change="patch({ commonAccent: ($event.target as HTMLInputElement).value })"
               />
             </label>
           </div>

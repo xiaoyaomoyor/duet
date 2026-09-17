@@ -33,6 +33,12 @@ const props = defineProps<{
   showNumbers?: boolean
   /** 聚光灯"色彩弱化"要压暗的侧 */
   dimmedSideIds?: readonly string[]
+  /**
+   * 通用行（横跨两栏）使用的强调色。
+   * 由 CompareCanvas 算好传进来：默认是两侧强调色的中点，
+   * 也可以在「对比配置」里指定（见 lib/color.ts 的 mixHex）。
+   */
+  commonAccent: string
 }>()
 
 /**
@@ -180,12 +186,20 @@ function cellStyle(side: Side): Record<string, string> {
   /*
    * 通用行不属于任何一侧，因此不套用某一边的主题色（否则会误导"这是左边的"）。
    *
-   * 注意这里**不写** --accent-soft：留空即可回落到 :root 上那层主题紫的淡底。
-   * 早先版本把它设成 transparent，结果通用行里的卡片背景被叠成完全透明，
-   * 与两侧的卡片一眼就能看出不是同一种东西。
+   * v0.5.7 起用**中间色**：默认取两侧强调色的中点（由 CompareCanvas 算好传进来），
+   * 也可以在「对比配置」里指定别的颜色。此前它用的是 `--accent-500`
+   * （即界面主题色）——那是"当前主题的紫"，与左右两侧的工具色毫无关系，
+   * 夹在中间看起来像第三种不相干的东西。用户实测反馈：
+   * "通用模块应该着色为中间色，并且也可以在对比配置中设置颜色。"
+   *
+   * `--accent-soft` 也必须显式写出来：只给 `--accent` 的话，
+   * 底色会回落到 :root 上那层主题紫的淡底，又变成另一个颜色。
    */
   if (isFullRow.value) {
-    return { '--accent': 'var(--accent-500)' }
+    return {
+      '--accent': props.commonAccent,
+      '--accent-soft': sideTint(props.commonAccent),
+    }
   }
   /*
    * 卡片底色与工具卡片共用 sideTint（同一个函数、同一个浓度）。

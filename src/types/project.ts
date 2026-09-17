@@ -282,6 +282,15 @@ export interface LayoutConfig {
   backgroundBase?: string | undefined
 
   /**
+   * 通用模块的强调色（v0.5.7）。
+   *
+   * 通用行（横跨两栏）不属于任何一侧，套用某一边的颜色会误导。
+   * 留空 = **自动取两侧的中间色**（见 lib/color.ts 的 mixHex）——
+   * 它既不属于谁，又明显与两侧同源。想指定一个别的颜色就写在这里。
+   */
+  commonAccent?: string | undefined
+
+  /**
    * 填充形式（v0.5.0 改语义）：
    *   content 图案只铺在内容区（默认）
    *   page    图案充满**整个对比页**；演示全屏时充满整个屏幕

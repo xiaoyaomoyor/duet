@@ -75,7 +75,7 @@ const rootStyle = computed(() => {
     // 背景图案的变量在演示视图里也要有，否则"充满整页"铺不出来（见 pagePattern）
     '--bg-scale': `${scale}px`,
     '--bg-tint': layout.backgroundTint ?? '',
-    '--bg-base': layout.backgroundBase ?? '',
+    '--page-fill': layout.backgroundBase ?? '',
   }
 })
 
@@ -499,7 +499,7 @@ defineExpose({ zoom, hasContent })
    * 底色是图案的**底**：background-color 天然画在 background-image 之下，
    * 所以"底色不会挡住图案"是免费的（用户的要求）。
    */
-  background-color: var(--bg-base, transparent);
+  background-color: var(--page-fill, transparent);
 }
 
 .present__pattern--grid {

@@ -698,6 +698,8 @@ export default {
     groupAccent: '两侧配色',
     accentHint: '分别挑左右两边的颜色。预设会跟着主题走：浅色主题用深一档，深色主题用浅一档。',
     accentCustom: '自定义颜色',
+    commonAccent: '通用模块',
+    commonAccentAuto: '两侧中点',
     groupNumber: '序号',
     showNumbers: '显示行号与模块序号',
     showNumbersHint: '行号在行左上角、模块子序号（如 2.2）在模块左上角。',

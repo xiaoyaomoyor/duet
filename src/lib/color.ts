@@ -101,8 +101,34 @@ export function shade(hex: string, amount: number): string {
   return toHex({ r: mix(rgb.r), g: mix(rgb.g), b: mix(rgb.b) })
 }
 
-export function toHex({ r, g, b }: Rgb): string {
-  const part = (c: number) =>
+/**
+ * 两个颜色的中间色（v0.5.7）。
+ *
+ * 用途：**通用行**（横跨两栏的那种行）不属于任何一侧，
+ * 但它也得有一种强调色——用左边那个会误导成"这是左边的"，
+ * 用右边那个同理。取两侧的中间色是唯一说得通的选择：
+ * 它既不属于谁，又明显与两侧同源。
+ *
+ * 用 sRGB 直接插值而不是转到 Lab：这两个颜色最终只是几层 10% 的淡底，
+ * 感知上的细微差异看不出来，而 sRGB 插值的**结果是可预期的**——
+ * 紫 + 青 永远得到同一个中间色，不会因为色彩空间转换的细节而漂移。
+ *
+ * 任一侧不是合法 hex 时返回另一个；两个都不合法时返回 fallback。
+ */
+export function mixHex(a: string, b: string, fallback = '#8c82aa'): string {
+  const rgbA = parseHex(a)
+  const rgbB = parseHex(b)
+  if (!rgbA) return rgbB ? toHex(rgbB) : fallback
+  if (!rgbB) return toHex(rgbA)
+
+  return toHex({
+    r: Math.round((rgbA.r + rgbB.r) / 2),
+    g: Math.round((rgbA.g + rgbB.g) / 2),
+    b: Math.round((rgbA.b + rgbB.b) / 2),
+  })
+}
+
+export function toHex({ r, g, b }: Rgb): string {  const part = (c: number) =>
     Math.max(0, Math.min(255, Math.round(c)))
       .toString(16)
       .padStart(2, '0')

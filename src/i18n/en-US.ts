@@ -699,6 +699,8 @@ export default {
     accentHint:
       'Pick a color for each side. Presets follow the theme: darker on light themes, lighter on dark ones.',
     accentCustom: 'Custom color',
+    commonAccent: 'Shared modules',
+    commonAccentAuto: 'Midpoint of both sides',
     groupNumber: 'Numbering',
     showNumbers: 'Show row and module numbers',
     showNumbersHint: 'Row numbers sit at the top-left of a row; module numbers (2.2) on each module.',

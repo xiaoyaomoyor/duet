@@ -1,7 +1,7 @@
 {
   "name": "duet",
   "private": true,
-  "version": "0.5.5",
+  "version": "0.5.7",
   "type": "module",
   "description": "对奏 Duet — 专注内容横向对比的本地优先 Web 应用。Same prompt. Two tools. One stage.",
   "license": "AGPL-3.0-or-later",

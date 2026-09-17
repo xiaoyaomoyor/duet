@@ -70,7 +70,7 @@ const stageStyle = computed(() => {
     '--bg-scale': `${scale}px`,
     '--bg-tint': current.backgroundTint ?? '',
     // 底色是图案的**底**：background-color 天然画在 background-image 之下
-    '--bg-base': current.backgroundBase ?? '',
+    '--page-fill': current.backgroundBase ?? '',
   }
 })
 // ——————————————————————————————————————————————————————————
@@ -294,7 +294,7 @@ function onPresentExit(): void {
 .compare__stage--bg-grid,
 .compare__stage--bg-dots,
 .compare__stage--bg-solid {
-  background-color: var(--bg-base, transparent);
+  background-color: var(--page-fill, transparent);
   /*
    * `background-attachment: fixed` 是关键：它让背景相对**视口**绘制，
    * 于是内容滚动时图案不动——这正是"壁纸"该有的样子。

@@ -9,6 +9,7 @@ import {
   contrastRatio,
   hexToSoft,
   meetsAaText,
+  mixHex,
   parseHex,
   readableTextOn,
   relativeLuminance,
@@ -179,5 +180,38 @@ describe('toHex', () => {
 
   it('越界通道被截断', () => {
     expect(toHex({ r: 300, g: -20, b: 128 })).toBe('#ff0080')
+  })
+})
+
+/**
+ * 中间色（v0.5.7）。
+ *
+ * 通用行横跨两栏、不属于任何一侧，用它俩的中间色才说得通：
+ * 既不属于谁，又明显与两侧同源。
+ */
+describe('mixHex', () => {
+  it('取两色的中点', () => {
+    expect(mixHex('#000000', '#ffffff')).toBe('#808080')
+    // 紫 (167,139,250) 与 青 (34,211,238) 的中点 = (101,175,244)
+    expect(mixHex('#a78bfa', '#22d3ee')).toBe('#65aff4')
+  })
+
+  it('**确定性**：同一对颜色永远得到同一个结果', () => {
+    // 这是它能作为"默认值"的前提——每次渲染都得到同一个颜色
+    expect(mixHex('#a78bfa', '#22d3ee')).toBe(mixHex('#a78bfa', '#22d3ee'))
+  })
+
+  it('顺序无关（中点是对称的）', () => {
+    expect(mixHex('#a78bfa', '#22d3ee')).toBe(mixHex('#22d3ee', '#a78bfa'))
+  })
+
+  it('一侧非法时退回另一侧，而不是抛错或变黑', () => {
+    expect(mixHex('nope', '#22d3ee')).toBe('#22d3ee')
+    expect(mixHex('#a78bfa', '')).toBe('#a78bfa')
+  })
+
+  it('两侧都非法时给兜底色（保证画面上永远有颜色）', () => {
+    expect(mixHex('', '')).toBe('#8c82aa')
+    expect(mixHex('x', 'y', '#123456')).toBe('#123456')
   })
 })

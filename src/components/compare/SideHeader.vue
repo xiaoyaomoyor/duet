@@ -137,8 +137,14 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
 
 <template>
   <header class="side-head" :class="{ 'side-head--dimmed': dimmed }" :style="headerStyle">
-    <!-- 强调色条：左侧竖条 -->
-    <span class="side-head__bar" aria-hidden="true" />
+    <!--
+      左侧那根 5px 的强调条已经移除（v0.5.7）。
+      它是工具卡片还是「画布顶部一张独立卡片」时加的；变成「标题」模块之后，
+      模块卡片自己就有一条 border-left: 2px solid var(--accent)——
+      两条竖线并排，看着像没对齐的双边框（用户实测反馈：
+      「标题模块左侧不要再显示内部的旧的竖线了」）。
+      外面那条才是这一层的语义，内部这条属于上一个时代。
+    -->
 
     <div class="side-head__body">
       <!--
@@ -254,12 +260,7 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
     filter var(--dur-slow) var(--ease-out);
 }
 
-/* 左侧强调条：占满整卡高度，颜色随本侧主题色 */
-.side-head__bar {
-  flex: none;
-  width: 5px;
-  background: var(--accent, var(--accent-500));
-}
+/* 左侧强调条的样式已随元素一并移除（v0.5.7）：外面那条属于模块卡片 */
 
 .side-head__body {
   position: relative;

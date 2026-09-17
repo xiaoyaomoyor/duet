@@ -24,6 +24,7 @@ import { moduleTitle } from '@/i18n/helper'
 import { useResolvedTheme } from '@/composables/useResolvedTheme'
 import { usePlayingSides } from '@/composables/usePlayingSides'
 import { resolveAccent } from '@/data/accentPresets'
+import { mixHex } from '@/lib/color'
 import type { CellRef, ModuleInstance, ModuleRef, Project, Row, SideId } from '@/types/project'
 
 const props = defineProps<{
@@ -131,6 +132,18 @@ const backgroundClass = computed(() => `canvas--bg-${layout.value.background}`)
 const DEFAULT_BG_SCALE = 32
 
 /**
+ * 图案是否**充满整页**（而不只是铺在内容底下）。
+ *
+ * v0.5.0 改语义：此前这一项叫 solid，做的是"整页铺一层实心底色"，
+ * 而用户要的是"网格/点阵充满整个对比页"。
+ *
+ * ⚠️ 这个 computed 必须在 `backgroundVars` **之前**声明：
+ * 后者会读它。计算属性本身是惰性的（求值时早就初始化完了），
+ * 但把顺序写对，读代码的人不必去推敲 TDZ。
+ */
+const pageFill = computed(() => layout.value.backgroundFill === 'page')
+
+/**
  * 背景参数写成 CSS 变量而不是几套写死的类：
  * 「密度 / 颜色 / 填充形式」三者的组合有几十种，枚举成类会爆炸，
  * 而它们本身都是连续量，交给变量最自然。
@@ -145,20 +158,28 @@ const backgroundVars = computed(() => {
     // 留空 = 跟随主题（用各主题自己的 --border-* 色）
     '--bg-tint': layout.value.backgroundTint ?? '',
     '--bg-tint-fallback': 'var(--border-subtle)',
-    '--bg-base': layout.value.backgroundBase ?? '',
+    /*
+     * 底色只在"画布自己负责背景"时才下发。
+     *
+     * "充满整页"时背景归外层壁纸层——画布要是也铺一层底色，
+     * 它正好压在壁纸上、把中间整块图案盖掉，只剩页面边缘还看得见图案
+     * （用户实测反馈："内部还是被背景挡住了图案，导致图案只出现在边缘"）。
+     *
+     * ⚠️ 变量名**不能**叫 `--bg-base`：那是主题里"应用底色"的 token
+     * （tokens.css 三个主题各定义一次）。同名的话 `var(--bg-base, transparent)`
+     * 会解析成**主题色**而不是"未设置"，画布于是永远铺着一层不透明底色——
+     * 这正是"图案只在边缘"的真凶。
+     *
+     * 也不能沿用外层壁纸层的 `--page-fill`：自定义属性会**继承**，
+     * 画布读到的会是外层那个值（探针实测就是如此），照样铺一层底色把图案盖掉。
+     * 所以画布用自己专用的 `--canvas-fill`，两边互不影响。
+     */
+    '--canvas-fill': pageFill.value ? '' : (layout.value.backgroundBase ?? ''),
   }
 })
 
 /** 演示视图下是否保留背景图案（默认关） */
 const showBackground = computed(() => !isReadonly.value || layout.value.backgroundInPresent === true)
-
-/**
- * 图案是否**充满整页**（而不只是铺在内容底下）。
- *
- * v0.5.0 改语义：此前这一项叫 solid，做的是"整页铺一层实心底色"，
- * 而用户要的是"网格/点阵充满整个对比页"。
- */
-const pageFill = computed(() => layout.value.backgroundFill === 'page')
 
 /**
  * 画布这里要不要画图案。
@@ -174,6 +195,18 @@ const pageFill = computed(() => layout.value.backgroundFill === 'page')
 const drawPattern = computed(() => showBackground.value && !pageFill.value)
 
 const showRowNumbers = computed(() => layout.value.showRowNumbers === true)
+
+/**
+ * 通用行（横跨两栏）的强调色（v0.5.7）。
+ *
+ * 默认取两侧强调色的**中点**：通用行不属于任何一侧，用某一边的颜色会
+ * 误导成"这是左边的"；用界面主题色则与两侧毫无关系，像第三种东西。
+ * 中点既不属于谁，又明显与两侧同源；「对比配置」里可以另指定一个颜色。
+ */
+const commonAccent = computed(
+  () =>
+    layout.value.commonAccent || mixHex(sides.value[0]?.accent ?? '', sides.value[1]?.accent ?? ''),
+)
 
 // ————————————————————————————————————————————————————————
 // 行
@@ -352,6 +385,7 @@ function onDuplicateModule(ref: ModuleRef): void {
             :project-id="project.id"
             :show-numbers="showRowNumbers"
             :dimmed-side-ids="dimmedSideIds"
+          :common-accent="commonAccent"
             @insert="insertRowAt"
             @add-common="openCommonPicker"
             @toggle-collapse="store.toggleRowCollapsed"
@@ -378,6 +412,7 @@ function onDuplicateModule(ref: ModuleRef): void {
           :project-id="project.id"
           :show-numbers="showRowNumbers"
           :dimmed-side-ids="dimmedSideIds"
+          :common-accent="commonAccent"
           readonly
         />
       </div>
@@ -433,7 +468,7 @@ function onDuplicateModule(ref: ModuleRef): void {
    * 背景底色（v0.5.3）。留空时这一层不生效，由外层容器的主题色负责——
    * 用 background-color 而不是覆盖 background，图案仍由 .canvas--bg-* 画。
    */
-  background-color: var(--bg-base, transparent);
+  background-color: var(--canvas-fill, transparent);
   border-radius: var(--radius-sm);
 }
 
