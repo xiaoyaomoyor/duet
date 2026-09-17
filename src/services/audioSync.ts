@@ -264,6 +264,35 @@ export class AudioSyncEngine {
     this.setStatus({ driftMs: 0 })
   }
 
+  /**
+   * 只定位**一侧**（v0.5.3，音频模块自己的进度条用）。
+   *
+   * 为什么需要它：`seek()` 是"整体定位"，两个音轨一起动。
+   * 而模块里的进度条是**这一侧**的控件——用户拖它时另一侧也跟着跳，
+   * 实测反馈"拖动进度条不应该一起变动"。
+   *
+   * 关键在**同时改写这一侧的偏移量**：引擎每 250ms 会把各轨对齐到参考轨，
+   * 只写 `currentTime` 的话下一次采样就把它拉回原处
+   * （这正是 M10 误判成"拨不动"的那个现象）。
+   * 把偏移改成「目标位置 − 参考位置」之后，对齐公式算出来的落点
+   * 恰好就是用户放下的位置，两边都自洽。
+   */
+  seekSide(sideId: string, ms: number): void {
+    const track = this.tracks.find((item) => item.sideId === sideId)
+    if (!track) return
+
+    const reference = this.resolveMaster()
+    const referenceMs = reference && reference.sideId !== sideId ? this.displayTimeMs(reference) : ms
+
+    // 先改偏移再落位：顺序反过来的话中间会有一瞬按旧偏移对齐
+    track.offsetMs = Math.round(ms - referenceMs)
+
+    const target = Math.max(0, ms / 1000)
+    const duration = Number.isFinite(track.element.duration) ? track.element.duration : target
+    track.element.currentTime = Math.min(target, Math.max(0, duration))
+    this.setStatus({ driftMs: 0 })
+  }
+
   /** 以两侧中较早的播放位置为准，用于"从头对齐" */
   rewindToStart(): void {
     this.seek(0)

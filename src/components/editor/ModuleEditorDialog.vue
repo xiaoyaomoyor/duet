@@ -44,6 +44,8 @@ const { t } = useI18n()
 
 const definition = computed(() => getModule(props.module.type))
 const hasOptions = computed(() => (definition.value?.options?.length ?? 0) > 0)
+/** 该模块的编辑器要整幅宽度（自己就是双列的那种，如「标题」模块） */
+const editorWide = computed(() => definition.value?.editorWide === true)
 
 /**
  * 各分块的展开状态。
@@ -150,7 +152,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </button>
         </header>
 
-        <div class="editor-dialog__body">
+        <div
+          class="editor-dialog__body"
+          :class="{ 'editor-dialog__body--wide': editorWide }"
+        >
           <!-- ① 基本：标题（双列布局里落在右列上） -->
           <section class="sec sec--basics">
             <button
@@ -341,6 +346,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   animation: duet-pop-in var(--dur-base) var(--ease-spring) both;
 }
 
+/* 编辑器自己就是双列时，弹窗要更宽，否则它那一列的每一半都会很窄 */
+.editor-dialog:has(.editor-dialog__body--wide) {
+  width: min(1040px, 100%);
+}
+
 .editor-dialog__head {
   display: flex;
   flex: none;
@@ -410,6 +420,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .sec--options {
   grid-row: 2;
   grid-column: 2;
+}
+
+/*
+ * 编辑器的内容块整幅宽（模块自己就是双列时）。
+ * 顺序按 DOM：标题 → 内容 → 选项——标题在最上面才像"这一块叫什么"。
+ */
+.editor-dialog__body--wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.editor-dialog__body--wide .sec--content,
+.editor-dialog__body--wide .sec--basics,
+.editor-dialog__body--wide .sec--options {
+  grid-row: auto;
+  grid-column: auto;
 }
 
 @media (max-width: 880px) {

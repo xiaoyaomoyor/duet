@@ -266,6 +266,17 @@ export interface LayoutConfig {
   backgroundTint?: string | undefined
 
   /**
+   * 背景**底色**（v0.5.3）。
+   *
+   * 与 `backgroundTint`（图案颜色）是两件事：这一项铺的是整块背景，
+   * 那一项画的是网格/点阵的线。留空 = 跟随主题。
+   *
+   * 编辑视图与演示模式都生效——它是"这份对比页长什么样"的一部分，
+   * 不是编辑期的辅助线。
+   */
+  backgroundBase?: string | undefined
+
+  /**
    * 填充形式（v0.5.0 改语义）：
    *   content 图案只铺在内容区（默认）
    *   page    图案充满**整个对比页**；演示全屏时充满整个屏幕

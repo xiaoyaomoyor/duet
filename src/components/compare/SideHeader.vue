@@ -226,12 +226,23 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
 </template>
 
 <style scoped>
+/*
+ * 工具名卡片。
+ *
+ * v0.5.3：**不再自带卡片外观**（用户："既然标题模块本身就存在模块卡片，
+ * 就不要内嵌之前的卡片样式了"）。
+ *
+ * 它曾经是画布顶部一张独立的卡片，所以有底色、描边、圆角。
+ * 变成「标题」模块之后，外面已经有一层 `.u-module-card`（模块卡片），
+ * 再画一层就是"卡片里套卡片"——两张边框、两层底色，边界说不清是谁的。
+ * 现在它只负责排布：左强调条 + 内容。
+ */
 .side-head {
   display: flex;
   overflow: hidden;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  background: none;
+  border: none;
+  border-radius: 0;
 }
 
 /* 聚光灯「色彩弱化」：与模块格用完全相同的处理，否则工具头会显得"没跟上" */
@@ -352,17 +363,17 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
 }
 
 /*
- * 显现态：恢复文字色，**背景保持透明**（用户："展示显示后文字也不要出现背景按钮，
- * 也就是保持文字透明底"）。只在鼠标指到它时才给一点极淡的底，
- * 作为"这里可以再点一下遮回去"的提示——那是个悬停态，不是常驻的按钮外观。
+ * 显现态：恢复文字色，**背景始终保持透明**。
+ *
+ * 用户反馈过两次：第一次是"显现后不要出现背景按钮"，第二次是
+ * "鼠标悬浮在匿名的文字上不要显示文字的背景色"——连悬停底色也不要。
+ * 那就一点都不给：它本来就只是一段文字，鼠标放上去变成可点的样子
+ * 反而像那里有个按钮（而那里什么都没有，只有一个"点一下看内容"的约定）。
+ * 可点性由 `cursor: pointer` 表达，那已经够了。
  */
 .side-head__mask:not(.side-head__mask--hidden) {
   color: inherit;
   background: transparent;
-}
-
-.side-head__mask:not(.side-head__mask--hidden):hover {
-  background: var(--accent-soft);
 }
 
 .side-head__mask:focus-visible {

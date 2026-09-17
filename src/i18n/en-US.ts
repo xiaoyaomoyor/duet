@@ -525,6 +525,9 @@ export default {
     linkOnlyOption: 'Link only, do not download (faster, but may break on hotlink-protected hosts)',
     sizeLimit: 'Up to {size} per file',
     duration: 'Duration',
+    cover: 'Cover art',
+    coverHint:
+      'Uses the artwork embedded in the audio file by default; uploading one here overrides it, removing it restores the embedded art',
     error: {
       missing: 'Asset is missing — it may have been cleaned up',
       cors: 'The host does not allow cross-origin access (CORS). Please download and upload it manually',
@@ -708,8 +711,8 @@ export default {
     backgroundTint: 'Pattern color',
     tintAuto: 'Follow theme',
     backgroundInPresent: 'Keep background in present view',
-    backgroundInPresentHint:
-      'The background is an alignment aid while editing; finished output usually does not need it.',
+    backgroundBase: 'Background colour',
+    baseAuto: 'Follow theme',
     groupSpotlight: 'Spotlight',
     groupAnonymize: 'Anonymise',
     chainAnonymize: 'Linked masking',

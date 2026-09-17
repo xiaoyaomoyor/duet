@@ -75,29 +75,38 @@ const rootStyle = computed(() => {
     // 背景图案的变量在演示视图里也要有，否则"充满整页"铺不出来（见 pagePattern）
     '--bg-scale': `${scale}px`,
     '--bg-tint': layout.backgroundTint ?? '',
+    '--bg-base': layout.backgroundBase ?? '',
   }
 })
 
 const showAxis = computed(() => props.project.sheet.layout.showAxis)
 
 /**
- * 背景图案是否要铺满**整个演示屏幕**（v0.5.0）。
+ * 整页背景壁纸（v0.5.3 重做）。
  *
- * 两个条件都要满足：
- *   1. 填充形式选了"充满整页"
- *   2. 演示视图保留了背景图案（backgroundInPresent，默认关）
+ * 规则（用户原话）："「充满整页」要作为对比页的背景，但不会遮挡顶栏等内容，
+ * 只是壁纸"，而且**只要一种图案**。
  *
- * 用一层绝对定位的全屏图层来画，而不是给 .present__scroll 加背景：
- * 后者是滚动容器，背景会跟着内容一起滚（`background-attachment: local` 的
- * 默认行为），看起来就不是"整页铺满"而是"贴在内容上的一张壁纸"。
+ * 因此：
+ *   - 图案由**这一层**画；画布那边在"演示 + 充满整页"时不再画
+ *     （见 CompareCanvas 的 drawPattern）——两边都画就是两张图案叠在一起；
+ *   - 这一层固定定位、不跟随滚动：它是壁纸，不是贴在内容上的一张图；
+ *   - 它从顶栏**下面**开始铺（`--present-topbar-h`），所以不会盖住顶栏。
  */
 const pagePattern = computed(() => {
   const layout = props.project.sheet.layout
   if (layout.backgroundFill !== 'page') return false
-  if (layout.backgroundInPresent !== true) return false
   return layout.background === 'grid' || layout.background === 'dots'
 })
 
+/**
+ * 背景图案是否要铺满**整个演示屏幕**（v0.5.0 引入，v0.5.3 去掉多余条件）。
+ *
+ * 只要求"填充形式 = 充满整页"。**不再要求** `backgroundInPresent`：
+ * 那一项管的是"画布自己要不要画图案"（编辑期的对齐辅助），
+ * 而"充满整页"本身选的就是"我要一张铺满整个演示页的背景"——
+ * 两者叠加会让用户遇到"我明明选了充满整页却什么都没发生"。
+ */
 const patternClass = computed(() =>
   props.project.sheet.layout.background === 'dots' ? 'present__pattern--dots' : 'present__pattern--grid',
 )
@@ -345,6 +354,11 @@ defineExpose({ zoom, hasContent })
   transition: opacity var(--dur-slow) var(--ease-out);
 }
 
+/* 供整页背景壁纸定位用：它要从顶栏下面开始铺 */
+.present {
+  --present-topbar-h: var(--size-topbar);
+}
+
 .present__bar--hidden {
   opacity: 0;
   pointer-events: none;
@@ -472,7 +486,12 @@ defineExpose({ zoom, hasContent })
  */
 .present__pattern {
   position: fixed;
-  inset: 0;
+  /*
+   * 从顶栏**下面**开始铺（用户："不会遮挡顶栏等内容，只是壁纸"）。
+   * inset: 0 会让图案一直铺到屏幕最上沿，从顶栏的透明缝隙里透出来，
+   * 看起来像顶栏被"盖住"了。
+   */
+  inset: var(--present-topbar-h, 44px) 0 0 0;
   z-index: 0;
   pointer-events: none;
 }

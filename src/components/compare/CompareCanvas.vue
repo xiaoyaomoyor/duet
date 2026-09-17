@@ -156,20 +156,30 @@ const backgroundVars = computed(() => {
     // 留空 = 跟随主题（用各主题自己的 --border-* 色）
     '--bg-tint': layout.value.backgroundTint ?? '',
     '--bg-tint-fallback': 'var(--border-subtle)',
+    '--bg-base': layout.value.backgroundBase ?? '',
   }
 })
 
-/** 演示视图下是否保留背景图案（默认关：成稿要的是内容本身） */
+/** 演示视图下是否保留背景图案（默认关） */
 const showBackground = computed(() => !isReadonly.value || layout.value.backgroundInPresent === true)
 
 /**
  * 图案是否**充满整页**（而不只是铺在内容底下）。
  *
  * v0.5.0 改语义：此前这一项叫 solid，做的是"整页铺一层实心底色"，
- * 而用户要的是"网格/点阵充满整个对比页"。现在 page 的含义是
- * "图案一直铺到页面底部（演示时铺满整个屏幕）"。
+ * 而用户要的是"网格/点阵充满整个对比页"。
  */
 const pageFill = computed(() => layout.value.backgroundFill === 'page')
+
+/**
+ * 画布这里要不要画图案。
+ *
+ * 演示视图 + 充满整页 → **不画**：那一份交给遮罩层上的固定壁纸
+ * （它铺的是整个屏幕、不跟随滚动，且顶栏压在它上面）。
+ * 画布再画一份就是屏幕上同时出现两张图案——
+ * 用户实测反馈"存在了两种背景图案是错的"。
+ */
+const drawPattern = computed(() => showBackground.value && !(isReadonly.value && pageFill.value))
 
 const showRowNumbers = computed(() => layout.value.showRowNumbers === true)
 
@@ -398,7 +408,7 @@ function onDuplicateModule(ref: ModuleRef): void {
       class="canvas"
       :class="[
         backgroundClass,
-        { 'canvas--bg-hidden': !showBackground, 'canvas--bg-page': pageFill },
+        { 'canvas--bg-hidden': !drawPattern, 'canvas--bg-page': pageFill },
       ]"
       :style="[canvasStyle, backgroundVars]"
     >
@@ -514,6 +524,12 @@ function onDuplicateModule(ref: ModuleRef): void {
   position: relative; /* 中轴拖拽手柄的定位基准 */
   max-width: var(--canvas-max, 1440px);
   margin: 0 auto;
+  /*
+   * 背景底色（v0.5.3）。留空时这一层不生效，由外层容器的主题色负责——
+   * 用 background-color 而不是覆盖 background，图案仍由 .canvas--bg-* 画。
+   */
+  background-color: var(--bg-base, transparent);
+  border-radius: var(--radius-sm);
 }
 
 /*

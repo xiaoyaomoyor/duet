@@ -30,6 +30,11 @@ const definition: ModuleDefinition<Record<string, never>, Record<string, never>>
   defaultProps: {},
   options: [],
   editor: defineAsyncComponent(() => import('./TitleEditor.vue')),
+  /*
+   * 编辑器自己就是双列的（左工具列表、右名称与开关），因此要整幅宽度——
+   * 否则会被弹窗默认的双列布局挤成两条窄缝（用户实测反馈"优化编辑标题模块的窗口布局"）。
+   */
+  editorWide: true,
   renderer: defineAsyncComponent(() => import('./TitleRenderer.vue')),
   /**
    * **永远不算空**。

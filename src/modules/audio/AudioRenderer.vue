@@ -199,10 +199,12 @@ function togglePlay(): void {
 /**
  * 拖动进度。
  *
- * 引擎接管时**必须交给引擎**（`engine.seek`）：引擎每 250ms 采样一次、
- * 把两侧对齐到主轨，直接写 `el.currentTime` 会被下一次采样**拉回去**——
- * 表现就是"进度条拨不动"（其实拨动了，只是立刻被同步逻辑纠正回原处）。
- * 交给引擎既没有这个冲突，也与「音频控制台」的定位行为一致。
+ * 引擎接管时交给引擎的 `seekSide`（**只定位这一侧**）：
+ *   - 直接写 `el.currentTime` 会被下一次采样拉回去（引擎每 250ms 对齐一次），
+ *     表现就是"进度条拨不动"；
+ *   - 而用 `engine.seek()` 是整体定位，**另一侧的进度条会跟着跳**——
+ *     用户实测反馈"拖动进度条不应该一起变动"。
+ * `seekSide` 同时改写这一侧的偏移，因此对齐之后它仍停在用户放下的位置。
  *
  * 同时立刻更新本地 `currentMs`：不然要等下一个 `timeupdate` 才回填，
  * 拖动时手感会顿一下。
@@ -217,7 +219,7 @@ function onSeek(event: Event): void {
   const id = projectId?.value
   const engine = id ? getSyncEngine(id) : null
   if (engine?.isAttached) {
-    engine.seek(ms)
+    engine.seekSide(props.sideId, ms)
     return
   }
 
@@ -321,7 +323,18 @@ watch(
       背景用 CSS 变量下发而不是真的塞一个 <img>：
       这样它天然被裁切成正方形、且不会参与无障碍朗读（它只是装饰）。
     -->
-    <div v-if="audioProps.layout === 'square'" class="audio__backdrop" aria-hidden="true" />
+    <div
+      v-if="audioProps.layout === 'square'"
+      class="audio__backdrop"
+      :class="{ 'audio__backdrop--placeholder': !audioProps.showCover || !coverUrl }"
+      aria-hidden="true"
+    >
+      <!--
+        没有封面（或用户关掉了"显示封面"）时退回占位图标（用户要求）。
+        关掉封面不该得到一块空白方块——那看起来像加载失败。
+      -->
+      <AppIcon v-if="!audioProps.showCover || !coverUrl" name="music" :size="36" />
+    </div>
 
     <div class="audio__body">
       <!--
@@ -565,20 +578,18 @@ watch(
 }
 
 /*
- * 没有内嵌封面时的图标：做成右上角一枚**很淡的水印**。
- * 早先它铺满整块居中，结果与左下角的播放键叠在一起（截图核验时一眼看到）。
- * 挪到右上角之后，名称（左上）、播放键（左下）、总时间（右下）都不碰它。
+ * 没有内嵌封面时的图标：**居中**（用户第二次反馈"调整占位的音符的位置"）。
+ *
+ * 第一次我把它挪到右上角是为了躲开左下角的播放键——那时播放键还在
+ * 纵向流里、正好压在中间。现在播放键已经归到 `.cover__foot` 那一行，
+ * 中间整块都空着，占位图标回到正中才是它该在的位置。
  */
 .cover__img--placeholder {
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  inset: auto 4px auto auto;
-  width: auto;
-  height: auto;
-  padding: 2px;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
-  opacity: 0.55;
+  opacity: 0.75;
 }
 
 .cover__name,
@@ -660,15 +671,32 @@ watch(
   aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: var(--radius-md);
+  /* 居中（用户要求）：不写这一条它会贴在左侧，与长条布局的左对齐视觉不一致 */
+  margin-inline: auto;
+}
+
+/* 正方形布局下内容整体居中（名称、波形、播放条都对齐到中轴） */
+.audio--square .audio__body {
+  align-items: center;
+  text-align: center;
 }
 
 .audio__backdrop {
   position: absolute;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
   background-color: var(--accent-soft, var(--bg-surface-2));
   background-image: var(--audio-cover, none);
   background-position: center;
   background-size: cover;
+}
+
+/* 占位态：不铺封面图，只留品牌色底 + 一枚音符 */
+.audio__backdrop--placeholder {
+  background-image: none;
 }
 
 /*

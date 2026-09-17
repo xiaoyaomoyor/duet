@@ -132,6 +132,51 @@ test.describe('M4 同步播放', () => {
   })
 
   /**
+   * 回归：拖动一侧的进度条**不应该**把另一侧也拖走。
+   *
+   * 背景：引擎接管后直接写 `el.currentTime` 会被下一次对齐采样拉回去，
+   * 所以 M10 把模块的 seek 交给了 `engine.seek()`——那是**整体定位**，
+   * 两个音轨一起动。用户实测反馈"拖动进度条不应该一起变动"。
+   * 修法是 `engine.seekSide()`：只定位这一侧，并同时改写它的偏移量，
+   * 让对齐公式算出来的落点恰好就是用户放下的位置。
+   */
+  test('拖动一侧的进度条不会带动另一侧', async ({ page }) => {
+    await page.goto('/')
+    await createFromTemplate(page, /音乐对比/)
+    await importBothTracks(page)
+
+    const row = contentRows(page).nth(1)
+    const leftCell = row.locator('.canvas__cell').nth(0)
+    const rightCell = row.locator('.canvas__cell').nth(1)
+    const leftAudio = leftCell.locator('audio').first()
+    const rightAudio = rightCell.locator('audio').first()
+
+    const before = await rightAudio.evaluate((el) => (el as HTMLAudioElement).currentTime)
+
+    const seek = leftCell.locator('.player__seek')
+    await seek.scrollIntoViewIfNeeded()
+    const box = await seek.boundingBox()
+    expect(box).not.toBeNull()
+    if (!box) return
+
+    // 从 20% 拖到 80%
+    const y = box.y + box.height / 2
+    await page.mouse.move(box.x + box.width * 0.2, y)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width * 0.8, y, { steps: 8 })
+    await page.mouse.up()
+
+    // 左侧确实动了
+    await expect
+      .poll(() => leftAudio.evaluate((el) => (el as HTMLAudioElement).currentTime), { timeout: 5000 })
+      .toBeGreaterThan(1)
+
+    // 右侧**基本没动**（允许对齐带来的极小抖动）
+    const after = await rightAudio.evaluate((el) => (el as HTMLAudioElement).currentTime)
+    expect(Math.abs(after - before)).toBeLessThan(0.5)
+  })
+
+  /**
    * 回归：音频模块自研播放条的进度必须能用鼠标拖动。
    *
    * 这条来自实测反馈"进度条拨不动"。排查过程中踩到的第一个坑很值得记下来：

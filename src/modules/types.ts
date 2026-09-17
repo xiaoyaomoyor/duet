@@ -91,6 +91,15 @@ export interface ModuleDefinition<TData = unknown, TProps = Record<string, unkno
   options?: ModuleOption[]
   editor: Component
   renderer: Component
+  /**
+   * 编辑器需要整幅宽度（v0.5.3）。
+   *
+   * 模块编辑弹窗默认是双列（左内容、右标题与选项）。但有些模块的编辑器
+   * **自己就是双列的**——比如「标题」模块（左工具列表、右名称与开关）。
+   * 把双列塞进双列的一格里，两边都会被挤成窄缝。
+   * 声明这一项之后弹窗改用单列，把整幅宽度让给编辑器。
+   */
+  editorWide?: boolean
   /** 是否"未填写"：直接决定演示视图是否隐藏（§7.4） */
   isEmpty: (data: TData, props: TProps) => boolean
   /** 可选：导出长图前的准备（等待图片解码等） */

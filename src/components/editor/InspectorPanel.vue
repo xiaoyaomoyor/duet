@@ -341,6 +341,33 @@ const fontSizeMax = 64
           />
         </label>
 
+        <!--
+          背景底色（v0.5.3）。
+          与"图案颜色"是两件事：图案颜色画的是网格/点阵的线，
+          底色铺的是整块背景。之前只能调前者，于是想做"深色底 + 浅色网格"
+          这种搭配就没办法。
+        -->
+        <div class="field">
+          <span class="field__label">{{ t('inspector.backgroundBase') }}</span>
+          <div class="tint">
+            <button
+              class="tint__auto"
+              type="button"
+              :class="{ 'tint__auto--active': !layout.backgroundBase }"
+              @click="patch({ backgroundBase: undefined })"
+            >
+              {{ t('inspector.baseAuto') }}
+            </button>
+            <input
+              class="tint__input"
+              type="color"
+              :value="layout.backgroundBase ?? '#f4f2f8'"
+              :aria-label="t('inspector.backgroundBase')"
+              @input="patch({ backgroundBase: ($event.target as HTMLInputElement).value })"
+            />
+          </div>
+        </div>
+
         <div class="field">
           <span class="field__label">{{ t('inspector.backgroundTint') }}</span>
           <div class="tint">
@@ -370,7 +397,6 @@ const fontSizeMax = 64
             @change="patch({ backgroundInPresent: ($event.target as HTMLInputElement).checked })"
           />
         </label>
-        <p class="group__hint">{{ t('inspector.backgroundInPresentHint') }}</p>
       </section>
 
       <!-- ——————————————— 聚光灯 ——————————————— -->

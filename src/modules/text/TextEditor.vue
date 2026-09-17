@@ -17,9 +17,9 @@ const data = computed<TextData>(() => {
 })
 
 const alignOptions: Array<{ value: TextData['align']; icon: string; labelKey: string }> = [
-  { value: 'left', icon: 'text', labelKey: 'moduleOption.alignLeft' },
-  { value: 'center', icon: 'divider', labelKey: 'moduleOption.alignCenter' },
-  { value: 'right', icon: 'text', labelKey: 'moduleOption.alignRight' },
+  { value: 'left', icon: 'alignLeft', labelKey: 'moduleOption.alignLeft' },
+  { value: 'center', icon: 'alignCenter', labelKey: 'moduleOption.alignCenter' },
+  { value: 'right', icon: 'alignRight', labelKey: 'moduleOption.alignRight' },
 ]
 
 function setText(value: string): void {

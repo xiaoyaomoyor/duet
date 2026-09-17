@@ -17,6 +17,9 @@
 
 import {
   Activity,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   BetweenHorizontalStart,
   Box,
   Check,
@@ -94,6 +97,17 @@ export const ICONS: Record<string, LucideIcon> = {
    * 图标名与语义名是两个命名空间，同一个 Lucide 组件可以被多个语义名引用。
    */
   minus: Minus,
+  /*
+   * 文本对齐（v0.5.3）。
+   *
+   * 这三条此前借用别的图标——左对齐与右对齐都用 `text`、居中用 `divider`，
+   * 于是三个按钮里两个长得一模一样、另一个是一条横线
+   * （用户实测反馈"文字模块的左对齐，居中对齐，右对齐的图标有问题"）。
+   * 对齐有它自己的专用图标，没有理由借用。
+   */
+  alignLeft: AlignLeft,
+  alignCenter: AlignCenter,
+  alignRight: AlignRight,
   close: X,
   check: Check,
   search: Search,

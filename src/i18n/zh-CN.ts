@@ -519,6 +519,15 @@ export default {
     linkOnlyOption: '仅引用，不下载文件（更快，但可能受防盗链影响）',
     sizeLimit: '单个文件上限 {size}',
     duration: '时长',
+    /*
+     * 音频封面的覆盖入口（v0.5.0 加的）。
+     *
+     * 这两条当时**忘了加进语言包**，于是中文界面里直接显示出键名
+     * （`media.cover`）——用户实测反馈"中文界面的音频模块导入封面却是英文"。
+     * 教训：新增 t() 调用时必须同时补两个语言包，光看代码是看不出缺的。
+     */
+    cover: '封面',
+    coverHint: '默认使用音频内嵌的图片；在这里上传一张会覆盖它，移除即恢复内嵌封面',
     error: {
       missing: '资源不存在，可能已被清理',
       cors: '对方站点未开放跨域访问（CORS），无法读取。请下载后手动上传',
@@ -701,7 +710,14 @@ export default {
     backgroundTint: '图案颜色',
     tintAuto: '跟随主题',
     backgroundInPresent: '演示模式也显示背景',
-    backgroundInPresentHint: '背景在编辑器里是对齐辅助；成稿通常不需要它。',
+    /*
+     * 这句提示已经删掉（用户实测反馈）。
+     * 它写着"背景在编辑器里是对齐辅助；成稿通常不需要它"——
+     * 那是在替用户下结论。背景图案当然也可以当装饰用，
+     * 一个开关不需要附带一句"你其实不该开"。
+     */
+    backgroundBase: '背景底色',
+    baseAuto: '跟随主题',
     groupSpotlight: '聚光灯',
     groupAnonymize: '匿名',
     chainAnonymize: '连锁匿名',
