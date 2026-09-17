@@ -5,7 +5,7 @@ import { APP } from '@/app.config'
  * 路由（hash 模式）
  *
  * 选 hash 而非 history 的原因见 §5 T4：
- *   静态托管无需 fallback 配置，且 file:// 与 Tauri 打包后同样可用。
+ *   静态托管无需 fallback 配置，兼容 GitHub Pages 子路径。
  */
 export const router = createRouter({
   history: createWebHashHistory(),

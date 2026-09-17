@@ -6,6 +6,7 @@
  * 危险操作支持 requireText（要求用户输入指定文字才能确认），避免误点。
  */
 import { computed, ref, watch } from 'vue'
+import { useModalFocus } from '@/composables/useModalFocus'
 import { useI18n } from 'vue-i18n'
 import AppIcon from './AppIcon.vue'
 
@@ -41,9 +42,8 @@ const canConfirm = computed(
   () => !props.requireText || typed.value.trim() === props.requireText,
 )
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') emit('cancel')
-}
+const dialogRoot = ref<HTMLElement | null>(null)
+useModalFocus(dialogRoot, () => emit('cancel'))
 </script>
 
 <template>
@@ -53,15 +53,14 @@ function onKeydown(event: KeyboardEvent): void {
       class="dialog-mask"
       role="presentation"
       @click.self="emit('cancel')"
-      @keydown="onKeydown"
     >
       <div
+        ref="dialogRoot"
         class="dialog"
         role="alertdialog"
         aria-modal="true"
         :aria-label="title"
         tabindex="-1"
-        @keydown="onKeydown"
       >
         <header class="dialog__head">
           <AppIcon

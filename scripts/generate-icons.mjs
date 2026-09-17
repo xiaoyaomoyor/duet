@@ -3,7 +3,7 @@
  *
  * 为什么自己写而不是装 sharp / canvas：
  *   PWA 只需要三张**静态**图标，而 sharp 会带来几十 MB 的原生依赖，
- *   在 CI 与 Tauri 构建里都是负担。这里的图形很简单（圆角矩形 + 几个色块），
+ *   在 CI 与 Web 构建里都是负担。这里的图形很简单（圆角矩形 + 几个色块），
  *   用 4× 超采样手写光栅化 + 自己拼 PNG（Node 自带 zlib）就够了。
  *
  * 产物：
@@ -221,62 +221,6 @@ function encodePng(size, rgba) {
   ])
 }
 
-// —— ICO / ICNS 容器（Windows / macOS 桌面版需要） ——
-
-/**
- * 打包成 ICO。
- *
- * ICO 可以直接内嵌 PNG（Vista 起支持），因此不需要再写一套 BMP 编码：
- * 每个尺寸就是一份完整的 PNG 数据。
- * 宽/高字段为 0 表示 256（一个字节放不下 256）。
- */
-function encodeIco(entries) {
-  const header = Buffer.alloc(6)
-  header.writeUInt16LE(0, 0) // 保留位
-  header.writeUInt16LE(1, 2) // 类型：1 = 图标
-  header.writeUInt16LE(entries.length, 4)
-
-  const directory = Buffer.alloc(16 * entries.length)
-  let offset = header.length + directory.length
-
-  for (const [index, entry] of entries.entries()) {
-    const base = index * 16
-    directory[base] = entry.size >= 256 ? 0 : entry.size
-    directory[base + 1] = entry.size >= 256 ? 0 : entry.size
-    directory[base + 2] = 0 // 调色板数量（真彩为 0）
-    directory[base + 3] = 0 // 保留位
-    directory.writeUInt16LE(1, base + 4) // 颜色平面
-    directory.writeUInt16LE(32, base + 6) // 位深
-    directory.writeUInt32LE(entry.png.length, base + 8)
-    directory.writeUInt32LE(offset, base + 12)
-    offset += entry.png.length
-  }
-
-  return Buffer.concat([header, directory, ...entries.map((entry) => entry.png)])
-}
-
-/**
- * 打包成 ICNS。
- *
- * 容器同样简单：magic + 总长度，然后一串 (类型, 长度, 数据)。
- * 现代 macOS 接受 PNG 载荷，类型码决定系统在什么场合用它。
- */
-function encodeIcns(entries) {
-  const chunks = entries.map((entry) => {
-    const header = Buffer.alloc(8)
-    header.write(entry.type, 0, 4, 'ascii')
-    header.writeUInt32BE(entry.png.length + 8, 4)
-    return Buffer.concat([header, entry.png])
-  })
-
-  const body = Buffer.concat(chunks)
-  const head = Buffer.alloc(8)
-  head.write('icns', 0, 4, 'ascii')
-  head.writeUInt32BE(body.length + 8, 4)
-
-  return Buffer.concat([head, body])
-}
-
 // —— 入口 ——
 
 mkdirSync(OUT_DIR, { recursive: true })
@@ -295,54 +239,7 @@ for (const { file, size, inset } of targets) {
   console.log(`✓ public/icons/${file}  ${size}×${size}  ${kb(png)}`)
 }
 
-/**
- * Tauri 的图标（`tauri.conf.json` 的 bundle.icon 直接引用这些路径）。
- * 这里不做 maskable 内缩：桌面图标不需要为系统裁切留白。
- */
-const TAURI_DIR = resolve(ROOT, 'src-tauri/icons')
-mkdirSync(TAURI_DIR, { recursive: true })
-
-const tauriPngs = [
-  { file: '32x32.png', size: 32 },
-  { file: '128x128.png', size: 128 },
-  { file: '128x128@2x.png', size: 256 },
-  { file: 'icon.png', size: 512 },
-]
-
-const pngBySize = new Map()
-for (const { file, size } of tauriPngs) {
-  const png = encodePng(size, render(size, 0))
-  pngBySize.set(size, png)
-  writeFileSync(resolve(TAURI_DIR, file), png)
-  console.log(`✓ src-tauri/icons/${file}  ${size}×${size}  ${kb(png)}`)
-}
-
-// Windows：多尺寸 ICO，让任务栏/桌面/文件管理器各取所需
-const ico = encodeIco([
-  { size: 16, png: encodePng(16, render(16, 0)) },
-  { size: 32, png: pngBySize.get(32) },
-  { size: 48, png: encodePng(48, render(48, 0)) },
-  { size: 64, png: encodePng(64, render(64, 0)) },
-  { size: 128, png: pngBySize.get(128) },
-  { size: 256, png: pngBySize.get(256) },
-])
-writeFileSync(resolve(TAURI_DIR, 'icon.ico'), ico)
-console.log(`✓ src-tauri/icons/icon.ico  16/32/48/64/128/256  ${kb(ico)}`)
-
-// macOS：ICNS 的每个类型码对应系统的不同使用场景
-const icns = encodeIcns([
-  { type: 'ic11', png: encodePng(32, render(32, 0)) }, // 16@2x
-  { type: 'ic12', png: encodePng(64, render(64, 0)) }, // 32@2x
-  { type: 'ic07', png: pngBySize.get(128) }, // 128
-  { type: 'ic13', png: pngBySize.get(256) }, // 128@2x
-  { type: 'ic08', png: pngBySize.get(256) }, // 256
-  { type: 'ic14', png: pngBySize.get(512) }, // 256@2x
-  { type: 'ic09', png: pngBySize.get(512) }, // 512
-])
-writeFileSync(resolve(TAURI_DIR, 'icon.icns'), icns)
-console.log(`✓ src-tauri/icons/icon.icns  16→512  ${kb(icns)}`)
-
-console.log(`\n输出目录：\n  ${OUT_DIR}\n  ${TAURI_DIR}`)
+console.log(`输出目录：${OUT_DIR}`)
 
 function kb(buffer) {
   return `${(buffer.length / 1024).toFixed(1)} KB`

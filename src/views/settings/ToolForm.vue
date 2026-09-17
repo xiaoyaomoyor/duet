@@ -7,6 +7,7 @@
  * 也避免出现低对比度的脏色（§11.3）。
  */
 import { computed, ref, watch } from 'vue'
+import { useModalFocus } from '@/composables/useModalFocus'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import ToolIcon from '@/components/common/ToolIcon.vue'
@@ -162,9 +163,8 @@ async function resetBuiltin(): Promise<void> {
   emit('close')
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') emit('close')
-}
+const dialogRoot = ref<HTMLElement | null>(null)
+useModalFocus(dialogRoot, () => emit('close'))
 
 /** 供模板调用的预览名（未填时用占位） */
 const previewName = computed(() => name.value.trim() || t('tools.newTool'))
@@ -172,8 +172,8 @@ const previewName = computed(() => name.value.trim() || t('tools.newTool'))
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="mask" @click.self="emit('close')" @keydown="onKeydown">
-      <div class="form" role="dialog" aria-modal="true" :aria-label="isEdit ? t('tools.editTool') : t('tools.newTool')">
+    <div v-if="open" class="mask" @click.self="emit('close')">
+      <div ref="dialogRoot" class="form" role="dialog" aria-modal="true" :aria-label="isEdit ? t('tools.editTool') : t('tools.newTool')">
         <header class="form__head">
           <h2 class="form__title">{{ isEdit ? t('tools.editTool') : t('tools.newTool') }}</h2>
           <button class="form__close" type="button" :aria-label="t('common.close')" @click="emit('close')">

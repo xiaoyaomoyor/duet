@@ -6,7 +6,8 @@
  * 只展示**已在注册表登记**的模块；meta.ts 中规划中的模块以"规划中"标注并禁用，
  * 避免给出点了没反应的选项（诚实边界）。
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useModalFocus } from '@/composables/useModalFocus'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { groupModuleMeta, MODULE_META, moduleMaturity, type ModuleCategory } from '@/modules/meta'
@@ -33,6 +34,8 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const query = ref('')
+const dialogRoot = ref<HTMLElement | null>(null)
+useModalFocus(dialogRoot, () => emit('close'))
 
 watch(
   () => props.open,
@@ -105,35 +108,12 @@ function pick(type: string): void {
   emit('close')
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') emit('close')
-}
-
-/*
- * Esc 监听在 **window** 上，而不是挂在弹窗元素上。
- *
- * 这是本项目已经踩过两次的坑（模块编辑弹窗、工具卡片弹窗）：挂在元素上就要求
- * "焦点恰好在弹窗内部"，而自动聚焦有可能失败——一旦失败，Esc 完全失效、
- * 弹窗关不掉，而模态遮罩会留在页面上**拦截所有后续点击**，
- * 表现为"后面什么都点不动"（实测截图核验时就这样卡住过一次）。
- * 选择器是纯列表，没有需要保留焦点的输入状态，全局监听没有副作用。
- */
-watch(
-  () => props.open,
-  (open) => {
-    if (open) window.addEventListener('keydown', onKeydown)
-    else window.removeEventListener('keydown', onKeydown)
-  },
-  { immediate: true },
-)
-
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <Teleport to="body">
     <div v-if="open" class="mask" @click.self="emit('close')">
-      <div class="picker" role="dialog" aria-modal="true" :aria-label="t('picker.title')">
+      <div ref="dialogRoot" class="picker" role="dialog" aria-modal="true" :aria-label="t('picker.title')">
         <header class="picker__head">
           <h2 class="picker__title">{{ t('picker.title') }}</h2>
           <button class="picker__close" type="button" :aria-label="t('common.close')" @click="emit('close')">

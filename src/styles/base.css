@@ -269,6 +269,26 @@ ol {
   color: var(--text-muted);
 }
 
+.inline-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+/* 临时揭晓只属于当前演示；长图导出仍遵守持久匿名设置。 */
+[data-exporting] [data-export-mask] {
+  color: transparent !important;
+  text-shadow: none !important;
+  background: #18181b !important;
+}
+
+[data-exporting] [data-export-mask] * {
+  visibility: hidden !important;
+}
+
 .inline-editor__control,
 .inline-editor__area {
   width: 100%;
@@ -519,4 +539,3 @@ ol {
 .code-block__text {
   white-space: pre;
 }
-

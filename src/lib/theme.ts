@@ -174,15 +174,3 @@ export function __resetThemeForTests(): void {
   mediaQuery = null
   mediaListener = null
 }
-
-/** 平台标记：用于 CSS 与逻辑区分 Web / Tauri 桌面端 */
-export function applyPlatformFlags(): void {
-  const el = root()
-  if (!el) return
-
-  const isTauri =
-    typeof window !== 'undefined' &&
-    ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
-
-  el.dataset.platform = isTauri ? 'desktop' : 'web'
-}

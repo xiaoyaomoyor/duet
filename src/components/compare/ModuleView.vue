@@ -13,7 +13,7 @@
  *   - 本组件只负责"一个模块长什么样"，不管空模块占位、按钮、拖拽。
  *   - 空模块的占位与"点击填写"属于编辑态专属，放在 ModuleCard 里。
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getModule } from '@/modules/registry'
 import type { ModuleInstance, SideId } from '@/types/project'
@@ -37,6 +37,7 @@ const props = defineProps<{
 const { t } = useI18n()
 
 const definition = computed(() => getModule(props.module.type))
+const renderPending = ref(false)
 
 /**
  * 是否显示标题。
@@ -57,6 +58,7 @@ const headless = computed(() => definition.value?.headless === true)
 <template>
   <section
     class="module-view"
+    :data-render-pending="renderPending || undefined"
     :class="{ 'module-view--headless': headless }"
     :style="{ '--accent': accent }"
   >
@@ -77,14 +79,15 @@ const headless = computed(() => definition.value?.headless === true)
       同一个信息出现两条 DOM 路径，两边样式与测试都会各自漂移。
     -->
     <slot name="body">
-      <component
-        :is="definition?.renderer"
-        v-if="definition"
-        :module="module"
-        :side-id="sideId"
-        :accent="accent"
-        :readonly="readonly === true"
-      />
+      <Suspense v-if="definition" @pending="renderPending = true" @resolve="renderPending = false">
+        <component
+          :is="definition.renderer"
+          :module="module"
+          :side-id="sideId"
+          :accent="accent"
+          :readonly="readonly === true"
+        />
+      </Suspense>
 
       <!-- 注册表里没有这个类型：多半是旧文件用了新版本才有的模块，如实说明而不是空白 -->
       <p v-else class="module-view__unknown">

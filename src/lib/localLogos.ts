@@ -49,7 +49,7 @@ export function loadLocalLogos(): Promise<Record<string, LocalLogoEntry>> {
 
   pending = (async () => {
     try {
-      // 相对路径：应用可能跑在子路径下（GitHub Pages / file:// / Tauri）
+      // 相对路径：应用可能跑在子路径下（GitHub Pages）
       const url = new URL('brand-local/manifest.json', document.baseURI).href
       const response = await fetch(url, { cache: 'no-store' })
       if (!response.ok) {

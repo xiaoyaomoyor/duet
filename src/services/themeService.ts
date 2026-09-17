@@ -1,12 +1,12 @@
 /**
  * 主题服务
  *
- * 职责：把设置映射到 DOM，并对外提供平台能力探测。
+ * 职责：把设置映射到 DOM，并提供存储能力与版本信息。
  * 纯 DOM 操作集中在 lib/theme.ts，本文件只做编排与对外接口。
  */
 
 import { APP } from '@/app.config'
-import { applyThemeSettings, applyPlatformFlags } from '@/lib/theme'
+import { applyThemeSettings } from '@/lib/theme'
 import type { AppSettings } from '@/types'
 
 /** 应用全部主题相关设置（语言、主题、动效、侧栏宽度） */
@@ -17,17 +17,6 @@ export function applySettings(settings: AppSettings): void {
     reducedMotion: settings.reducedMotion,
     sidebarWidth: settings.sidebarWidth,
   })
-}
-
-/** 启动时初始化平台标记（web / desktop） */
-export function initPlatform(): void {
-  applyPlatformFlags()
-}
-
-/** 是否运行在 Tauri 桌面壳中（影响外链媒体与原生文件读写策略，§8.5） */
-export function isDesktop(): boolean {
-  if (typeof window === 'undefined') return false
-  return '__TAURI_INTERNALS__' in window || '__TAURI__' in window
 }
 
 /** 系统是否要求减少动效 */

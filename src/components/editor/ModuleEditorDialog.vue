@@ -20,7 +20,8 @@
  *   3. 模块自己的编辑器保持**整宽**不参与并排——图集、参数表、代码对比
  *      这类编辑器都需要横向空间，挤成半屏只会让人更想滚。
  */
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useModalFocus } from '@/composables/useModalFocus'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { getModule } from '@/modules/registry'
@@ -62,7 +63,8 @@ function toggleSection(key: keyof typeof sections): void {
 
 /** 标题用本地草稿 + 失焦提交：避免每敲一个字都进一次撤销栈 */
 const titleDraft = ref('')
-const titleInput = ref<HTMLInputElement | null>(null)
+const dialogRoot = ref<HTMLElement | null>(null)
+useModalFocus(dialogRoot, close)
 
 watch(
   () => [props.open, props.module.title] as const,
@@ -70,13 +72,6 @@ watch(
     if (open) titleDraft.value = props.module.title
   },
   { immediate: true },
-)
-
-watch(
-  () => props.open,
-  (open) => {
-    if (open) void Promise.resolve().then(() => titleInput.value?.focus())
-  },
 )
 
 function commitTitle(): void {
@@ -92,39 +87,17 @@ function forwardProps(patch: Record<string, unknown>): void {
   emit('patchProps', patch)
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    // 先提交标题再关闭，否则用户刚敲的标题会被丢掉
-    commitTitle()
-    emit('close')
-  }
+function close(): void {
+  commitTitle()
+  emit('close')
 }
-
-/*
- * Esc 关窗监听在 **window** 上，而不是挂在弹窗元素上。
- *
- * 挂在元素上的话，只有"焦点恰好在弹窗内部"时才能收到事件；
- * 而自动聚焦有可能失败（元素刚渲染、浏览器拒绝、用户点了别处），
- * 一旦失败，Esc 就完全失效——弹窗关不掉，模态遮罩留在页面上
- * **拦截所有后续点击**，表现为"后面什么都点不动"。
- * 这个坑在 E2E 里被放大成了十几个看似无关的失败。
- */
-watch(
-  () => props.open,
-  (open) => {
-    if (open) window.addEventListener('keydown', onKeydown)
-    else window.removeEventListener('keydown', onKeydown)
-  },
-  { immediate: true },
-)
-
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="mask" role="presentation" @click.self="emit('close')">
+    <div v-if="open" class="mask" role="presentation" @click.self="close">
       <div
+        ref="dialogRoot"
         class="editor-dialog"
         role="dialog"
         aria-modal="true"
@@ -177,7 +150,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               <label class="field">
                 <span class="field__label">{{ t('module.titleLabel') }}</span>
                 <input
-                  ref="titleInput"
+                  data-modal-autofocus
                   v-model="titleDraft"
                   class="field__control dialog__title-input"
                   type="text"

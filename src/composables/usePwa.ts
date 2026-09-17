@@ -37,7 +37,7 @@ let deferredPrompt: BeforeInstallPromptEvent | null = null
 let updateServiceWorker: ((reload?: boolean) => Promise<void>) | null = null
 let started = false
 
-/** 是否以独立窗口运行（已安装的 PWA / Tauri） */
+/** 是否以独立窗口运行（已安装的 PWA） */
 function detectStandalone(): boolean {
   if (typeof window === 'undefined') return false
   if (window.matchMedia?.('(display-mode: standalone)').matches) return true

@@ -23,6 +23,13 @@ import { onUnmounted, reactive, shallowRef, toValue, watch, type MaybeRefOrGette
 import { resolveMedia, type MediaError } from '@/services/mediaResolver'
 import type { MediaSource } from '@/types/project'
 
+const pendingResolutions = new Set<Promise<void>>()
+
+/** 导出须等 IndexedDB 媒体解析完成，不能只等待固定帧数。 */
+export async function waitForMediaResolutions(): Promise<void> {
+  while (pendingResolutions.size) await Promise.all([...pendingResolutions])
+}
+
 export interface ResolvedMedia {
   /** 可直接放进 <img src> / <audio src>；未就绪时为 null */
   src: string | null
@@ -54,6 +61,7 @@ export function useResolvedMedia(
   const retryTick = shallowRef(0)
 
   async function run(): Promise<void> {
+    const currentToken = ++token
     const current = toValue(source)
 
     if (!current) {
@@ -63,7 +71,6 @@ export function useResolvedMedia(
       return
     }
 
-    const currentToken = ++token
     state.status = 'loading'
     state.error = undefined
 
@@ -78,7 +85,12 @@ export function useResolvedMedia(
 
   watch(
     () => `${sourceKey(toValue(source))}#${retryTick.value}`,
-    () => void run(),
+    () => {
+      const task = run()
+      pendingResolutions.add(task)
+      const finish = (): void => { pendingResolutions.delete(task) }
+      void task.then(finish, finish)
+    },
     { immediate: true },
   )
 

@@ -4,7 +4,6 @@ import App from './App.vue'
 import { router } from './router'
 import { i18n } from './i18n'
 import { useSettingsStore } from './stores/useSettingsStore'
-import { applyPlatformFlags } from './lib/theme'
 import { APP } from './app.config'
 
 /**
@@ -33,8 +32,6 @@ async function boot(): Promise<void> {
   app.use(pinia)
   app.use(router)
   app.use(i18n)
-
-  applyPlatformFlags()
 
   // 设置存于 IndexedDB，必须在挂载前完成，否则会先渲染默认主题再跳变
   const settings = useSettingsStore(pinia)

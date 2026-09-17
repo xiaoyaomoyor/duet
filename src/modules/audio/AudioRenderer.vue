@@ -321,7 +321,7 @@ watch(
 <template>
   <div
     class="audio"
-    :class="[`audio--${audioProps.layout}`, { 'audio--playing': playing }]"
+    :class="[`audio--${audioProps.layout}`, { 'audio--playing': playing, 'audio--no-cover': !audioProps.showCover }]"
     :style="squareStyle"
   >
     <!--
@@ -426,7 +426,7 @@ watch(
       -->
       <div v-if="audioProps.showPlayer" class="player">
         <button
-          v-if="audioProps.layout === 'square'"
+          v-if="audioProps.layout === 'square' || !audioProps.showCover"
           class="player__play player__play--inline"
           type="button"
           :title="playing ? t('audio.pause') : t('audio.play')"
@@ -551,6 +551,22 @@ watch(
  */
 .audio--bar .audio__info {
   display: none;
+}
+
+.audio--bar.audio--no-cover .audio__body {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+}
+
+.audio--bar.audio--no-cover .audio__body > .audio__info,
+.audio--bar.audio--no-cover .audio__body > .wave,
+.audio--bar.audio--no-cover .audio__body > .player {
+  grid-column: 1;
+  grid-row: auto;
+}
+
+.audio--bar.audio--no-cover .audio__info {
+  display: flex;
 }
 
 /*

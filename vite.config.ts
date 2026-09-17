@@ -78,7 +78,7 @@ export default defineConfig({
     },
   },
 
-  // 相对基址：同时兼容 GitHub Pages 子路径、file:// 与 Tauri 打包
+  // 相对基址：兼容 GitHub Pages 等子路径静态托管
   base: './',
 
   server: {

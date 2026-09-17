@@ -90,7 +90,8 @@ export function createFieldEditor(fields: readonly FieldSpec[]): Component {
                   type: 'checkbox',
                   checked: value === true,
                   disabled: props.readonly,
-                  onChange: (event: Event) => write(field.key, (event.target as HTMLInputElement).checked),
+                  onChange: (event: Event) =>
+                    write(field.key, (event.target as HTMLInputElement).checked),
                 }),
                 h('span', labelOf(field)),
               ])
@@ -112,39 +113,51 @@ export function createFieldEditor(fields: readonly FieldSpec[]): Component {
                     },
                   },
                   (field.options ?? []).map((option) =>
-                    h('option', { value: String(option.value) }, option.labelKey),
+                    h('option', { value: String(option.value) }, translate(option.labelKey)),
                   ),
                 ),
               ])
             }
 
             if (field.type === 'textarea') {
-              return h('textarea', {
-                key: field.key,
-                class: ['inline-editor__area', field.mono ? 'inline-editor__area--mono' : ''],
-                rows: field.rows ?? 3,
-                disabled: props.readonly,
-                placeholder: field.placeholderKey ?? '',
-                value: typeof value === 'string' ? value : '',
-                onInput: (event: Event) => write(field.key, (event.target as HTMLTextAreaElement).value),
-              })
+              return h('label', { class: 'inline-editor__field', key: field.key }, [
+                h('span', labelOf(field)),
+                h('textarea', {
+                  key: field.key,
+                  class: ['inline-editor__area', field.mono ? 'inline-editor__area--mono' : ''],
+                  rows: field.rows ?? 3,
+                  disabled: props.readonly,
+                  placeholder: field.placeholderKey ? translate(field.placeholderKey) : '',
+                  value: typeof value === 'string' ? value : '',
+                  onInput: (event: Event) =>
+                    write(field.key, (event.target as HTMLTextAreaElement).value),
+                }),
+              ])
             }
 
-            return h('input', {
-              key: field.key,
-              class: 'inline-editor__control',
-              type: field.type === 'number' ? 'number' : 'text',
-              min: field.min,
-              max: field.max,
-              step: field.step ?? 1,
-              disabled: props.readonly,
-              placeholder: field.placeholderKey ?? '',
-              value: field.type === 'number' ? String(value ?? '') : typeof value === 'string' ? value : '',
-              onInput: (event: Event) => {
-                const raw = (event.target as HTMLInputElement).value
-                write(field.key, field.type === 'number' ? parseNumber(raw) : raw)
-              },
-            })
+            return h('label', { class: 'inline-editor__field', key: field.key }, [
+              h('span', labelOf(field)),
+              h('input', {
+                key: field.key,
+                class: 'inline-editor__control',
+                type: field.type === 'number' ? 'number' : 'text',
+                min: field.min,
+                max: field.max,
+                step: field.step ?? 1,
+                disabled: props.readonly,
+                placeholder: field.placeholderKey ? translate(field.placeholderKey) : '',
+                value:
+                  field.type === 'number'
+                    ? String(value ?? '')
+                    : typeof value === 'string'
+                      ? value
+                      : '',
+                onInput: (event: Event) => {
+                  const raw = (event.target as HTMLInputElement).value
+                  write(field.key, field.type === 'number' ? parseNumber(raw) : raw)
+                },
+              }),
+            ])
           }),
         )
     },

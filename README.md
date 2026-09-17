@@ -83,7 +83,7 @@ npm run test           # 单元测试（Vitest）
 npm run test:e2e       # 端到端测试（Playwright）
 npm run check          # 编码 + 类型 + 对比度 + Lint + 单测，一次跑全
 npm run build          # 生产构建（含 PWA 产物与首屏体积校验）
-npm run icons          # 重新生成 PWA 与桌面版图标
+npm run icons          # 重新生成 PWA 图标
 ```
 
 首次运行 E2E 需要安装浏览器：
@@ -95,7 +95,10 @@ npx playwright install chromium
 ### Web 与 PWA
 
 **桌面版已停止开发，后续专注 Web 应用与 PWA。**
-现存 `src-tauri/` 和平台桥接代码是尚待清理的历史实现，不作为支持的分发版本。
+v0.5.8（R0）已移除 `src-tauri/`、原生平台桥接与桌面图标构建路径。
+
+R0 同时修复了隐藏封面后的播放、只读网页的布局／主题／媒体、匿名导出、字段标签和弹窗焦点。
+实施范围与验证结果见 [R0 验收记录](docs/03-R0验收记录.md)。
 浏览器内可选择或拖入本地素材、下载工程文件；远程素材读取失败时，请先下载再导入。
 
 升级方向与分阶段范围见 [Web 体验升级规划](docs/02-Web体验升级规划.md)。

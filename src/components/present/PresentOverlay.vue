@@ -167,6 +167,7 @@ watch(isFullscreen, (full) => {
 })
 
 function onKeydown(event: KeyboardEvent): void {
+  if (document.querySelector('[aria-modal="true"]')) return
   switch (event.key) {
     case 'Escape':
       exit()

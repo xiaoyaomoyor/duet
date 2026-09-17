@@ -5,7 +5,8 @@
  * 用于"从外链导入媒体"等需要一段文本输入的场景。
  * 比 window.prompt 可靠：可校验、可显示错误、可带附加选项。
  */
-import { ref, watch } from 'vue'
+import { ref, useId, watch } from 'vue'
+import { useModalFocus } from '@/composables/useModalFocus'
 import { useI18n } from 'vue-i18n'
 import AppIcon from './AppIcon.vue'
 
@@ -50,29 +51,29 @@ function confirm(): void {
   emit('confirm', trimmed, checked.value)
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') emit('cancel')
-  if (event.key === 'Enter') confirm()
-}
+const inputId = useId()
+const dialogRoot = ref<HTMLElement | null>(null)
+useModalFocus(dialogRoot, () => emit('cancel'))
 </script>
 
 <template>
   <Teleport to="body">
     <div v-if="open" class="mask" @click.self="emit('cancel')">
-      <div class="prompt" role="dialog" aria-modal="true" :aria-label="title" @keydown="onKeydown">
+      <div ref="dialogRoot" class="prompt" role="dialog" aria-modal="true" :aria-label="title">
         <header class="prompt__head">
           <AppIcon name="link" :size="16" class="prompt__icon" />
           <h2 class="prompt__title">{{ title }}</h2>
         </header>
 
-        <label v-if="label" class="prompt__label">{{ label }}</label>
+        <label v-if="label" :for="inputId" class="prompt__label">{{ label }}</label>
         <input
+          :id="inputId"
           v-model="value"
           class="prompt__input"
           type="text"
           autofocus
           :placeholder="placeholder"
-          @keydown.enter.prevent="confirm"
+          @keydown.enter.prevent="!$event.isComposing && confirm()"
         />
 
         <label v-if="checkboxLabel" class="prompt__check">

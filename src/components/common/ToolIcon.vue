@@ -21,13 +21,15 @@
  *   顺带解决了两件事：文件里的填色不再重要（重新抓取换了颜色也不会坏），
  *   以及不必再为"给图标垫一层底"而内缩。
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { proceduralIconDataUri } from '@/lib/icons'
-import { getAsset } from '@/db/assetsRepo'
+import { assetSource, useResolvedMedia } from '@/composables/useResolvedMedia'
 import { loadLocalLogos, localLogoUrl } from '@/lib/localLogos'
 
 interface Props {
   name: string
+  /** 可与图形来源名称分开，避免匿名名称从 alt / title 泄露。 */
+  label?: string
   /**
    * 可选属性显式允许 undefined：
    * 模板中常写 `:color="tool.color"`，而该值可能为 undefined；
@@ -43,7 +45,8 @@ interface Props {
 const props = defineProps<Props>()
 
 /** 自定义图标的 blob URL（上传图标才有） */
-const customUrl = ref<string | null>(null)
+const media = useResolvedMedia(() => assetSource(props.iconAssetId))
+const customUrl = computed(() => media.src)
 /** 本地品牌 LOGO 是否就绪（清单读完前先按程序化图标渲染，避免闪烁） */
 const logosReady = ref(false)
 
@@ -51,21 +54,6 @@ onMounted(async () => {
   await loadLocalLogos()
   logosReady.value = true
 })
-
-watch(
-  () => props.iconAssetId,
-  async (assetId, previous) => {
-    if (previous && customUrl.value) {
-      URL.revokeObjectURL(customUrl.value)
-      customUrl.value = null
-    }
-    if (!assetId) return
-
-    const asset = await getAsset(assetId)
-    if (asset) customUrl.value = URL.createObjectURL(asset.blob)
-  },
-  { immediate: true },
-)
 
 const fallbackSrc = computed(() => {
   const options = props.color !== undefined ? { color: props.color } : {}
@@ -77,7 +65,7 @@ const brandLogo = computed(() => (logosReady.value ? localLogoUrl(props.logoKey)
 
 /** 用户上传的图标优先于品牌 LOGO；两者都没有才走程序化图标 */
 const src = computed(() => customUrl.value ?? fallbackSrc.value)
-const label = computed(() => props.name)
+const label = computed(() => props.label ?? props.name)
 const size = computed(() => props.size ?? 32)
 
 /** 是否正在显示本地品牌 LOGO（决定用 mask 渲染还是 img 渲染） */
@@ -159,4 +147,3 @@ const brandStyle = computed(() => {
   border-radius: 22%;
 }
 </style>
-

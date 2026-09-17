@@ -48,6 +48,7 @@ export function useGlobalShortcuts(): void {
   const ui = useUiStore()
 
   function onKeydown(event: KeyboardEvent): void {
+    if (hasOpenModal()) return
     const mod = event.ctrlKey || event.metaKey
     if (!mod || event.altKey) return
 

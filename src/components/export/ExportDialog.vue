@@ -10,7 +10,8 @@
  *   1. 导出必须有进度与失败原因（点完没反应是最差的体验）
  *   2. 视图切换必须成对出现（finally 里还原），否则用户会发现界面莫名其妙变了
  */
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { useModalFocus } from '@/composables/useModalFocus'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -18,7 +19,9 @@ import { useUiStore } from '@/stores/useUiStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { duetFileName, exportDuet } from '@/services/exportService'
 import { exportElementToPng } from '@/services/imageExport'
-import { collectDocumentCss, exportReadonlyHtml } from '@/services/htmlExport'
+import { exportReadonlyHtml } from '@/services/htmlExport'
+import { waitForMediaResolutions } from '@/composables/useResolvedMedia'
+import { loadLocalLogos } from '@/lib/localLogos'
 import { downloadBlob, downloadText } from '@/lib/download'
 
 const props = defineProps<{ open: boolean }>()
@@ -85,7 +88,18 @@ async function inPresentView<T>(fn: (root: HTMLElement) => Promise<T>): Promise<
       warnings.value = [...warnings.value, t('export.failed', { message: '未找到展示区域' })]
       return null
     }
+    const started = performance.now()
+    while (root.querySelector('[data-render-pending]')) {
+      if (performance.now() - started > 15000) throw new Error('展示模块尚未加载完成，请重试')
+      await nextFrames(1)
+    }
+    await Promise.all([waitForMediaResolutions(), loadLocalLogos()])
+    await nextTick()
+    await nextFrames(1)
     return await fn(root)
+  } catch (error) {
+    warnings.value = [t('export.failed', { message: error instanceof Error ? error.message : String(error) })]
+    return null
   } finally {
     if (needsSwitch) store.setMode('edit')
   }
@@ -172,14 +186,10 @@ async function doExportHtml(): Promise<void> {
   warnings.value = []
   progress.value = t('export.exporting')
   try {
-    // 样式在切换视图**之前**收集：切视图可能让部分样式表规则暂时不可读
-    const css = collectDocumentCss()
-
     const result = await inPresentView(async (root) =>
       exportReadonlyHtml(current, {
         embedMedia: embedMedia.value,
         presentRoot: root,
-        preCollectedCss: css,
         onProgress: (label) => {
           progress.value = label
         },
@@ -205,12 +215,14 @@ function close(): void {
   if (busy.value) return
   emit('close')
 }
+const dialogRoot = ref<HTMLElement | null>(null)
+useModalFocus(dialogRoot, close)
 </script>
 
 <template>
   <Teleport to="body">
     <div v-if="open" class="mask" @click.self="close">
-      <div class="dialog" role="dialog" aria-modal="true" :aria-label="t('export.title')">
+      <div ref="dialogRoot" class="dialog" role="dialog" aria-modal="true" :aria-label="t('export.title')">
         <header class="dialog__head">
           <h2 class="dialog__title">{{ t('export.title') }}</h2>
           <button

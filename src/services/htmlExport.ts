@@ -20,6 +20,7 @@ import { err, ok, type Result } from '@/lib/result'
 import { isPresentable } from '@/modules/visibility'
 import { getModuleMeta } from '@/modules/meta'
 import type { Project } from '@/types/project'
+import { t } from '@/i18n/helper'
 
 export interface ExportHtmlOptions {
   /** 是否内嵌媒体（默认 true，小于上限的文件才内嵌） */
@@ -29,9 +30,7 @@ export interface ExportHtmlOptions {
   /** 由调用方提供的"已就绪的展示态 DOM"（避免这里再造一套渲染） */
   presentRoot: HTMLElement
   /**
-   * 调用方预先收集好的 CSS。
-   * 为什么要在外面收集：导出会临时切换视图，切换期间部分样式表规则可能读不到；
-   * 由调用方在切换前收集更可靠。
+   * 可选的补充 CSS；展示 DOM 就绪后仍会收集当前样式。
    */
   preCollectedCss?: string
   onProgress?: (label: string) => void
@@ -52,7 +51,8 @@ export async function exportReadonlyHtml(
 
   try {
     options.onProgress?.('整理样式…')
-    const css = options.preCollectedCss ?? collectDocumentCss()
+    // 展示组件可能刚刚异步加载；必须在展示 DOM 就绪后再补收一遍样式。
+    const css = [options.preCollectedCss, collectDocumentCss()].filter(Boolean).join('\n')
 
     options.onProgress?.('内嵌媒体…')
     const { html: bodyHtml, warnings } = await serializePresentRoot(options.presentRoot, {
@@ -62,7 +62,15 @@ export async function exportReadonlyHtml(
 
     options.onProgress?.('生成文件…')
     const title = project.title || '对奏'
-    const document = buildDocument({ title, css, bodyHtml, warnings, project })
+    const embeddedCss = await inlineCssUrls(css, { embedMedia, embedLimit }, warnings)
+    const document = buildDocument({
+      title,
+      css: embeddedCss,
+      bodyHtml,
+      warnings,
+      project,
+      root: options.presentRoot,
+    })
 
     return ok(document)
   } catch (error) {
@@ -90,7 +98,7 @@ export function collectDocumentCss(): string {
  *
  * 处理要点：
  *   - blob: URL 在别的文档里无效 → 必须换成 data URI
- *   - 去掉 Vue 的 data-v-* 属性（无意义且让文件变大）
+ *   - 保留 Vue 的 data-v-* 属性，作用域样式依赖这些选择器
  *   - 去掉交互残留（按钮、输入框），保证"只读"是结构性的
  */
 async function serializePresentRoot(
@@ -99,6 +107,37 @@ async function serializePresentRoot(
 ): Promise<{ html: string; warnings: string[] }> {
   const clone = root.cloneNode(true) as HTMLElement
   const warnings: string[] = []
+
+  // 画布会继承演示容器的变量；脱离容器后仍应保持同样的尺寸和配色。
+  const computed = getComputedStyle(root)
+  for (const property of Array.from(computed)) {
+    if (property.startsWith('--'))
+      clone.style.setProperty(property, computed.getPropertyValue(property))
+  }
+  clone.style.zoom = '1'
+  const wallpaper = root.closest('.present')?.querySelector<HTMLElement>('.present__pattern')
+  if (wallpaper) {
+    const style = getComputedStyle(wallpaper)
+    clone.style.backgroundImage = style.backgroundImage
+    clone.style.backgroundSize = style.backgroundSize
+    clone.style.backgroundColor = style.backgroundColor
+  }
+
+  // 不保存临时揭晓的真实身份；保留同样的版式与遮罩，而非删掉整个标题。
+  for (const node of clone.querySelectorAll<HTMLElement>('[data-export-mask]')) {
+    node.textContent = node.dataset.exportMask === 'icon' ? '' : (node.dataset.exportLabel ?? '•••')
+    node.removeAttribute('title')
+    node.removeAttribute('aria-label')
+    node.classList.add(
+      node.dataset.exportMask === 'icon' ? 'side-head__logo--masked' : 'side-head__mask--hidden',
+    )
+    const replacement = document.createElement('span')
+    for (const attr of Array.from(node.attributes)) {
+      if (!['type', 'tabindex'].includes(attr.name)) replacement.setAttribute(attr.name, attr.value)
+    }
+    replacement.textContent = node.textContent
+    node.replaceWith(replacement)
+  }
 
   // 清掉所有可交互元素：只读页不应该有任何能点出行为的东西
   for (const selector of ['button', 'input', 'textarea', 'select', '.no-export']) {
@@ -112,16 +151,29 @@ async function serializePresentRoot(
     }
   }
 
+  // 只读文件没有 Vue 事件，原生播放器是可离线工作的播放入口。
+  for (const media of clone.querySelectorAll<HTMLMediaElement>('audio, video')) {
+    media.controls = true
+    media.removeAttribute('autoplay')
+    media.removeAttribute('hidden')
+    media.classList.add('duet-export-media')
+    if (media.tagName === 'AUDIO') {
+      const audio = media.closest('.audio')
+      audio?.querySelector('.player')?.remove()
+      audio?.querySelector('.audio__body')?.append(media)
+    }
+  }
+
   // blob: → data URL
-  const mediaNodes = Array.from(clone.querySelectorAll<HTMLMediaElement | HTMLImageElement>('img, audio, video, source'))
+  const mediaNodes = Array.from(
+    clone.querySelectorAll<HTMLMediaElement | HTMLImageElement>('img, audio, video, source'),
+  )
   for (const node of mediaNodes) {
     const src = node.getAttribute('src')
     if (!src) continue
 
     if (src.startsWith('blob:')) {
-      const inlined = options.embedMedia
-        ? await blobUrlToDataUrl(src, options.embedLimit)
-        : null
+      const inlined = options.embedMedia ? await blobUrlToDataUrl(src, options.embedLimit) : null
       if (inlined) {
         node.setAttribute('src', inlined)
       } else {
@@ -131,25 +183,67 @@ async function serializePresentRoot(
       continue
     }
 
-    if (/^https?:/i.test(src)) {
+    if (!/^(data:|#)/i.test(src)) {
+      // 本地品牌图片的相对 URL 也必须内嵌，否则 file:// 打开会丢图。
+      const absolute = new URL(src, document.baseURI).href
+      const embedded = options.embedMedia
+        ? await blobUrlToDataUrl(absolute, options.embedLimit)
+        : null
+      node.setAttribute('src', embedded ?? absolute)
+      if (embedded) continue
       warnings.push('只读页包含外链媒体，对方打开时需要联网；若对方站点有防盗链则可能加载失败')
     }
   }
 
-  // 清掉 Vue 的 scope 属性
-  for (const node of Array.from(clone.querySelectorAll('*'))) {
-    for (const attr of Array.from(node.attributes)) {
-      if (attr.name.startsWith('data-v-')) node.removeAttribute(attr.name)
-    }
+  for (const node of [clone, ...clone.querySelectorAll<HTMLElement>('[style]')]) {
+    node.setAttribute(
+      'style',
+      await inlineCssUrls(node.getAttribute('style') ?? '', options, warnings),
+    )
+  }
+  for (const video of clone.querySelectorAll('video[poster]')) {
+    const url = new URL(video.getAttribute('poster')!, document.baseURI).href
+    const embedded = options.embedMedia ? await blobUrlToDataUrl(url, options.embedLimit) : null
+    if (embedded) video.setAttribute('poster', embedded)
+    else if (url.startsWith('blob:')) video.removeAttribute('poster')
+    else video.setAttribute('poster', url)
   }
 
-  return { html: clone.innerHTML, warnings: [...new Set(warnings)] }
+  return { html: clone.outerHTML, warnings: [...new Set(warnings)] }
+}
+
+async function inlineCssUrls(
+  css: string,
+  options: { embedMedia: boolean; embedLimit: number },
+  warnings: string[],
+): Promise<string> {
+  const urls = new Map<string, string>()
+  for (const match of css.matchAll(/url\(\s*(['"]?)(.*?)\1\s*\)/g)) {
+    const src = match[2]?.trim()
+    if (!src || /^(data:|#)/i.test(src) || urls.has(match[0])) continue
+    const absolute = new URL(src, document.baseURI).href
+    const embedded = options.embedMedia
+      ? await blobUrlToDataUrl(absolute, options.embedLimit)
+      : null
+    urls.set(
+      match[0],
+      embedded
+        ? `url("${embedded}")`
+        : absolute.startsWith('blob:')
+          ? 'none'
+          : `url("${absolute}")`,
+    )
+    if (!embedded) warnings.push('部分背景、图标或字体未内嵌，离线打开时可能不可用')
+  }
+  for (const [from, to] of urls) css = css.split(from).join(to)
+  return css
 }
 
 /** blob: URL → data URI（需要有对应的资源；这里直接从数据库按 id 反查） */
 async function blobUrlToDataUrl(blobUrl: string, limit: number): Promise<string | null> {
   try {
-    const response = await fetch(blobUrl)
+    const response = await fetch(blobUrl, { signal: AbortSignal.timeout(8000) })
+    if (!response.ok) return null
     const blob = await response.blob()
     if (!shouldEmbed(blob.size, limit)) return null
     const result = await blobToDataUrl(blob)
@@ -166,26 +260,35 @@ function buildDocument(input: {
   bodyHtml: string
   warnings: string[]
   project: Project
+  root: HTMLElement
 }): string {
-  const meta = describeProject(input.project)
+  const meta = describeProject(input.project, input.root)
+  const theme = document.documentElement.dataset.theme ?? 'violet-dark'
+  const language = document.documentElement.lang || 'zh-CN'
   const warningBlock =
     input.warnings.length > 0
       ? `<ul class="duet-warnings">${input.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`
       : ''
 
   return `<!doctype html>
-<html lang="zh-CN" data-theme="violet-dark">
+<html lang="${escapeHtml(language)}" data-theme="${escapeHtml(theme)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="${theme === 'light' ? 'light' : 'dark'}">
 <title>${escapeHtml(input.title)} · ${APP.nameZh} ${APP.nameEn}</title>
 <meta name="generator" content="${APP.nameZh} ${APP.nameEn} v${APP.version}">
 <style>
-${input.css}
+${input.css.replace(/<\/style/gi, '<\\/style')}
 /* —— 只读页专用：静态化所有动效，避免打开即播 —— */
 [data-exporting] .no-export { display: none !important; }
 body { overflow: auto !important; }
+.duet-readonly-canvas *, .duet-readonly-canvas *::before, .duet-readonly-canvas *::after {
+  animation: none !important; transition: none !important;
+}
+.duet-export-media { display: block !important; visibility: visible !important; width: 100% !important; grid-column: 1 / -1; }
+audio.duet-export-media { height: 42px !important; min-height: 42px; margin-top: 8px; }
+.duet-readonly-canvas [data-export-mask] { color: transparent !important; background: #18181b !important; }
 .duet-readonly-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 10px 20px; font-size: 12px; color: var(--text-muted);
@@ -208,12 +311,23 @@ ${warningBlock}
 }
 
 /** 一行元信息：两侧工具与版本，让人一眼知道这是在比什么 */
-function describeProject(project: Project): string {
-  const parts = project.sheet.sides.map((side) => {
+function describeProject(project: Project, root: HTMLElement): string {
+  const headers = Array.from(root.querySelectorAll<HTMLElement>('[data-side-id]'))
+  const parts = project.sheet.sides.map((side, index) => {
+    const header = headers.find((node) => node.dataset.sideId === side.id)
     const name =
-      side.labelOverride ??
-      (side.toolRef.kind === 'inline' ? side.toolRef.name : side.toolRef.toolId)
-    return side.modelVersion ? `${name} ${side.modelVersion}` : name
+      side.showName === false
+        ? ''
+        : side.anonymizeName
+          ? t('compare.anonymousTool', { n: index + 1 })
+          : (header?.dataset.exportName ??
+            side.labelOverride ??
+            (side.toolRef.kind === 'inline' ? side.toolRef.name : side.toolRef.toolId))
+    const version =
+      side.showVersion === false || side.anonymizeVersion
+        ? ''
+        : (header?.dataset.exportVersion ?? side.modelVersion)
+    return [name, version].filter(Boolean).join(' ')
   })
   return [project.title, parts.join(' vs ')].filter(Boolean).join(' · ')
 }
@@ -228,7 +342,10 @@ function escapeHtml(input: string): string {
 }
 
 /** 该资源是否值得内嵌（供 UI 预估体积用） */
-export async function shouldEmbedAsset(assetId: string, limit = 20 * 1024 * 1024): Promise<boolean> {
+export async function shouldEmbedAsset(
+  assetId: string,
+  limit = 20 * 1024 * 1024,
+): Promise<boolean> {
   const asset = await getAsset(assetId)
   return asset ? shouldEmbed(asset.size, limit) : false
 }

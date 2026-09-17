@@ -14,10 +14,6 @@ test-results/
 blob-report/
 playwright/.cache/
 
-# —— Tauri ——
-src-tauri/target/
-src-tauri/gen/
-
 # —— 本地品牌 LOGO（第三方商标，刻意不入库） ——
 # 由 scripts/fetch-brand-logos.mjs 生成。
 # 提交他人商标等于再分发，风险远大于本机自用；

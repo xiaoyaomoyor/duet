@@ -32,7 +32,6 @@ test.describe('应用外壳（M0）', () => {
     expect(['dark', 'light', 'violet-dark']).toContain(resolved)
     expect(resolved).toBe('light')
 
-    await expect(html).toHaveAttribute('data-platform', 'web')
     await expect(html).toHaveAttribute('lang', 'zh-CN')
 
     const background = await page.evaluate(

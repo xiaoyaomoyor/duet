@@ -4,7 +4,6 @@
  */
 import { useI18n } from 'vue-i18n'
 import { APP } from '@/app.config'
-import { isDesktop } from '@/services/themeService'
 import { install, pwaState } from '@/composables/usePwa'
 import { useUiStore } from '@/stores/useUiStore'
 import AppIcon from '@/components/common/AppIcon.vue'
@@ -59,7 +58,7 @@ async function onInstall(): Promise<void> {
     </div>
     <div class="about__row">
       <dt>Platform</dt>
-      <dd>{{ isDesktop() ? 'Desktop (Tauri)' : 'Web' }}</dd>
+      <dd>{{ installed ? 'PWA' : 'Web' }}</dd>
     </div>
     <div class="about__row">
       <dt>{{ t('app.tagline') }}</dt>
@@ -67,8 +66,8 @@ async function onInstall(): Promise<void> {
     </div>
   </dl>
 
-  <!-- 已经装过就不再劝装一次；装在 Tauri 里也没有意义 -->
-  <template v-if="!isDesktop() && !installed">
+  <!-- 已经安装的 PWA 不再显示安装入口 -->
+  <template v-if="!installed">
     <h4 class="about__subheading">{{ t('pwa.install') }}</h4>
     <button class="install-btn" type="button" @click="onInstall">
       <AppIcon name="export" :size="13" />

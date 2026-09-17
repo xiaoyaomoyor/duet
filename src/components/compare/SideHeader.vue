@@ -43,6 +43,9 @@ const project = useProjectStore()
 
 const tool = computed(() => tools.resolve(props.side.toolRef))
 const displayName = computed(() => props.side.labelOverride ?? tool.value.name)
+const anonymousLabel = computed(() => t('compare.anonymousTool', {
+  n: Math.max(0, project.current?.sheet.sides.findIndex((side) => side.id === props.side.id) ?? 0) + 1,
+}))
 
 /** 各元素的显示开关；省略 = 显示 */
 const showIcon = computed(() => props.side.showIcon !== false)
@@ -136,7 +139,11 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
 </script>
 
 <template>
-  <header class="side-head" :class="{ 'side-head--dimmed': dimmed }" :style="headerStyle">
+  <header class="side-head" :class="{ 'side-head--dimmed': dimmed }" :style="headerStyle"
+    :data-side-id="side.id"
+    :data-export-name="showName ? (side.anonymizeName ? anonymousLabel : displayName) : ''"
+    :data-export-version="showVersion && !side.anonymizeVersion ? versionLabel : ''"
+  >
     <!--
       左侧那根 5px 的强调条已经移除（v0.5.7）。
       它是工具卡片还是「画布顶部一张独立卡片」时加的；变成「标题」模块之后，
@@ -154,6 +161,7 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
       -->
       <button
         v-if="showIcon && iconHidden"
+        data-export-mask="icon"
         class="side-head__logo side-head__logo--masked"
         type="button"
         :title="t('compare.revealIcon')"
@@ -162,6 +170,7 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
       />
       <button
         v-else-if="showIcon && revealed.has('icon') && props.side.anonymizeIcon === true"
+        data-export-mask="icon"
         class="side-head__logo side-head__logo--reveal"
         type="button"
         :title="t('compare.hideIcon')"
@@ -170,6 +179,7 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
       >
         <ToolIcon
           :name="displayName"
+          :label="side.anonymizeName ? anonymousLabel : displayName"
           :color="tool.color"
           :icon-asset-id="iconAssetId"
           :logo-key="tool.builtinKey ?? tool.id"
@@ -180,6 +190,7 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
         v-else-if="showIcon"
         class="side-head__logo"
         :name="displayName"
+        :label="side.anonymizeName ? anonymousLabel : displayName"
         :color="tool.color"
         :icon-asset-id="iconAssetId"
         :logo-key="tool.builtinKey ?? tool.id"
@@ -191,6 +202,8 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
           <!-- 名称匿名：文字变成黑框，点一下显现、再点一下遮回去 -->
           <button
             v-if="showName && props.side.anonymizeName === true"
+            data-export-mask="text"
+            :data-export-label="anonymousLabel"
             class="side-head__mask"
             :class="{ 'side-head__mask--hidden': nameHidden }"
             type="button"
@@ -198,7 +211,7 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
             :aria-label="nameHidden ? t('compare.revealName') : t('compare.hideName')"
             @click="toggleReveal('name')"
           >
-            {{ displayName }}
+            {{ nameHidden ? anonymousLabel : displayName }}
           </button>
           <span v-else-if="showName" class="side-head__name">{{ displayName }}</span>
 
@@ -206,6 +219,8 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
           <template v-if="showVersion && versionLabel">
             <button
               v-if="props.side.anonymizeVersion === true"
+              data-export-mask="text"
+              data-export-label="•••"
               class="side-head__mask side-head__mask--version"
               :class="{ 'side-head__mask--hidden': versionHidden }"
               type="button"
@@ -213,7 +228,7 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
               :aria-label="versionHidden ? t('compare.revealVersion') : t('compare.hideVersion')"
               @click="toggleReveal('version')"
             >
-              {{ versionLabel }}
+              {{ versionHidden ? '•••' : versionLabel }}
             </button>
             <span v-else class="side-head__version">{{ versionLabel }}</span>
           </template>
