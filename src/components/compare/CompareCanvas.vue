@@ -99,36 +99,25 @@ const dimmedSideIds = computed(() => {
 })
 
 const canvasStyle = computed(() => {
-  const ratio = layout.value.ratio
-  // ratio 理论上恒为两个正数，但工程文件可能被手改过，这里兜一层
-  const a = Number.isFinite(ratio?.[0]) && ratio[0] > 0 ? ratio[0] : 1
-  const b = Number.isFinite(ratio?.[1]) && ratio[1] > 0 ? ratio[1] : 1
-
   /*
-   * 比例强调：在用户设的比例基础上给正在播放的一侧加权，
-   * 而不是直接写死 62:38 —— 用户手里的 1:1 或 3:2 是他特意调过的，
-   * 用固定值会把它抹掉。
+   * 比例强调：给正在播放的一侧加权（聚光灯）。
+   * 两侧基础宽度恒为等宽——v0.5.5 移除了"拖动中轴调比例"，
+   * 因此这里不再读 `layout.ratio`（那个字段也一并从数据模型删掉了）。
    */
   const emphasised = spotlightSideId.value
   const boost = spotlightMode.value === 'ratio' ? 1.7 : 1
-  const firstId = sides.value[0]?.id
-  const weightA = emphasised && firstId === emphasised ? a * boost : a
-  const weightB = emphasised && firstId !== emphasised ? b * boost : b
+  const isFirst = emphasised !== undefined && sides.value[0]?.id === emphasised
+  const weightA = isFirst ? boost : 1
+  const weightB = !isFirst && emphasised ? boost : 1
 
   return {
     '--side-a': sides.value[0]?.accent ?? 'var(--accent-500)',
     '--side-b': sides.value[1]?.accent ?? 'var(--accent-500)',
     '--canvas-gutter': `${layout.value.gutter}px`,
     '--canvas-max': `${layout.value.maxWidth}px`,
-    /*
-     * 两侧宽度比。M6 之前 layout.ratio 只存在于数据模型里、
-     * 渲染时被写死成 `1fr 1fr`——所以"拖动中轴调宽度"这件事
-     * 数据上早就支持，只是从来没接到 CSS。
-     */
+    /* 两侧等宽；聚光灯「比例强调」时给正在播放的一侧加权 */
     '--col-a': `${weightA}fr`,
     '--col-b': `${weightB}fr`,
-    /** 左列占内容宽度的比例，供中轴拖拽手柄定位 */
-    '--col-frac': `${weightA / (weightA + weightB)}`,
   }
 })
 
@@ -174,93 +163,17 @@ const pageFill = computed(() => layout.value.backgroundFill === 'page')
 /**
  * 画布这里要不要画图案。
  *
- * 演示视图 + 充满整页 → **不画**：那一份交给遮罩层上的固定壁纸
- * （它铺的是整个屏幕、不跟随滚动，且顶栏压在它上面）。
- * 画布再画一份就是屏幕上同时出现两张图案——
- * 用户实测反馈"存在了两种背景图案是错的"。
+ * "充满整页" → **不画**：那一份交给外层（编辑视图是滚动容器
+ * `.compare__stage`，演示视图是遮罩层上的固定壁纸层）。
+ * 那两处都用 `position: fixed` / `background-attachment: fixed`，
+ * 图案像壁纸一样钉住不动，而且都在顶栏之内、不会盖住它。
+ *
+ * 画布这边再画一份就是同一张图案出现两次——
+ * 用户实测反馈"演示视图中存在了两种背景图案是错的"。
  */
-const drawPattern = computed(() => showBackground.value && !(isReadonly.value && pageFill.value))
+const drawPattern = computed(() => showBackground.value && !pageFill.value)
 
 const showRowNumbers = computed(() => layout.value.showRowNumbers === true)
-
-// ————————————————————————————————————————————————————————
-// 中轴拖拽：调整左右宽度比
-// ————————————————————————————————————————————————————————
-
-/** 单侧最小占比：再窄就放不下卡片内容了（约等于 200px / 1000px 版面） */
-const MIN_COLUMN_FRAC = 0.2
-const MAX_COLUMN_FRAC = 0.8
-
-/**
- * 画布根节点。
- *
- * ⚠️ 这个 ref **必须**绑在模板的 `.canvas` 上（`ref="canvasEl"`）。
- * M6 引入中轴拖拽时漏了这一步，于是 `canvasEl.value` 永远是 null、
- * `width` 永远是 0、`onColumnResizeMove` 在第二行就 return ——
- * 手柄能按下去、鼠标指针也变成 col-resize，但**左右宽度纹丝不动**。
- * 实测反馈"工具之间的分界线调整功能似乎不生效"说的就是它：
- * 整条链路只有一个环节断了，而且不报任何错。
- */
-const canvasEl = ref<HTMLElement | null>(null)
-const resizingColumns = ref(false)
-let resizeStartX = 0
-let resizeStartRatio: [number, number] = [1, 1]
-
-function onColumnResizeStart(event: PointerEvent): void {
-  resizeStartX = event.clientX
-  resizeStartRatio = [...layout.value.ratio] as [number, number]
-  resizingColumns.value = true
-  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
-  document.body.style.userSelect = 'none'
-  document.body.style.cursor = 'col-resize'
-}
-
-function onColumnResizeMove(event: PointerEvent): void {
-  if (!resizingColumns.value) return
-  event.preventDefault()
-
-  const width = canvasEl.value?.clientWidth ?? 0
-  // 宽度拿不到就没法把像素换算成比例——这里**不能**静默 return 当作没事发生，
-  // 开发期告警一次，免得又出现"手柄能拖但没反应"这种极难定位的状态
-  if (width <= 0) {
-    if (import.meta.env.DEV) {
-      console.warn('[duet/canvas] 中轴拖拽拿不到画布宽度：canvasEl 是否忘了绑定？')
-    }
-    return
-  }
-
-  // 把像素位移换算成占比，再写回两侧的权重
-  const delta = (event.clientX - resizeStartX) / width
-  const startSum = resizeStartRatio[0] + resizeStartRatio[1]
-  const startFrac = resizeStartRatio[0] / startSum
-  const frac = Math.min(MAX_COLUMN_FRAC, Math.max(MIN_COLUMN_FRAC, startFrac + delta))
-
-  // 用同一个总和来表达，视觉上总宽度不变（只有分配比例在动）
-  store.patchLayout({ ratio: [frac * startSum, (1 - frac) * startSum] })
-}
-
-function onColumnResizeEnd(event: PointerEvent): void {
-  if (!resizingColumns.value) return
-  resizingColumns.value = false
-  ;(event.target as HTMLElement).releasePointerCapture?.(event.pointerId)
-  document.body.style.userSelect = ''
-  document.body.style.cursor = ''
-}
-
-/** 双击中轴：恢复左右等宽 */
-function resetColumnRatio(): void {
-  store.patchLayout({ ratio: [1, 1] })
-}
-
-/** 键盘可达：方向键微调（拖拽对键盘用户不可用） */
-function onColumnResizeKeydown(event: KeyboardEvent): void {
-  const step = event.shiftKey ? 0.1 : 0.02
-  const [a, b] = layout.value.ratio
-  if (event.key === 'ArrowLeft') store.patchLayout({ ratio: [Math.max(MIN_COLUMN_FRAC, a - step), b + step] })
-  else if (event.key === 'ArrowRight') store.patchLayout({ ratio: [Math.min(MAX_COLUMN_FRAC, a + step), b - step] })
-  else return
-  event.preventDefault()
-}
 
 // ————————————————————————————————————————————————————————
 // 行
@@ -483,20 +396,12 @@ function onDuplicateModule(ref: ModuleRef): void {
         一个这样的注释就会让整张图解析失败、导出直接报错，且极难定位。
         导出侧已经会剔除所有注释节点兜底，但写注释时仍应避开。
       -->
-      <div
-        v-if="!isReadonly && visibleRows.length > 0"
-        class="canvas__axis-resizer u-split u-split--v"
-        role="separator"
-        aria-orientation="vertical"
-        :aria-label="t('compare.resizeColumns')"
-        tabindex="0"
-        @pointerdown="onColumnResizeStart"
-        @pointermove="onColumnResizeMove"
-        @pointerup="onColumnResizeEnd"
-        @pointercancel="onColumnResizeEnd"
-        @dblclick="resetColumnRatio"
-        @keydown="onColumnResizeKeydown"
-      />
+      <!--
+        中轴拖拽手柄已移除（v0.5.5，用户："删除工具之间的分界拖动的设计，
+        实用性不强"）。它只在两侧宽度明显失衡时才有意义，而那份需求
+        几乎不存在——反倒是一条压在内容上的竖线，还占着一个 Tab 焦点。
+        两侧现在恒为等宽（见 .canvas__cells 的 grid 模板）。
+      -->
 
       <div v-if="!isReadonly" class="canvas__footer">
         <button class="canvas__add-row" type="button" @click="store.addRow()">
@@ -533,25 +438,8 @@ function onDuplicateModule(ref: ModuleRef): void {
 }
 
 /*
- * 中轴拖拽手柄。
- *
- * 定位公式复现了格子的 fr 分配：内容宽度减去中缝后按 --col-frac 切分，
- * 再加上半个中缝就是真正的中线。这样无论比例怎么变，
- * 手柄都精确压在视觉中缝上，而不是画布正中。
- *
- * 宽度与"看得见的那条线"由 .u-split--v 统一提供（抓取 12px、线 3px），
- * 这里只负责把它摆到正确的位置上。
+ * 中轴拖拽手柄的样式已随功能一并移除（v0.5.5）。
  */
-.canvas__axis-resizer {
-  position: absolute;
-  top: var(--sp-6);
-  bottom: var(--sp-12);
-  left: calc(
-    (100% - var(--canvas-gutter, 32px)) * var(--col-frac, 0.5) +
-      var(--canvas-gutter, 32px) / 2 - 6px
-  );
-  z-index: 2;
-}
 
 .canvas__rows {
   display: flex;

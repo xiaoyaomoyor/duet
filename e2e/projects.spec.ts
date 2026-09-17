@@ -38,10 +38,16 @@ test.describe('M1 项目生命周期', () => {
     await expect(main.getByText('工具 A')).toBeVisible()
     await expect(main.getByText('工具 B')).toBeVisible()
 
-    // 模板预置的模块（M7 起「封面图」并入「图片」；v0.5.0 起另有「标题」行）
-    for (const moduleName of ['标题', '图片', '音频', '歌词', '进度条']) {
+    /*
+     * 模板预置的模块（M7 起「封面图」并入「图片」；v0.5.0 起另有「标题」行）。
+     * v0.5.5 起「标题」模块是**无头**的：不画模块名那一行
+     * （内容本身就是工具名，再顶一行"标题"是重复信息）。
+     */
+    for (const moduleName of ['图片', '音频', '歌词', '进度条']) {
       await expect(main.getByText(moduleName, { exact: true }).first()).toBeVisible()
     }
+    // 标题行确实存在，只是没有模块名那一行
+    await expect(main.locator('.canvas__row[data-has-title]')).toHaveCount(1)
 
     // 侧栏出现该项目，且显示行数
     await expect(

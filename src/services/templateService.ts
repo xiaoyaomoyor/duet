@@ -48,7 +48,6 @@ export const ACCENT_PAIRS: ReadonlyArray<{ name: string; colors: AccentPair }> =
 ]
 
 export const DEFAULT_LAYOUT: LayoutConfig = {
-  ratio: [1, 1],
   gutter: 32,
   showAxis: true,
   background: 'solid',

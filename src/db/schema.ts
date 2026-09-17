@@ -327,7 +327,49 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    to: 8,
+    /**
+     * v7 → v8：删掉 layout.ratio。
+     *
+     * v0.5.5 移除了"拖动中轴调左右宽度"（用户："实用性不强"），
+     * 两侧恒为等宽。"只有一种取值、又没有界面"的字段必须删掉——
+     * 留着的话下一个读代码的人会以为它还有效，改它却看不到任何变化
+     * （与 v0.4.0 删 density 是同一个理由）。
+     */
+    run: (_db, tx) => {
+      const store = tx.objectStore(STORE.projects)
+      const cursorReq = store.openCursor()
+
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result
+        if (!cursor) return
+
+        const project = cursor.value as { sheet?: { layout?: Record<string, unknown> } }
+        const sheet = project.sheet
+        if (!sheet?.layout) {
+          cursor.continue()
+          return
+        }
+
+        cursor.update({
+          ...project,
+          schemaVersion: 8,
+          sheet: { ...sheet, layout: withoutColumnRatio(sheet.layout) },
+        })
+
+        cursor.continue()
+      }
+    },
+  },
 ]
+
+/** 单个 sheet.layout 的 v7→v8 改写（导出是为了能直接单测） */
+export function withoutColumnRatio(layout: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...layout }
+  delete next.ratio
+  return next
+}
 
 /**
  * 若没有任何 title 模块，就在最前面插一行「标题」行。

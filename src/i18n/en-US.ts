@@ -82,7 +82,6 @@ export default {
     untitled: 'Untitled comparison',
     addFirstModule: 'Add your first module below',
     nothingToPresent: 'Nothing to present yet',
-    resizeColumns: 'Drag to resize the two sides (double-click to reset)',
     nothingToPresentHint: 'Fill in some content in the edit view first',
     tabClose: 'Close tab',
     unsaved: 'Unsaved',

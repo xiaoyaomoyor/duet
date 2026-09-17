@@ -169,31 +169,37 @@ function onTimeUpdate(): void {
 }
 
 /**
- * 自研播放条的播放 / 暂停。
+ * 自研播放条的播放 / 暂停：**只管这一侧**。
  *
- * 引擎已经接管两侧时**交给引擎**，而不是直接 `el.play()`：
- * 频谱（波形动效）是引擎的 AnalyserNode 出来的，绕开引擎播就等于
- * 没有频谱数据 → 波形摊成一条线（实测反馈"动态波形不动了"就是这个）。
- * 引擎没接管（只有一侧有音频、浏览器不支持等）时才直接操作元素。
+ * 这里踩过一次坑（M12 → v0.5.5 修回）：M12 为了让频谱有数据，把播放键
+ * 交给了 `engine.play()`——而引擎的 play 是**两侧一起播**，
+ * 于是"点左边模块的播放键，右边的音乐也响了"（用户实测反馈）。
+ *
+ * 其实完全不必：分析器是接在**元素自己**的节点链上的
+ * （source → gain → analyser → destination），谁调用 `el.play()` 都有频谱。
+ * 唯一需要引擎的地方是**恢复音频上下文**——自动播放策略会让它停在
+ * suspended，不 resume 就没有声音。
  */
 function togglePlay(): void {
   const el = audioEl.value
   if (!el) return
 
-  const id = projectId?.value
-  const engine = id ? getSyncEngine(id) : null
-
-  if (engine?.isAttached) {
-    if (!el.paused) {
-      engine.pause()
-      return
-    }
-    void engine.play().catch(() => void 0)
+  if (!el.paused) {
+    el.pause()
     return
   }
 
-  if (el.paused) void el.play().catch(() => void 0)
-  else el.pause()
+  const id = projectId?.value
+  const engine = id ? getSyncEngine(id) : null
+  const start = (): void => {
+    void el.play().catch(() => void 0)
+  }
+
+  if (engine?.isAttached) {
+    void engine.resume().then(start).catch(start)
+    return
+  }
+  start()
 }
 
 /**

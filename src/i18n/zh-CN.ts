@@ -82,7 +82,6 @@ export default {
     addFirstModule: '从下方添加第一个模块',
     nothingToPresent: '还没有可展示的内容',
     nothingToPresentHint: '请先在编辑视图填写内容',
-    resizeColumns: '拖拽调整左右宽度（双击恢复等宽）',
     tabClose: '关闭标签',
     unsaved: '未保存',
     saved: '已保存',

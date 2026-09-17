@@ -297,8 +297,9 @@ defineExpose({ zoom, hasContent })
       </header>
 
       <!--
-        整屏背景图案（"充满整页"）。
-        固定定位、不随内容滚动 —— 它铺的是**屏幕**，不是某一段内容。
+        整屏背景壁纸（"充满整页"）。
+        固定定位、不随内容滚动；底色与图案同处一层（底色天然在图案之下）。
+        它从顶栏下面开始铺，因此不会盖住顶栏——见 .present__pattern 的说明。
       -->
       <div
         v-if="pagePattern"
@@ -494,6 +495,11 @@ defineExpose({ zoom, hasContent })
   inset: var(--present-topbar-h, 44px) 0 0 0;
   z-index: 0;
   pointer-events: none;
+  /*
+   * 底色是图案的**底**：background-color 天然画在 background-image 之下，
+   * 所以"底色不会挡住图案"是免费的（用户的要求）。
+   */
+  background-color: var(--bg-base, transparent);
 }
 
 .present__pattern--grid {

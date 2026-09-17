@@ -35,6 +35,11 @@ const definition: ModuleDefinition<Record<string, never>, Record<string, never>>
    * 否则会被弹窗默认的双列布局挤成两条窄缝（用户实测反馈"优化编辑标题模块的窗口布局"）。
    */
   editorWide: true,
+  /*
+   * 不画模块名那一行、卡片内边距更紧：它的内容就是工具名本身，
+   * 上面再顶一行"标题"是重复信息，还白白多出二十几个像素。
+   */
+  headless: true,
   renderer: defineAsyncComponent(() => import('./TitleRenderer.vue')),
   /**
    * **永远不算空**。

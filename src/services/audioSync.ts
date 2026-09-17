@@ -254,6 +254,19 @@ export class AudioSyncEngine {
     this.setStatus({ playing: false, driftMs: 0 })
   }
 
+  /**
+   * 确保音频上下文处于运行态。
+   *
+   * 自动播放策略会让 AudioContext 停在 `suspended`；一旦元素被接进了
+   * 这张图（`createMediaElementSource`），不 resume 就**没有声音**。
+   * 音频模块自己按播放键时用它——它不接管"播哪几轨"，只负责把闸合上。
+   */
+  async resume(): Promise<void> {
+    if (this.context?.state === 'suspended') {
+      await this.context.resume().catch(() => void 0)
+    }
+  }
+
   /** 定位到某个时间点（两侧保持各自偏移） */
   seek(ms: number): void {
     for (const track of this.tracks) {

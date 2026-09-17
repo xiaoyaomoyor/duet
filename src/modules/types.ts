@@ -100,6 +100,15 @@ export interface ModuleDefinition<TData = unknown, TProps = Record<string, unkno
    * 声明这一项之后弹窗改用单列，把整幅宽度让给编辑器。
    */
   editorWide?: boolean
+  /**
+   * 「无头」模块：不渲染模块名那一行，卡片内边距也更紧（v0.5.5）。
+   *
+   * 给「标题」模块用：它的内容本身就是"这一侧是谁"，上面再顶一行
+   * "标题"既是重复信息，又白白多出二十几个像素——
+   * 用户要求它"贴合原本的工具名卡片的厚度"。
+   * 模块名仍然可以在编辑弹窗里改，只是不画在卡片上。
+   */
+  headless?: boolean
   /** 是否"未填写"：直接决定演示视图是否隐藏（§7.4） */
   isEmpty: (data: TData, props: TProps) => boolean
   /** 可选：导出长图前的准备（等待图片解码等） */

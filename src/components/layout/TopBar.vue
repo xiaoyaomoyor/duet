@@ -81,8 +81,13 @@ function togglePresent(): void {
         :title="t('nav.compare')"
         :aria-label="t('nav.compare')"
       >
-        <!-- 「对比」用 VS. 文字标记（用户要求），见下方 .topbar__vs 的说明 -->
-        <span class="topbar__vs" aria-hidden="true">VS.</span>
+        <!--
+          「对比」用 VS. 文字标记（用户要求），见下方 .topbar__vs 的说明。
+          挂上 u-selected-icon 才能跟随 `.u-selected` 变成主题色——
+          这个类原本只认 AppIcon，纯文字的元素得自己声明（用户实测反馈
+          "VS. 图标被选中后没有变成和齿轮一样的着色效果"）。
+        -->
+        <span class="topbar__vs u-selected-icon" aria-hidden="true">VS.</span>
       </RouterLink>
 
       <RouterLink

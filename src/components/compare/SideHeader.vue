@@ -268,9 +268,22 @@ const iconHidden = computed(() => props.side.anonymizeIcon === true && !revealed
   gap: var(--sp-4);
   align-items: center;
   min-width: 0;
-  padding: var(--sp-4);
-  /* 本侧主题色的极淡底，让左右两张卡片有整体区分 */
-  background: var(--accent-soft);
+  /*
+   * 内边距收紧（v0.5.5）：外面已经是模块卡片，它自己有 padding，
+   * 这里再加一圈就把"标题"撑得比原来的工具名卡片厚一倍。
+   */
+  padding: var(--sp-2) 0;
+  /*
+   * **没有自己的底色**（v0.5.5）。
+   *
+   * 这里曾经铺着一层 `--accent-soft`：那时 `.side-head` 是画布顶部一张
+   * 独立卡片，需要自己着色。变成「标题」模块之后，外面已经有模块卡片
+   * （`.u-module-card`）铺了同一层色，于是同一块地方叠了两层——
+   * 看起来就是"模块卡片里面还有一张卡片"。
+   * 用户实测反馈："LOGO 与名称等内容直接出现在模块卡片上就好了，
+   * 内部不再需要额外的背景着色。"
+   */
+  background: none;
 }
 
 /*

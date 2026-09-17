@@ -44,6 +44,35 @@ const isPresent = computed(() => store.current?.ui.mode === 'present')
 const showConfig = computed(() => ui.inspectorOpen && !isPresent.value)
 
 const configStyle = computed(() => ({ '--config-width': `${ui.inspectorWidth}px` }))
+
+const layout = computed(() => store.current?.sheet.layout)
+
+/**
+ * 整页壁纸（v0.5.5）。
+ *
+ * "填充形式 = 充满整页"时，背景由**滚动容器**自己画，并且用
+ * `background-attachment: fixed` —— 这样它像壁纸一样钉在视口上、不随内容滚动，
+ * 而且因为容器本来就在顶栏与侧栏**之内**，天然不会盖住它们（用户要求：
+ * "不会遮挡顶栏等内容，只是壁纸"）。
+ *
+ * 编辑视图同样生效（用户要求："在编辑视图中也能看到作为壁纸的效果"）——
+ * 早先只有演示遮罩层画这一层，编辑时看不到，等于这个选项在编辑期是隐形的。
+ */
+const pageFill = computed(() => layout.value?.backgroundFill === 'page')
+
+const stageStyle = computed(() => {
+  const current = layout.value
+  if (!pageFill.value || !current) return undefined
+  const scale = Number.isFinite(current.backgroundScale)
+    ? Math.min(96, Math.max(8, current.backgroundScale as number))
+    : 32
+  return {
+    '--bg-scale': `${scale}px`,
+    '--bg-tint': current.backgroundTint ?? '',
+    // 底色是图案的**底**：background-color 天然画在 background-image 之下
+    '--bg-base': current.backgroundBase ?? '',
+  }
+})
 // ——————————————————————————————————————————————————————————
 // 对比配置面板：拖拽调宽（与左侧项目列表同一套做法）
 // ——————————————————————————————————————————————————————————
@@ -181,7 +210,11 @@ function onPresentExit(): void {
           展示态本来就被遮罩层完全盖住，把那块画布去掉既修掉了上面的问题，
           也顺带省掉一半的渲染与内存。
         -->
-        <div class="compare__stage u-scroll-y">
+        <div
+          class="compare__stage u-scroll-y"
+          :class="pageFill ? `compare__stage--bg-${layout?.background}` : undefined"
+          :style="stageStyle"
+        >
           <CompareCanvas v-if="!isPresent" :project="store.current" />
         </div>
 
@@ -252,6 +285,38 @@ function onPresentExit(): void {
 .compare__stage {
   flex: 1;
   min-width: 0;
+}
+
+/*
+ * 只有"充满整页"时才会带上这几个类（见模板）。
+ * "仅内容区"时图案仍由画布自己画——只铺在内容那一段，不到页面底部。
+ */
+.compare__stage--bg-grid,
+.compare__stage--bg-dots,
+.compare__stage--bg-solid {
+  background-color: var(--bg-base, transparent);
+  /*
+   * `background-attachment: fixed` 是关键：它让背景相对**视口**绘制，
+   * 于是内容滚动时图案不动——这正是"壁纸"该有的样子。
+   * 而容器本身在顶栏与侧栏之内，所以图案不会盖到那两块上面去
+   * （用户要求："不会遮挡顶栏等内容，只是壁纸"）。
+   *
+   * 底色与图案同处一层：`background-color` 天然画在 `background-image` 之下，
+   * 所以"底色是图案的背景、不会挡住图案"是免费的。
+   */
+  background-attachment: fixed;
+}
+
+.compare__stage--bg-grid {
+  background-image:
+    linear-gradient(to right, var(--bg-tint, var(--border-subtle)) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--bg-tint, var(--border-subtle)) 1px, transparent 1px);
+  background-size: var(--bg-scale, 32px) var(--bg-scale, 32px);
+}
+
+.compare__stage--bg-dots {
+  background-image: radial-gradient(var(--bg-tint, var(--border-default)) 1px, transparent 1px);
+  background-size: var(--bg-scale, 20px) var(--bg-scale, 20px);
 }
 
 /*

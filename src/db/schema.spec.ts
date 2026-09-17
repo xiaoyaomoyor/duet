@@ -15,6 +15,7 @@ import {
   migrateModule,
   migrateSideAccent,
   withTitleRow,
+  withoutColumnRatio,
 } from './schema'
 
 describe('migrateModule：cover → image', () => {
@@ -276,5 +277,31 @@ describe('withTitleRow：补「标题」行', () => {
 
   it('一行都没有时不动（空工程没有可供推断两侧 id 的依据）', () => {
     expect(withTitleRow([])).toEqual([])
+  })
+})
+
+/**
+ * v7 → v8：删掉 layout.ratio。
+ *
+ * v0.5.5 移除了"拖动中轴调左右宽度"（用户："实用性不强"），两侧恒为等宽。
+ * 与 v0.4.0 删 density 同一个理由：只有一种取值、又没有界面的字段必须删掉，
+ * 否则下一个读代码的人会以为它还有效。
+ */
+describe('withoutColumnRatio：移除左右宽度比', () => {
+  it('删掉 ratio，其余字段原样保留', () => {
+    const result = withoutColumnRatio({ ratio: [2, 1], gutter: 40, background: 'grid' })
+    expect('ratio' in result).toBe(false)
+    expect(result.gutter).toBe(40)
+    expect(result.background).toBe('grid')
+  })
+
+  it('幂等：再跑一次结果不变', () => {
+    const once = withoutColumnRatio({ ratio: [1, 1], gutter: 32 })
+    expect(withoutColumnRatio(once)).toEqual(once)
+  })
+
+  it('没有 ratio 时是空操作', () => {
+    const layout = { gutter: 48, maxWidth: 1440 }
+    expect(withoutColumnRatio(layout)).toEqual(layout)
   })
 })

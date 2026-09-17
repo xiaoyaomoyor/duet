@@ -46,16 +46,26 @@ const definition = computed(() => getModule(props.module.type))
  * 便于编辑期辨认；成稿前改成自己想要的维度名或清空。
  */
 const showTitle = computed(() => props.module.title.trim().length > 0)
+
+/**
+ * 「无头」模块：整行标题都不画（v0.5.5）。
+ * 见 ModuleDefinition.headless 的说明——「标题」模块的内容就是它自己的名字。
+ */
+const headless = computed(() => definition.value?.headless === true)
 </script>
 
 <template>
-  <section class="module-view" :style="{ '--accent': accent }">
+  <section
+    class="module-view"
+    :class="{ 'module-view--headless': headless }"
+    :style="{ '--accent': accent }"
+  >
     <!--
       标题行：子序号在模块名**前面**（v0.5.0 按实测反馈，此前它单独占一行在标题上方）。
       排在名字前面之后，"2.2 图片"读起来就是一个带编号的名字，
       还省下一行高度——二十个模块并排时这一行省得很明显。
     -->
-    <h4 v-if="showTitle || number" class="module-view__heading">
+    <h4 v-if="!headless && (showTitle || number)" class="module-view__heading">
       <span v-if="number" class="module-view__number">{{ number }}</span>
       <span v-if="showTitle" class="module-view__title">{{ module.title }}</span>
     </h4>
@@ -90,6 +100,11 @@ const showTitle = computed(() => props.module.title.trim().length > 0)
   flex-direction: column;
   gap: var(--sp-2);
   min-width: 0;
+}
+
+/* 无头模块没有标题行，间距也一并去掉，免得留一段空白 */
+.module-view--headless {
+  gap: 0;
 }
 
 /* 标题行：序号与模块名横向排 */

@@ -55,6 +55,8 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const definition = computed(() => getModule(props.module.type))
+/** 无头模块（如「标题」）：没有模块名那一行，卡片内边距也更紧 */
+const headless = computed(() => definition.value?.headless === true)
 const editing = ref(false)
 
 /**
@@ -78,7 +80,7 @@ function forwardProps(patch: Record<string, unknown>): void {
 <template>
   <article
     class="card u-module-card"
-    :class="{ 'card--hidden': module.hidden }"
+    :class="{ 'card--hidden': module.hidden, 'card--headless': headless }"
     :style="{ '--accent': accent }"
   >
     <!-- 右上角操作区：悬浮或键盘聚焦时出现 -->
@@ -173,6 +175,15 @@ function forwardProps(patch: Record<string, unknown>): void {
 
 .card:active {
   cursor: grabbing;
+}
+
+/*
+ * 无头模块（「标题」）的卡片更紧。
+ * `.u-module-card` 的 padding 是给一般模块留呼吸用的；
+ * 「标题」要"贴合原本的工具名卡片的厚度"，所以收到 8px。
+ */
+.card--headless {
+  padding: var(--sp-2) var(--sp-3);
 }
 
 /*
