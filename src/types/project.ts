@@ -1,3 +1,4 @@
+import type { ComparisonContent, MigrationSnapshot } from './presentation'
 /**
  * 对奏 Duet — 领域类型（唯一真源，见 §6.1）
  *
@@ -16,7 +17,7 @@
  *   这是**破坏性**变更：旧 type 的实现已从注册表删除，
  *   不迁移就会命中"模块类型未注册"分支、表现为内容消失。
  */
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
 
 // ——————————————————————————————————————————————————————————
 // 工具（生产源）
@@ -343,6 +344,9 @@ export interface ProjectUiState {
 }
 
 export interface Project {
+  /** v9 content. Optional only for in-memory legacy factories and fixtures before normalization. */
+  comparison?: ComparisonContent
+  migrationSnapshot?: MigrationSnapshot
   id: string
   schemaVersion: number
   title: string

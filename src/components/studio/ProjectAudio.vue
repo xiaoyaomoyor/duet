@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useResolvedMedia, assetSource } from '@/composables/useResolvedMedia'
+import { useResolvedMedia, assetSource, sourceKey } from '@/composables/useResolvedMedia'
 import type { useStagePlayback } from '@/composables/useStagePlayback'
 import { repairEmbeddedCover } from '@/services/assetService'
-import { reportAudioState } from '@/composables/useAudioClock'
+import { reportAudioState, releaseAudioClock } from '@/composables/useAudioClock'
 import StageMedia from '@/components/stage/StageMedia.vue'
 import type { StageParticipant } from '@/components/stage/types'
 import type { ResolvedContent } from '@/services/sceneResolver'
@@ -48,15 +48,18 @@ const participant = computed<StageParticipant>(() => ({
 }))
 const audio = ref<HTMLAudioElement | null>(null)
 watch(audio, (element) => player.register(props.content.trackId, element))
-watch(source, () => {
-  audio.value?.pause()
-  if (audio.value) audio.value.removeAttribute('src')
-})
+watch(
+  () => sourceKey(source.value),
+  () => {
+    audio.value?.pause()
+    if (audio.value) audio.value.removeAttribute('src')
+  },
+)
 function update() {
   player.update(props.content.trackId)
   const state = player.state[props.content.trackId]
   if (state && props.content.module.props.reportClock !== false)
-    reportAudioState(props.participant.id, {
+    reportAudioState(props.content.clockId, {
       playing: state.playing,
       currentMs: state.current * 1000,
       durationMs: state.duration * 1000,
@@ -65,7 +68,8 @@ function update() {
 onBeforeUnmount(() => {
   audio.value?.pause()
   player.register(props.content.trackId, null)
-  reportAudioState(props.participant.id, { playing: false, currentMs: 0, durationMs: 0 })
+  reportAudioState(props.content.clockId, { playing: false, currentMs: 0, durationMs: 0 })
+  releaseAudioClock(props.content.clockId)
 })
 </script>
 <template>

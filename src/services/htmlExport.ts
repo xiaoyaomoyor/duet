@@ -13,6 +13,7 @@
  * 这对"给别人看结果"这个用途来说是合理取舍。
  */
 
+import { PORTABLE_PLAYER } from './presentationExport'
 import { getAsset } from '@/db/assetsRepo'
 import { blobToDataUrl, shouldEmbed } from '@/lib/blob'
 import { APP } from '@/app.config'
@@ -23,6 +24,7 @@ import type { Project } from '@/types/project'
 import { t } from '@/i18n/helper'
 
 export interface ExportHtmlOptions {
+  portable?: boolean
   /** 是否内嵌媒体（默认 true，小于上限的文件才内嵌） */
   embedMedia?: boolean
   /** 内嵌上限 */
@@ -55,23 +57,35 @@ export async function exportReadonlyHtml(
     const css = [options.preCollectedCss, collectDocumentCss()].filter(Boolean).join('\n')
 
     options.onProgress?.('内嵌媒体…')
-    const { html: bodyHtml, warnings } = await serializePresentRoot(options.presentRoot, {
+    const { html, warnings } = await serializePresentRoot(options.presentRoot, {
       embedMedia,
       embedLimit,
     })
+    const portableMedia = options.portable
+      ? deduplicatePortableMedia(html)
+      : { bodyHtml: html, hydration: '' }
 
+    if (options.portable && warnings.length)
+      return err(
+        '部分媒体无法内嵌，不能生成完整离线演示。请缩小媒体或取消作品切换，导出阅读页。' +
+          warnings.join('；'),
+      )
     options.onProgress?.('生成文件…')
     const title = project.title || '对奏'
     const embeddedCss = await inlineCssUrls(css, { embedMedia, embedLimit }, warnings)
     const document = buildDocument({
+      portable: options.portable === true,
       title,
       css: embeddedCss,
-      bodyHtml,
+      bodyHtml: portableMedia.bodyHtml,
+      hydration: portableMedia.hydration,
       warnings,
       project,
       root: options.presentRoot,
     })
 
+    if (options.portable && new Blob([document]).size > 80 * 1024 * 1024)
+      return err('离线演示超过 80 MB，请缩小媒体或导出静态阅读页。')
     return ok(document)
   } catch (error) {
     return err(`生成只读网页失败：${error instanceof Error ? error.message : String(error)}`)
@@ -261,6 +275,8 @@ async function blobUrlToDataUrl(blobUrl: string, limit: number): Promise<string 
 
 /** 拼出最终的单文件 HTML */
 function buildDocument(input: {
+  hydration: string
+  portable: boolean
   title: string
   css: string
   bodyHtml: string
@@ -306,6 +322,11 @@ audio.duet-export-media { height: 42px !important; min-height: 42px; margin-top:
 }
 .duet-readonly-bar a { color: var(--accent-500); }
 .duet-warnings { margin: 12px 20px; padding-left: 18px; font-size: 12px; color: var(--warning); }
+.duet-player { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 24px; background: var(--d-surface); border-bottom: 1px solid var(--d-line); font: 12px var(--d-font); }
+.duet-player select, .duet-player button { background: var(--d-bg); border: 1px solid var(--d-line); color: var(--d-text); border-radius: 6px; padding: 8px 12px; max-width: 240px; }
+[data-export-frame][hidden] { display: none !important; }
+[data-runtime-export] { width: 100% !important; }
+[data-reading=true] .stage-frame { aspect-ratio: auto; min-height: 56.25cqw; height: auto; }
 .duet-warnings li { margin: 2px 0; }
 </style>
 </head>
@@ -316,8 +337,36 @@ audio.duet-export-media { height: 42px !important; min-height: 42px; margin-top:
 </div>
 ${warningBlock}
 <div class="duet-readonly-canvas">${input.bodyHtml}</div>
+${input.portable ? `<script>${input.hydration};\n${PORTABLE_PLAYER}</script>` : ''}
 </body>
 </html>`
+}
+
+/** Repeated frames share one embedded binary, just as project samples share asset IDs. */
+function deduplicatePortableMedia(html: string): { bodyHtml: string; hydration: string } {
+  const root = document.createElement('div')
+  root.innerHTML = html
+  const media: string[] = [],
+    indices = new Map<string, number>()
+  for (const node of root.querySelectorAll<HTMLElement>('img,audio,video,source')) {
+    for (const attribute of ['src', 'poster']) {
+      const value = node.getAttribute(attribute)
+      if (!value?.startsWith('data:')) continue
+      let index = indices.get(value)
+      if (index === undefined) {
+        index = media.length
+        media.push(value)
+        indices.set(value, index)
+      }
+      node.setAttribute(`data-duet-${attribute}`, String(index))
+      node.removeAttribute(attribute)
+    }
+  }
+  const json = JSON.stringify(media).replace(/</g, '\\u003c')
+  return {
+    bodyHtml: root.innerHTML,
+    hydration: `Promise.all(${json}.map(async data=>URL.createObjectURL(await(await fetch(data)).blob()))).then(urls=>{for(const key of ['src','poster'])for(const el of document.querySelectorAll('[data-duet-'+key+']'))el.setAttribute(key,urls[Number(el.getAttribute('data-duet-'+key))])})`,
+  }
 }
 
 /** 一行元信息：两侧工具与版本，让人一眼知道这是在比什么 */

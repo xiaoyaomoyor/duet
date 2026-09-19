@@ -2,6 +2,8 @@ import type { ModuleInstance, ModuleRef, Project, ToolRef } from '@/types/projec
 import { getModule } from '@/modules/registry'
 import { isPresentable } from '@/modules/visibility'
 import type { StageParticipant, StageMetric } from '@/components/stage/types'
+import type { ContentSelection, PresentationRuntime } from '@/types/presentation'
+import { projectSelection, defaultSelection } from './comparisonContent'
 
 export interface ResolvedContent {
   module: ModuleInstance
@@ -9,10 +11,14 @@ export interface ResolvedContent {
   trackId: string
   visible: boolean
   known: boolean
+  clockId: string
 }
 export interface ResolvedEntry {
   participantId: string
   sampleId: string
+  sampleTitle: string
+  missingSample: boolean
+  conditions: string
   contents: ResolvedContent[]
   hidden: boolean
 }
@@ -30,6 +36,8 @@ export interface ResolvedComparison {
   id: string
   title: string
   caseId: string
+  caseTitle: string
+  conditions: string
   theme: 'ink' | 'paper'
   participants: StageParticipant[]
   sections: ResolvedSection[]
@@ -42,7 +50,13 @@ export function resolveComparison(
   project: Project,
   resolveTool: (ref: ToolRef) => { name: string },
   t: (key: string) => string,
+  selection?: ContentSelection,
+  runtime?: PresentationRuntime,
 ): ResolvedComparison {
+  const selected =
+    selection ?? (project.comparison ? defaultSelection(project.comparison) : undefined)
+  project = projectSelection(project, selected)
+  const testCase = project.comparison?.cases.find((c) => c.id === selected?.caseId)
   const participants = project.sheet.sides.map((side, index): StageParticipant => ({
     id: side.id,
     label: String.fromCharCode(65 + index),
@@ -50,25 +64,36 @@ export function resolveComparison(
     name:
       side.showName === false
         ? ''
-        : side.anonymizeName
+        : side.anonymizeName && !runtime?.revealedIdentities.includes(side.id)
           ? `${t('studio.anonymous')} ${String.fromCharCode(65 + index)}`
           : (side.labelOverride ?? resolveTool(side.toolRef).name),
     version:
-      side.showVersion === false ? '' : side.anonymizeVersion ? '•••' : (side.modelVersion ?? ''),
+      side.showVersion === false
+        ? ''
+        : side.anonymizeVersion && !runtime?.revealedIdentities.includes(side.id)
+          ? '•••'
+          : (side.modelVersion ?? ''),
     description: side.showNote === false ? '' : (side.note ?? ''),
     track: '',
   }))
   const sections = project.sheet.rows.map((row): ResolvedSection => {
     const entries = participants.map((p): ResolvedEntry => {
       const cell = row.cells[p.id]
+      const sample = testCase?.entries[p.id]?.samples.find((s) => s.id === selected?.samples[p.id])
+      const sampleId = sample?.id ?? `${project.sheet.id}:${p.id}:default`
+      const clockId = `${project.id}:${testCase?.id ?? 'default'}:${p.id}:${sampleId}`
       return {
         participantId: p.id,
-        sampleId: `${project.sheet.id}:${p.id}:default`,
+        sampleId,
+        sampleTitle: sample?.title ?? '',
+        missingSample: !!testCase && !sample,
+        conditions: sample?.conditions ?? '',
         hidden: cell?.hidden === true,
         contents: (cell?.modules ?? []).map((module) => ({
           module,
           ref: { rowId: row.id, sideId: p.id, moduleId: module.id },
-          trackId: `${project.id}:${p.id}:default:${module.id}`,
+          trackId: `${clockId}:${module.id}`,
+          clockId,
           visible: !cell?.hidden && isPresentable(module),
           known: !!getModule(module.type),
         })),
@@ -95,7 +120,9 @@ export function resolveComparison(
   return {
     id: project.id,
     title: project.title,
-    caseId: `${project.sheet.id}:default`,
+    caseId: testCase?.id ?? `${project.sheet.id}:default`,
+    caseTitle: testCase?.title ?? '',
+    conditions: testCase?.conditions ?? '',
     theme: project.sheet.layout.presentation?.theme === 'paper' ? 'paper' : 'ink',
     participants,
     sections,

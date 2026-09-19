@@ -6,9 +6,13 @@
  * 因此本文件**不包含 Pinia**，可脱离 Vue 单测。
  */
 
-import { deleteProject as deleteProjectRow, getProject, listProjects, saveProject } from '@/db/projectsRepo'
+import {
+  deleteProject as deleteProjectRow,
+  getProject,
+  listProjects,
+  saveProject,
+} from '@/db/projectsRepo'
 import { deepClone } from '@/lib/clone'
-import { uuid } from '@/lib/id'
 import { waitFor } from '@/lib/async'
 import { debounce, onPageExit } from '@/lib/util'
 import { err, ok, type Result } from '@/lib/result'
@@ -23,6 +27,7 @@ import {
   type AccentPair,
 } from './templateService'
 import type { Project } from '@/types/project'
+import { withComparison, rekeyProject } from './comparisonContent'
 
 export { listProjects, getProject }
 
@@ -43,11 +48,11 @@ export function createProject(options: CreateProjectOptions = {}): Project {
   const template = options.templateId ? getTemplate(options.templateId) : undefined
   const accent = options.accent ?? DEFAULT_ACCENT_PAIR
 
-  if (!template) return createBlankProject(name, accent)
+  if (!template) return withComparison(createBlankProject(name, accent))
 
   const instantiateOptions: { name: string; accent: AccentPair; now?: number } = { name, accent }
   if (options.now !== undefined) instantiateOptions.now = options.now
-  return instantiateTemplate(template, instantiateOptions)
+  return withComparison(instantiateTemplate(template, instantiateOptions))
 }
 
 /**
@@ -55,21 +60,13 @@ export function createProject(options: CreateProjectOptions = {}): Project {
  * 使用新的 id 与全新的行/模块 id，避免与源项目共享任何引用。
  */
 export function duplicateProject(source: Project, now = Date.now()): Project {
-  const copy = deepClone(source)
+  const copy = rekeyProject(source)
 
-  copy.id = uuid()
   copy.title = `${source.title} 副本`
   copy.createdAt = now
   copy.updatedAt = now
-  copy.sheet.id = uuid()
 
   // 重建所有 id，保证两份项目在数据库与撤销栈中互不干扰
-  for (const row of copy.sheet.rows) {
-    row.id = uuid()
-    for (const cell of Object.values(row.cells)) {
-      for (const module of cell.modules) module.id = uuid()
-    }
-  }
 
   return copy
 }

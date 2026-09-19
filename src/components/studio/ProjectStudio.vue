@@ -10,6 +10,9 @@ import { getModule } from '@/modules/registry'
 import { moduleTitle } from '@/i18n/helper'
 import type { CellRef, Project } from '@/types/project'
 import ProjectScene from './ProjectScene.vue'
+import CollectionPanel from './CollectionPanel.vue'
+import { defaultSelection, resolveRuntime, projectSelection } from '@/services/comparisonContent'
+import type { ContentSelection, PresentationRuntime } from '@/types/presentation'
 import DButton from '@/components/design/DButton.vue'
 import ModulePicker from '@/components/editor/ModulePicker.vue'
 import ModuleEditorDialog from '@/components/editor/ModuleEditorDialog.vue'
@@ -18,7 +21,102 @@ const { t } = useI18n()
 const store = useProjectStore(),
   tools = useToolsStore(),
   ui = useUiStore()
-const comparison = computed(() => resolveComparison(props.project, tools.resolve, t))
+const collectionOpen = ref(false),
+  help = ref(false),
+  focused = ref(false)
+const selection = ref<ContentSelection>(defaultSelection(props.project.comparison!))
+const presentationSceneId = ref(props.project.comparison!.scenes[0]?.id ?? '')
+const runtime = ref<PresentationRuntime | null>(null)
+const sceneDefinition = computed(() =>
+  props.project.comparison!.scenes.find((s) => s.id === presentationSceneId.value),
+)
+const activeSelection = computed(() =>
+  present.value && runtime.value ? runtime.value : selection.value,
+)
+const comparison = computed(() =>
+  resolveComparison(
+    props.project,
+    tools.resolve,
+    t,
+    activeSelection.value,
+    present.value && !reading.value && !ui.presentationExport
+      ? (runtime.value ?? undefined)
+      : undefined,
+  ),
+)
+const playlist = computed(() =>
+  props.project.comparison!.scenes.filter(
+    (s) =>
+      !s.hidden &&
+      resolveComparison(
+        props.project,
+        tools.resolve,
+        t,
+        resolveRuntime(props.project.comparison!, s.id, s.steps.length),
+      ).sections.some((r) => r.id === s.sectionId && r.visible),
+  ),
+)
+const navigationIndex = computed(() =>
+  present.value ? playlist.value.findIndex((s) => s.id === presentationSceneId.value) : index.value,
+)
+const navigationTotal = computed(() =>
+  present.value ? playlist.value.length : scenes.value.length,
+)
+const currentCase = computed(() =>
+  props.project.comparison!.cases.find((c) => c.id === activeSelection.value.caseId)!,
+)
+
+function chooseSelection(value: ContentSelection) {
+  player.pauseAll()
+  pauseMedia()
+  selectedId.value = ''
+  if (present.value && runtime.value)
+    runtime.value = { ...runtime.value, ...value, transportState: 'paused' }
+  else selection.value = value
+}
+function chooseCase(id: string) {
+  chooseSelection(defaultSelection(props.project.comparison!, id))
+  if (present.value) {
+    const scene = playlist.value.find((s) => s.caseId === id)
+    if (scene) jumpScene(scene.id)
+  }
+}
+function jumpScene(id: string, step = 0) {
+  const scene = props.project.comparison!.scenes.find((s) => s.id === id)
+  if (!scene) return
+  player.pauseAll()
+  pauseMedia()
+  focused.value = false
+  presentationSceneId.value = id
+  runtime.value = resolveRuntime(props.project.comparison!, id, step)
+  selection.value = { caseId: runtime.value.caseId, samples: { ...runtime.value.samples } }
+  sceneId.value = scene.sectionId
+}
+function restart() {
+  const first = playlist.value[0]
+  if (first) jumpScene(first.id)
+}
+function toggleHelp() {
+  help.value = !help.value
+  player.pauseAll()
+  pauseMedia()
+}
+function toggleFocusView() {
+  if (!runtime.value?.focusIds.length && comparison.value.participants[0])
+    focusParticipant(comparison.value.participants[0].id)
+  focused.value = !focused.value
+}
+function focusParticipant(id: string) {
+  if (runtime.value)
+    runtime.value = { ...runtime.value, focusIds: runtime.value.focusIds.includes(id) ? [] : [id] }
+}
+function toggleSelectedAudio() {
+  const p = runtime.value?.focusIds[0] ?? comparison.value.participants[0]?.id
+  const content = section.value?.entries
+    .find((e) => e.participantId === p)
+    ?.contents.find((c) => c.module.type === 'audio' && c.visible)
+  if (content) void player.toggle(content.trackId)
+}
 const player = useStagePlayback()
 provide('duet:stage-playback', player)
 const projectId = computed(() => props.project.id)
@@ -33,7 +131,9 @@ const view = ref<'theatre' | 'reading'>('theatre'),
 const present = computed(() => props.project.ui.mode === 'present')
 const section = computed(
   () =>
-    comparison.value.sections.find((s) => s.id === sceneId.value) ??
+    comparison.value.sections.find(
+      (s) => s.id === (present.value ? sceneDefinition.value?.sectionId : sceneId.value),
+    ) ??
     comparison.value.sections.find((s) => !s.identity) ??
     comparison.value.sections[0],
 )
@@ -69,13 +169,54 @@ const picker = ref<CellRef | null>(null)
 const root = ref<HTMLElement | null>(null)
 const volume = ref(0.8)
 watch(
+  activeSelection,
+  (v) => {
+    store.contentSelection = v
+    player.pauseAll()
+    pauseMedia()
+  },
+  { flush: 'sync', immediate: true },
+)
+watch(
   () => props.project.id,
   () => {
+    selection.value = defaultSelection(props.project.comparison!)
+    presentationSceneId.value = props.project.comparison!.scenes[0]?.id ?? ''
+    runtime.value = null
     sceneId.value = ''
     selectedId.value = ''
     clean.value = false
     overflowIds.value = new Set()
     player.pauseAll()
+  },
+)
+watch(present, (value) => {
+  if (ui.presentationExport) return
+  if (value) {
+    const target =
+      playlist.value.find(
+        (s) =>
+          s.id === presentationSceneId.value &&
+          s.caseId === selection.value.caseId &&
+          s.sectionId === sceneId.value,
+      ) ??
+      playlist.value.find(
+        (s) => s.caseId === selection.value.caseId && s.sectionId === sceneId.value,
+      ) ??
+      playlist.value[0]
+    if (target) jumpScene(target.id)
+  } else {
+    runtime.value = null
+    focused.value = false
+    help.value = false
+  }
+})
+watch(
+  () => props.project.comparison,
+  (c) => {
+    if (!c) return
+    if (!c.cases.some((a) => a.id === selection.value.caseId)) selection.value = defaultSelection(c)
+    if (runtime.value && !c.scenes.some((s) => s.id === runtime.value!.sceneId)) restart()
   },
 )
 watch([() => section.value?.id, present, view], () => {
@@ -121,11 +262,36 @@ function select(content: ResolvedContent) {
   player.pauseAll()
 }
 function next(offset: number) {
+  if (present.value && sceneDefinition.value && !ui.presentationExport) {
+    const step = runtime.value?.stepIndex ?? 0,
+      count = sceneDefinition.value.steps.length
+    if (offset > 0 && step < count) {
+      jumpScene(presentationSceneId.value, step + 1)
+      return
+    }
+    if (offset < 0 && step > 0) {
+      jumpScene(presentationSceneId.value, step - 1)
+      return
+    }
+    const at = playlist.value.findIndex((s) => s.id === presentationSceneId.value)
+    const target = playlist.value[at + offset]
+    if (target) jumpScene(target.id, offset < 0 ? target.steps.length : 0)
+    return
+  }
   const item = scenes.value[Math.max(0, Math.min(scenes.value.length - 1, index.value + offset))]
   if (item) sceneId.value = item.id
   pauseMedia()
 }
 function exit() {
+  if (help.value) {
+    help.value = false
+    return
+  }
+  if (focused.value || runtime.value?.focusIds.length) {
+    focused.value = false
+    if (runtime.value) runtime.value.focusIds = []
+    return
+  }
   if (document.fullscreenElement) {
     void document.exitFullscreen()
     return
@@ -164,12 +330,40 @@ function keyboard(event: KeyboardEvent) {
   }
   if (
     event.target instanceof HTMLElement &&
-    event.target.closest('input,textarea,select,[contenteditable]')
+    event.target.closest('input,textarea,select,button,a,audio,video,[contenteditable]')
   )
     return
-  if (['ArrowRight', 'PageDown', 'ArrowLeft', 'PageUp'].includes(event.key)) {
+  if (help.value && event.key !== '?') return
+  if (['ArrowRight', 'PageDown', 'ArrowLeft', 'PageUp', ' '].includes(event.key)) {
     event.preventDefault()
-    next(['ArrowRight', 'PageDown'].includes(event.key) ? 1 : -1)
+    next(['ArrowRight', 'PageDown', ' '].includes(event.key) ? 1 : -1)
+  }
+  if (event.key === '?') {
+    event.preventDefault()
+    help.value = !help.value
+    player.pauseAll()
+    pauseMedia()
+  }
+  if (help.value) return
+  if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault()
+    const s = event.key === 'Home' ? playlist.value[0] : playlist.value.at(-1)
+    if (s) jumpScene(s.id)
+  }
+  if (event.key.toLowerCase() === 'p') {
+    event.preventDefault()
+    toggleSelectedAudio()
+  }
+  if (/^[1-6]$/.test(event.key)) {
+    const p = comparison.value.participants[Number(event.key) - 1]
+    if (p) {
+      event.preventDefault()
+      focusParticipant(p.id)
+    }
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    toggleFocusView()
   }
   if (event.key.toLowerCase() === 'f') {
     event.preventDefault()
@@ -177,17 +371,32 @@ function keyboard(event: KeyboardEvent) {
   }
 }
 onMounted(() => {
+  if (present.value && !runtime.value) restart()
   window.addEventListener('keydown', keyboard)
   document.addEventListener('visibilitychange', onVisibility)
 })
 onBeforeUnmount(() => {
   player.pauseAll()
   pauseMedia()
+  store.contentSelection = undefined
   window.removeEventListener('keydown', keyboard)
   document.removeEventListener('visibilitychange', onVisibility)
 })
 function patchData(patch: Record<string, unknown>) {
-  if (selected.value) store.patchModuleData(selected.value.ref, patch)
+  if (selected.value) {
+    const result = store.patchModuleData(selected.value.ref, patch)
+    if (
+      result.ok &&
+      selected.value.module.type === 'audio' &&
+      ('assetId' in patch || 'sourceUrl' in patch)
+    ) {
+      const sample = currentCase.value.entries[selected.value.ref.sideId]?.samples.find(
+        (s) => s.id === activeSelection.value.samples[selected.value!.ref.sideId],
+      )
+      if (sample?.lyricsNeedReview)
+        ui.notify('音频已更换，请在“作品与流程”核对并确认保留的歌词。', 'info')
+    }
+  }
 }
 function patchProps(patch: Record<string, unknown>) {
   if (selected.value)
@@ -202,9 +411,12 @@ function add(type: string) {
   const result = store.addModuleAt(target, type, moduleTitle(type))
   picker.value = null
   if (result.ok) {
-    const next = resolveComparison(result.value, tools.resolve, t).sections.find(
-      (s) => s.id === target.rowId,
-    )
+    const next = resolveComparison(
+      result.value,
+      tools.resolve,
+      t,
+      activeSelection.value,
+    ).sections.find((s) => s.id === target.rowId)
     selectedId.value =
       next?.entries.find((e) => e.participantId === target.sideId)?.contents.at(-1)?.module.id ?? ''
   }
@@ -212,7 +424,7 @@ function add(type: string) {
 async function addSection(shared: boolean) {
   const result = shared ? store.insertCommonRowAt(props.project.sheet.rows.length) : store.addRow()
   if (result.ok) {
-    sceneId.value = result.value.sheet.rows.at(-1)!.id
+    sceneId.value = projectSelection(result.value, activeSelection.value).sheet.rows.at(-1)!.id
     await nextTick()
     properties.value = true
   }
@@ -241,6 +453,7 @@ function theme(value: 'ink' | 'paper') {
       'studio--present': present,
       'studio--clean': clean && present,
       'studio--properties': properties && !present,
+      'studio--collection': collectionOpen && !present,
     }"
     @play.capture="onPlay"
   >
@@ -276,6 +489,13 @@ function theme(value: 'ink' | 'paper') {
           @click="properties = !properties"
           >{{ t('studio.showProperties') }}</DButton
         >
+        <DButton
+          v-if="!present"
+          compact
+          :aria-pressed="collectionOpen"
+          @click="collectionOpen = !collectionOpen"
+          >作品与流程</DButton
+        >
         <DButton compact icon="export" @click="ui.openExport()">{{ t('export.menu') }}</DButton>
         <DButton
           v-if="!present"
@@ -297,6 +517,15 @@ function theme(value: 'ink' | 'paper') {
       </div>
     </header>
     <div class="studio__layout">
+      <CollectionPanel
+        v-if="collectionOpen && !present"
+        :project="project"
+        :selection="activeSelection"
+        :scene-id="presentationSceneId"
+        @select="chooseSelection"
+        @scene="jumpScene"
+        @close="collectionOpen = false"
+      />
       <nav v-if="!present" class="studio__outline" :aria-label="t('studio.structure')">
         <h2 class="d-kicker">{{ t('studio.structure') }}</h2>
         <button
@@ -351,6 +580,76 @@ function theme(value: 'ink' | 'paper') {
         </div>
       </nav>
       <main class="studio__stage-scroll" :data-design-theme="comparison.theme">
+        <div v-show="!clean && !ui.presentationExport" class="studio__selection no-export">
+          <label
+            ><span>测试题</span
+            ><select
+              :value="activeSelection.caseId"
+              @change="chooseCase(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="c in project.comparison!.cases" :key="c.id" :value="c.id">
+                {{ c.title }}
+              </option>
+            </select></label
+          >
+          <template v-for="p in comparison.participants" :key="p.id"
+            ><label v-if="(currentCase.entries[p.id]?.samples.length ?? 0) > 1"
+              ><span>{{ p.label }}</span
+              ><select
+                :aria-label="p.label + ' 作品'"
+                :value="activeSelection.samples[p.id] ?? ''"
+                @change="
+                  chooseSelection({
+                    caseId: activeSelection.caseId,
+                    samples: {
+                      ...activeSelection.samples,
+                      [p.id]: ($event.target as HTMLSelectElement).value || null,
+                    },
+                  })
+                "
+              >
+                <option value="">本题未提供样本</option>
+                <option
+                  v-for="s in currentCase.entries[p.id]?.samples.filter(
+                    (s) => !s.hidden || !present,
+                  )"
+                  :key="s.id"
+                  :value="s.id"
+                >
+                  {{ s.title }}
+                </option>
+              </select></label
+            ></template
+          >
+          <label v-if="present && playlist.length > 1"
+            ><span>场景</span
+            ><select
+              aria-label="演示场景"
+              :value="presentationSceneId"
+              @change="jumpScene(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="(s, n) in playlist" :key="s.id" :value="s.id">
+                {{ n + 1 }} · {{ s.title || '场景' }}
+              </option>
+            </select></label
+          >
+          <DButton v-if="present" compact tone="quiet" @click="restart">重新开始</DButton
+          ><DButton v-if="present" compact tone="quiet" @click="toggleHelp">快捷键</DButton>
+        </div>
+        <div
+          v-if="help && present"
+          class="studio__help no-export"
+          role="region"
+          aria-label="演示快捷键"
+        >
+          <strong>演示控制</strong>
+          <p>→ / 空格 下一步 · ← 上一步 · Home / End 首尾场景</p>
+          <p>P 试听 / 暂停 · 1 / 2 聚焦工具 · Enter 放大 · F 全屏 · Esc 逐层退出</p>
+          <DButton compact @click="help = false">关闭帮助</DButton>
+        </div>
+        <p v-if="currentCase.conditions && !clean" class="studio__conditions">
+          {{ currentCase.conditions }}
+        </p>
         <p
           v-if="!present && section && overflowIds.has(section.id) && !reading"
           class="studio__warning no-export"
@@ -368,11 +667,26 @@ function theme(value: 'ink' | 'paper') {
             ><ProjectScene
               v-show="reading ? s.visible : s.id === section?.id"
               :comparison="comparison"
-              :section="s"
-              :index="n"
-              :total="scenes.length"
+              :section="
+                present && !reading && sceneDefinition?.title
+                  ? { ...s, title: sceneDefinition.title }
+                  : s
+              "
+              :index="present && !reading ? navigationIndex : n"
+              :total="present && !reading ? navigationTotal : scenes.length"
               :reading="reading"
               :editing="!present"
+              :focus-ids="
+                present && !reading && (!ui.presentationExport || ui.presentationCurrentStep)
+                  ? (runtime?.focusIds ?? [])
+                  : []
+              "
+              :concealed-ids="
+                present && !reading && (!ui.presentationExport || ui.presentationCurrentStep)
+                  ? (runtime?.concealedIds ?? [])
+                  : []
+              "
+              :focused="focused && (!ui.presentationExport || ui.presentationCurrentStep)"
               @select="select"
               @overflow="overflowIds.add($event)"
           /></template>
@@ -382,20 +696,40 @@ function theme(value: 'ink' | 'paper') {
           </div>
         </div>
         <footer v-if="!reading && scenes.length" class="studio__paging no-export">
+          <template v-if="present"
+            ><DButton
+              v-for="p in comparison.participants"
+              :key="p.id"
+              compact
+              tone="quiet"
+              :aria-pressed="runtime?.focusIds.includes(p.id) ?? false"
+              @click="focusParticipant(p.id)"
+              >聚焦 {{ p.label }}</DButton
+            ><DButton compact tone="quiet" @click="toggleFocusView">{{
+              focused ? '恢复对照' : '放大'
+            }}</DButton></template
+          >
           <DButton
             compact
             tone="quiet"
             icon="chevron-left"
             :aria-label="t('studio.previous')"
-            :disabled="index <= 0"
+            :disabled="navigationIndex <= 0 && !runtime?.stepIndex"
             @click="next(-1)"
-          /><span>{{ Math.max(1, index + 1) }} / {{ scenes.length }}</span
+          /><span
+            >{{ Math.max(1, navigationIndex + 1) }} / {{ navigationTotal
+            }}<small v-if="present && sceneDefinition?.steps.length">
+              · {{ runtime?.stepIndex ?? 0 }} / {{ sceneDefinition.steps.length }} 步</small
+            ></span
           ><DButton
             compact
             tone="quiet"
             icon="chevron-right"
             :aria-label="t('studio.next')"
-            :disabled="index >= scenes.length - 1"
+            :disabled="
+              navigationIndex >= navigationTotal - 1 &&
+              (!present || (runtime?.stepIndex ?? 0) >= (sceneDefinition?.steps.length ?? 0))
+            "
             @click="next(1)"
           /><label
             >{{ t('studio.volume')
@@ -625,6 +959,72 @@ function theme(value: 'ink' | 'paper') {
   </section>
 </template>
 <style scoped>
+@media (min-width: 1451px) {
+  .studio--collection .studio__layout {
+    grid-template-columns: 210px minmax(0, 1fr) 380px;
+  }
+}
+.studio__paging {
+  flex-wrap: wrap;
+}
+:global(body[data-exporting='1'] .studio__canvas) {
+  border: 0 !important;
+}
+.studio__layout {
+  position: relative;
+}
+.studio__selection {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  width: min(100%, 1400px);
+  margin: 0 auto 18px;
+}
+.studio__selection label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.studio__selection label span {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--d-muted);
+}
+.studio__selection select {
+  max-width: 210px;
+  padding: 7px 24px 7px 0;
+  border: 0;
+  border-bottom: 1px solid var(--d-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--d-text);
+  font-size: 12px;
+}
+.studio__conditions {
+  color: var(--d-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0 auto 18px;
+  max-width: 1400px;
+  white-space: pre-wrap;
+}
+.studio__help {
+  padding: 20px;
+  border: 1px solid var(--d-line);
+  background: var(--d-surface);
+  margin: 0 auto 20px;
+  max-width: 900px;
+  font-size: 13px;
+  line-height: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio :deep(*) {
+    transition: none !important;
+  }
+}
+
 .studio {
   height: 100%;
   display: flex;

@@ -10,6 +10,9 @@
 import { deepClone } from '@/lib/clone'
 import { err, ok, type Result } from '@/lib/result'
 import { uuid } from '@/lib/id'
+import { projectSelection, commitSelection, defaultSelection } from './comparisonContent'
+import { validateComparison } from '@/types/validateComparison'
+import type { ContentSelection } from '@/types/presentation'
 import type { Command, NewModuleInput } from '@/types/commands'
 import type {
   Cell,
@@ -28,7 +31,41 @@ export function applyCommand(project: Project, command: Command): Project {
 }
 
 /** 应用一条命令并返回 Result，便于 store 层把失败原因暴露给 UI */
-export function applyCommandResult(project: Project, command: Command): Result<Project, string> {
+export function applyCommandResult(
+  project: Project,
+  command: Command,
+  selection?: ContentSelection,
+): Result<Project, string> {
+  if (command.t === 'comparison/replace') {
+    const checked = validateComparison(command.content, project)
+    return checked.ok
+      ? ok(projectSelection({ ...project, comparison: deepClone(checked.value) }))
+      : checked
+  }
+  if (project.comparison && /^(row|cell|module|modules)\//.test(command.t)) {
+    const context = selection ?? defaultSelection(project.comparison)
+    if ('ref' in command) {
+      const item = project.comparison.cases.find((c) => c.id === context.caseId)
+      const section = item?.sections.find((s) => s.id === command.ref.rowId)
+      if (
+        section?.kind === 'paired' &&
+        !item?.entries[command.ref.sideId]?.samples.some(
+          (s) => s.id === context.samples[command.ref.sideId],
+        )
+      )
+        return err('本题未提供样本，请先在“作品与流程”中添加作品')
+    }
+    const projected = projectSelection(project, context)
+    const edited = applySheetCommand(projected, command)
+    return edited.ok ? ok(commitSelection(project, edited.value, context)) : edited
+  }
+  return applySheetCommand(project, command)
+}
+
+function applySheetCommand(
+  project: Project,
+  command: Exclude<Command, { t: 'comparison/replace' }>,
+): Result<Project, string> {
   switch (command.t) {
     case 'project/patch':
       return ok({ ...project, ...deepClone(command.patch) })
@@ -39,7 +76,10 @@ export function applyCommandResult(project: Project, command: Command): Result<P
     case 'layout/patch':
       return ok({
         ...project,
-        sheet: { ...project.sheet, layout: { ...project.sheet.layout, ...deepClone(command.patch) } },
+        sheet: {
+          ...project.sheet,
+          layout: { ...project.sheet.layout, ...deepClone(command.patch) },
+        },
       })
 
     case 'side/patch':
@@ -140,7 +180,11 @@ function clampIndex(index: number | undefined, length: number): number {
   return Math.min(length, Math.max(0, Math.trunc(index)))
 }
 
-function patchSide(project: Project, sideId: SideId, patch: Record<string, unknown>): Result<Project, string> {
+function patchSide(
+  project: Project,
+  sideId: SideId,
+  patch: Record<string, unknown>,
+): Result<Project, string> {
   if (!project.sheet.sides.some((side) => side.id === sideId)) {
     return err(`对比侧不存在：${sideId}`)
   }

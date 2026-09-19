@@ -13,6 +13,7 @@ import {
   serializeProjects,
 } from './projectService'
 import { getTemplate, instantiateTemplate } from './templateService'
+import { withComparison } from './comparisonContent'
 import { SCHEMA_VERSION } from '@/types/project'
 
 const music = getTemplate('music')!
@@ -33,7 +34,11 @@ describe('createProject', () => {
   })
 
   it('可覆盖配色', () => {
-    const project = createProject({ name: 'x', templateId: 'music', accent: ['#ffffff', '#000000'] })
+    const project = createProject({
+      name: 'x',
+      templateId: 'music',
+      accent: ['#ffffff', '#000000'],
+    })
     expect(project.sheet.sides[0]?.accent).toBe('#ffffff')
   })
 
@@ -83,7 +88,7 @@ describe('工程文件：序列化与解析往返', () => {
     if (!parsed.ok) return
 
     expect(parsed.value).toHaveLength(1)
-    expect(parsed.value[0]).toEqual(original)
+    expect(parsed.value[0]).toEqual(withComparison(original))
   })
 
   it('信封格式包含必要的元信息', () => {
@@ -197,7 +202,9 @@ describe('projectFileName', () => {
   })
 })
 
-function collectModuleIds(project: { sheet: { rows: Array<{ cells: Record<string, { modules: Array<{ id: string }> }> }> } }): string[] {
+function collectModuleIds(project: {
+  sheet: { rows: Array<{ cells: Record<string, { modules: Array<{ id: string }> }> }> }
+}): string[] {
   const ids: string[] = []
   for (const row of project.sheet.rows) {
     for (const cell of Object.values(row.cells)) {

@@ -19,7 +19,12 @@ export function useStagePlayback() {
     if (element) {
       elements.set(id, element)
       state[id] ??= { playing: false, current: 0, duration: 0, error: false }
-    } else elements.delete(id)
+    } else {
+      request++
+      elements.delete(id)
+      delete state[id]
+      if (activeId.value === id) activeId.value = null
+    }
   }
   function update(id: string): void {
     const audio = elements.get(id)

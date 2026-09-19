@@ -154,7 +154,7 @@ export async function exportElementToDataUrl(
       width: Math.ceil(rect.width),
       height: Math.ceil(rect.height),
       backgroundColor: options.backgroundColor ?? readBackgroundColor(root),
-      style: { margin: '0' },
+      style: { margin: '0', border: '0' },
       pixelRatio: scale,
       cacheBust: true,
     })
@@ -194,7 +194,7 @@ async function safeToBlob(
         cacheBust: true,
         // Computed auto margins become pixel offsets when cloned into an SVG.
         // The exported image starts at the canvas edge, not its position in the workspace.
-        style: { margin: '0' },
+        style: { margin: '0', border: '0' },
         /*
          * 过滤掉不该出现在导出图里的节点。
          *

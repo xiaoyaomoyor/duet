@@ -12,7 +12,12 @@
  */
 
 import { onUnmounted, ref } from 'vue'
-import { AudioSyncEngine, isSyncSupported, type SyncDegradeReason, type SyncStatus } from '@/services/audioSync'
+import {
+  AudioSyncEngine,
+  isSyncSupported,
+  type SyncDegradeReason,
+  type SyncStatus,
+} from '@/services/audioSync'
 
 export interface AudioClockState {
   currentMs: number
@@ -75,6 +80,11 @@ export function reportAudioState(sideId: string, patch: Partial<AudioClockState>
   emit(sideId, next)
 }
 
+/** Release ephemeral sample clocks once their media and lyric subscribers are gone. */
+export function releaseAudioClock(sideId: string): void {
+  if (!listeners.get(sideId)?.size && !manual.get(sideId)?.element) manual.delete(sideId)
+}
+
 /** 读取某个对比方当前的播放状态 */
 export function getAudioState(sideId: string): AudioClockState {
   const state = stateOf(sideId)
@@ -108,6 +118,7 @@ export function useAudioClock(sideId: string) {
     if (!current) return
     current.delete(listener)
     if (current.size === 0) listeners.delete(sideId)
+    releaseAudioClock(sideId)
   })
 
   return { currentMs, durationMs, playing }
@@ -125,7 +136,10 @@ export function useAudioClock(sideId: string) {
  *
  * @returns 退订函数
  */
-export function subscribeAudioState(sideId: string, listener: (state: AudioClockState) => void): () => void {
+export function subscribeAudioState(
+  sideId: string,
+  listener: (state: AudioClockState) => void,
+): () => void {
   let set = listeners.get(sideId)
   if (!set) {
     set = new Set()
@@ -231,8 +245,9 @@ export function attachSync(projectId: string, sides: string[]): AttachResult {
       if (!state?.element) return null
       return { sideId, element: state.element, offsetMs: state.offsetMs }
     })
-    .filter((track): track is { sideId: string; element: HTMLMediaElement; offsetMs: number } =>
-      track !== null,
+    .filter(
+      (track): track is { sideId: string; element: HTMLMediaElement; offsetMs: number } =>
+        track !== null,
     )
 
   if (tracks.length === 0) return { ok: false, reason: 'no-tracks' }

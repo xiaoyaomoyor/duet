@@ -1,0 +1,65 @@
+<script setup lang="ts">
+import { computed, provide } from 'vue'
+import { useI18n } from 'vue-i18n'
+import type { Project } from '@/types/project'
+import type { ExportFrame } from '@/services/presentationExport'
+import { resolveComparison } from '@/services/sceneResolver'
+import { useToolsStore } from '@/stores/useToolsStore'
+import { useStagePlayback } from '@/composables/useStagePlayback'
+import ProjectScene from './ProjectScene.vue'
+const props = defineProps<{ project: Project; frames: ExportFrame[] }>()
+const { t } = useI18n(),
+  tools = useToolsStore()
+provide('duet:stage-playback', useStagePlayback())
+const resolved = computed(() =>
+  props.frames.map((frame) => {
+    const comparison = resolveComparison(props.project, tools.resolve, t, frame.state, frame.state)
+    const scene = props.project.comparison!.scenes.find((s) => s.id === frame.state.sceneId)!
+    return {
+      frame,
+      comparison,
+      section: {
+        ...comparison.sections.find((s) => s.id === scene.sectionId)!,
+        title: scene.title || comparison.sections.find((s) => s.id === scene.sectionId)!.title,
+      },
+    }
+  }),
+)
+</script>
+<template>
+  <div
+    class="presentation-export"
+    data-runtime-export
+    :data-design-theme="project.sheet.layout.presentation?.theme ?? 'ink'"
+  >
+    <div
+      v-for="({ frame, comparison, section }, n) in resolved"
+      :key="n"
+      data-export-frame
+      :data-export-scene="frame.scene"
+      :data-export-step="frame.state.stepIndex"
+      :data-export-title="frame.title"
+      :data-export-choices="JSON.stringify(frame.choices)"
+      :data-export-defaults="JSON.stringify(frame.defaults)"
+      :data-export-samples="
+        JSON.stringify(project.sheet.sides.map((p) => frame.state.samples[p.id] ?? null))
+      "
+    >
+      <ProjectScene
+        :comparison="comparison"
+        :section="section"
+        :index="frame.scene"
+        :total="new Set(frames.map((f) => f.scene)).size"
+        :reading="false"
+        :editing="false"
+        :focus-ids="frame.state.focusIds"
+        :concealed-ids="frame.state.concealedIds"
+      />
+    </div>
+  </div>
+</template>
+<style scoped>
+.presentation-export {
+  width: 1280px;
+}
+</style>

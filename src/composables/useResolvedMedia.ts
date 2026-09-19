@@ -40,7 +40,7 @@ export interface ResolvedMedia {
 }
 
 /** 媒体来源的稳定键：用于 watch 比较 */
-function sourceKey(source: MediaSource | undefined): string {
+export function sourceKey(source: MediaSource | undefined): string {
   if (!source) return ''
   return source.kind === 'asset' ? `a:${source.assetId}` : `u:${source.url}`
 }
@@ -48,9 +48,7 @@ function sourceKey(source: MediaSource | undefined): string {
 /**
  * @param source 取值函数：返回 undefined 表示"未选择媒体"，不触发解析
  */
-export function useResolvedMedia(
-  source: MaybeRefOrGetter<MediaSource | undefined>,
-): ResolvedMedia {
+export function useResolvedMedia(source: MaybeRefOrGetter<MediaSource | undefined>): ResolvedMedia {
   const state = reactive<Omit<ResolvedMedia, 'retry'>>({
     src: null,
     status: 'idle',
@@ -88,7 +86,9 @@ export function useResolvedMedia(
     () => {
       const task = run()
       pendingResolutions.add(task)
-      const finish = (): void => { pendingResolutions.delete(task) }
+      const finish = (): void => {
+        pendingResolutions.delete(task)
+      }
       void task.then(finish, finish)
     },
     { immediate: true },

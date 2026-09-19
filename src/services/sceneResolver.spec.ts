@@ -11,7 +11,12 @@ const resolve = (p: Project) =>
     () => ({ name: 'Tool' }),
     (key) => key,
   )
-const fixture = () => createProject({ templateId: 'stage-generic', name: '评测' })
+const fixture = () => {
+  const p = createProject({ templateId: 'stage-generic', name: '评测' })
+  delete p.comparison
+  p.schemaVersion = 8
+  return p
+}
 describe('R2 legacy scene adapter', () => {
   it('keeps stable participant/sample/track identities and never mutates legacy data', () => {
     const p = fixture(),

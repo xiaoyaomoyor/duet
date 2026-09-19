@@ -9,6 +9,7 @@
 
 import { SCHEMA_VERSION } from '@/types'
 import { presetIdOfColor } from '@/data/accentPresets'
+import { validateProject } from '@/types/validate'
 
 /** 对象存储名（常量在此集中，避免各处拼写漂移） */
 export const STORE = {
@@ -362,6 +363,7 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  { to: 9, run: (_db, tx) => migrateProjectRecords(tx) },
 ]
 
 /** 单个 sheet.layout 的 v7→v8 改写（导出是为了能直接单测） */
@@ -403,7 +405,15 @@ export function withTitleRow(rows: unknown[]): unknown[] {
   const cells: Record<string, unknown> = {}
   for (const sideId of sideIds) cells[sideId] = { modules: [make()], hidden: false }
 
-  return [{ id: `migrated-title-row-${Math.random().toString(36).slice(2, 10)}`, kind: 'paired', cells, collapsed: false }, ...rows]
+  return [
+    {
+      id: `migrated-title-row-${Math.random().toString(36).slice(2, 10)}`,
+      kind: 'paired',
+      cells,
+      collapsed: false,
+    },
+    ...rows,
+  ]
 }
 export function migrateLayout(layout: Record<string, unknown>): Record<string, unknown> {
   const next = { ...layout }
@@ -448,14 +458,12 @@ export function migrateSideAccent(side: Record<string, unknown>): Record<string,
  */
 export function migrateModule(module: Record<string, unknown>): Record<string, unknown> {
   const type = module.type
-  const data = (typeof module.data === 'object' && module.data !== null ? module.data : {}) as Record<
-    string,
-    unknown
-  >
-  const props = (typeof module.props === 'object' && module.props !== null ? module.props : {}) as Record<
-    string,
-    unknown
-  >
+  const data = (
+    typeof module.data === 'object' && module.data !== null ? module.data : {}
+  ) as Record<string, unknown>
+  const props = (
+    typeof module.props === 'object' && module.props !== null ? module.props : {}
+  ) as Record<string, unknown>
 
   if (type === 'cover') {
     return {
@@ -487,7 +495,11 @@ export function migrateModule(module: Record<string, unknown>): Record<string, u
       ...module,
       type: 'text',
       data: { text: typeof data.text === 'string' ? data.text : '', align: 'left' },
-      props: { variant: 'note', tone: typeof data.tone === 'string' ? data.tone : 'neutral', ...props },
+      props: {
+        variant: 'note',
+        tone: typeof data.tone === 'string' ? data.tone : 'neutral',
+        ...props,
+      },
     }
   }
 
@@ -541,9 +553,26 @@ export function upgrade(db: IDBDatabase, oldVersion: number, tx: IDBTransaction)
   createStores(db)
 
   // 逐级执行迁移：老的库必须能一路升到 SCHEMA_VERSION
-  for (const migration of MIGRATIONS) {
-    if (migration.to > oldVersion && migration.to <= SCHEMA_VERSION) {
-      migration.run(db, tx)
+  if (oldVersion >= SCHEMA_VERSION) return
+  migrateProjectRecords(tx)
+}
+
+function migrateProjectRecords(tx: IDBTransaction): void {
+  // One cursor + one transaction: concurrent migration cursors can overwrite each other's updates.
+  const request = tx.objectStore(STORE.projects).openCursor()
+  request.onsuccess = () => {
+    const cursor = request.result
+    if (!cursor) return
+    try {
+      const result = validateProject(cursor.value)
+      if (!result.ok) {
+        tx.abort()
+        return
+      }
+      cursor.update(result.value)
+      cursor.continue()
+    } catch {
+      tx.abort()
     }
   }
 }

@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { StageMetric, StageParticipant } from './types'
 import StageIdentity from './StageIdentity.vue'
-defineProps<{ participants: StageParticipant[]; metrics: StageMetric[]; caption: string }>()
+defineProps<{
+  participants: StageParticipant[]
+  metrics: StageMetric[]
+  caption: string
+  focusIds?: string[] | undefined
+  concealedIds?: string[] | undefined
+}>()
 </script>
 <template>
   <div class="stage-table-wrap">
@@ -14,7 +20,15 @@ defineProps<{ participants: StageParticipant[]; metrics: StageMetric[]; caption:
       <thead>
         <tr>
           <th scope="col">{{ $t('showcase.dimension') }}</th>
-          <th v-for="participant in participants" :key="participant.id" scope="col">
+          <th
+            v-for="participant in participants"
+            :key="participant.id"
+            scope="col"
+            :style="{
+              visibility: concealedIds?.includes(participant.id) ? 'hidden' : undefined,
+              opacity: focusIds?.length && !focusIds.includes(participant.id) ? 0.35 : 1,
+            }"
+          >
             <StageIdentity :participant="participant" />
           </th>
         </tr>
@@ -28,6 +42,10 @@ defineProps<{ participants: StageParticipant[]; metrics: StageMetric[]; caption:
             v-for="participant in participants"
             :key="participant.id"
             :data-tone="participant.tone"
+            :style="{
+              visibility: concealedIds?.includes(participant.id) ? 'hidden' : undefined,
+              opacity: focusIds?.length && !focusIds.includes(participant.id) ? 0.35 : 1,
+            }"
           >
             <strong>{{ metric.values[participant.id]?.value ?? '—' }}</strong>
             <p>{{ metric.values[participant.id]?.note ?? $t('showcase.missingValue') }}</p>

@@ -12,6 +12,8 @@
 import { SCHEMA_VERSION, type Project, type Sheet, type Side, type Row, type Cell } from './project'
 import type { Result } from '@/lib/result'
 import { ok, err } from '@/lib/result'
+import { migrateProject } from '@/services/projectMigration'
+import { validateComparison } from './validateComparison'
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -144,6 +146,8 @@ export function validateProject(value: unknown): Result<Project, string> {
 
   if (value.schemaVersion === undefined) return err('工程文件：缺少 schemaVersion')
   if (typeof value.schemaVersion !== 'number') return err('工程文件：schemaVersion 必须是数字')
+  if (!Number.isInteger(value.schemaVersion) || value.schemaVersion < 1)
+    return err('工程文件：schemaVersion 必须是正整数')
 
   if (value.schemaVersion > SCHEMA_VERSION) {
     return err(
@@ -157,9 +161,27 @@ export function validateProject(value: unknown): Result<Project, string> {
 
   const sheetResult = validateSheet(value.sheet)
   if (!sheetResult.ok) return sheetResult
+  if (value.comparison !== undefined) {
+    const content = validateComparison(value.comparison, value as unknown as Project)
+    if (!content.ok) return content
+  }
+  if (value.migrationSnapshot !== undefined) {
+    const snapshot = value.migrationSnapshot
+    if (
+      !isPlainObject(snapshot) ||
+      typeof snapshot.schemaVersion !== 'number' ||
+      !Number.isInteger(snapshot.schemaVersion) ||
+      snapshot.schemaVersion < 1 ||
+      snapshot.schemaVersion > 8 ||
+      !validateSheet(snapshot.sheet).ok
+    )
+      return err('升级前快照损坏，无法保证恢复，请重新导入原始工程')
+  }
 
   // 补齐可选字段，保证下游不必到处判空
-  const project = value as unknown as Project
+  const project = migrateProject(value as unknown as Project)
+  const comparison = validateComparison(project.comparison, project)
+  if (!comparison.ok) return comparison
   return ok({
     ...project,
     tags: Array.isArray(project.tags) ? project.tags : [],
@@ -197,6 +219,7 @@ export function collectAssetIds(project: Project): Set<string> {
     }
   }
 
+  visitUnknown(project)
   for (const side of project.sheet.sides) {
     if (side.toolRef.kind === 'inline' && side.toolRef.iconAssetId) {
       ids.add(side.toolRef.iconAssetId)

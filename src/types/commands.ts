@@ -1,3 +1,4 @@
+import type { ComparisonContent } from './presentation'
 /**
  * 命令定义（唯一写入口，见施工文档 §8.3）
  *
@@ -23,6 +24,7 @@ import type {
 } from './project'
 
 export type Command =
+  | { t: 'comparison/replace'; content: ComparisonContent }
   // —— 项目级 ——
   | { t: 'project/patch'; patch: Partial<Pick<Project, 'title' | 'tags' | 'pinned'>> }
   | { t: 'ui/patch'; patch: Partial<ProjectUiState> }
@@ -47,7 +49,11 @@ export type Command =
   | { t: 'row/setHeight'; rowId: string; height: number | undefined }
   | { t: 'row/toggleCollapsed'; rowId: string }
   // —— 格 ——
-  | { t: 'cell/patch'; ref: CellRef; patch: Partial<Pick<CellPatchTarget, 'hidden' | 'background'>> }
+  | {
+      t: 'cell/patch'
+      ref: CellRef
+      patch: Partial<Pick<CellPatchTarget, 'hidden' | 'background'>>
+    }
   // —— 模块 ——
   | { t: 'module/add'; ref: CellRef; module: ModuleInstance; at?: number }
   | { t: 'module/remove'; ref: ModuleRef }
@@ -69,6 +75,7 @@ export interface CellPatchTarget {
 
 /** 命令类型名（用于日志、历史合并键与调试） */
 export const COMMAND_TYPES = [
+  'comparison/replace',
   'project/patch',
   'ui/patch',
   'layout/patch',

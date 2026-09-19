@@ -11,8 +11,12 @@ import { computed, inject, nextTick, onBeforeUnmount, ref, watch, type Ref } fro
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import MediaImage from '@/components/media/MediaImage.vue'
-import { useResolvedMedia, assetSource } from '@/composables/useResolvedMedia'
-import { registerSyncTrack, reportAudioState, unregisterSyncTrack } from '@/composables/useAudioClock'
+import { useResolvedMedia, assetSource, sourceKey } from '@/composables/useResolvedMedia'
+import {
+  registerSyncTrack,
+  reportAudioState,
+  unregisterSyncTrack,
+} from '@/composables/useAudioClock'
 import { getSyncEngine } from '@/composables/useAudioClock'
 import { onRafTick } from '@/composables/useRafTicker'
 import { repairEmbeddedCover } from '@/services/assetService'
@@ -253,14 +257,17 @@ function onEnded(): void {
 }
 
 // 换曲后重置时长与时钟，避免残留上一首的进度
-watch(source, () => {
-  durationMs.value = 0
-  currentMs.value = 0
-  playing.value = false
-  if (audioProps.value.reportClock) {
-    reportAudioState(props.sideId, { currentMs: 0, durationMs: 0, playing: false })
-  }
-})
+watch(
+  () => sourceKey(source.value),
+  () => {
+    durationMs.value = 0
+    currentMs.value = 0
+    playing.value = false
+    if (audioProps.value.reportClock) {
+      reportAudioState(props.sideId, { currentMs: 0, durationMs: 0, playing: false })
+    }
+  },
+)
 
 /**
  * 把自己登记到同步引擎。
@@ -321,7 +328,10 @@ watch(
 <template>
   <div
     class="audio"
-    :class="[`audio--${audioProps.layout}`, { 'audio--playing': playing, 'audio--no-cover': !audioProps.showCover }]"
+    :class="[
+      `audio--${audioProps.layout}`,
+      { 'audio--playing': playing, 'audio--no-cover': !audioProps.showCover },
+    ]"
     :style="squareStyle"
   >
     <!--
@@ -412,7 +422,9 @@ watch(
           class="wave__bar"
           :class="{ 'wave__bar--active': playing }"
           :style="
-            playing && hasSpectrum ? { height: `${Math.max(8, Math.round(value * 100))}%` } : undefined
+            playing && hasSpectrum
+              ? { height: `${Math.max(8, Math.round(value * 100))}%` }
+              : undefined
           "
         />
       </div>

@@ -11,6 +11,11 @@
  *   2. 视图切换必须成对出现（finally 里还原），否则用户会发现界面莫名其妙变了
  */
 import { computed, nextTick, ref, watch } from 'vue'
+import PresentationExport from '@/components/studio/PresentationExport.vue'
+import { exportFrames, type ExportFrame } from '@/services/presentationExport'
+const portable = ref(true)
+const runtimeFrames = ref<ExportFrame[]>([])
+const currentStep = ref(false)
 import { useModalFocus } from '@/composables/useModalFocus'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
@@ -82,15 +87,19 @@ async function inPresentView<T>(
 
   const previousMode = current.ui.mode
   const previousExport = ui.presentationExport
+  const previousStep = ui.presentationCurrentStep
+  ui.presentationCurrentStep = !report && currentStep.value
   if (current.sheet.layout.presentation?.enabled)
     ui.presentationExport = report ? 'report' : 'scene'
-  const needsSwitch = previousMode !== 'present'
+  const needsSwitch = previousMode !== 'present' && !current.sheet.layout.presentation?.enabled
 
   if (needsSwitch) store.setMode('present')
   try {
     await nextFrames(needsSwitch ? 3 : 1)
 
-    const root = document.querySelector<HTMLElement>('[data-present-root]')
+    const root =
+      document.querySelector<HTMLElement>('[data-runtime-export]') ??
+      document.querySelector<HTMLElement>('[data-present-root]')
     if (!root) {
       warnings.value = [...warnings.value, t('export.failed', { message: '未找到展示区域' })]
       return null
@@ -111,6 +120,7 @@ async function inPresentView<T>(
     return null
   } finally {
     ui.presentationExport = previousExport
+    ui.presentationCurrentStep = previousStep
     if (needsSwitch) store.setMode('edit')
   }
 }
@@ -146,6 +156,27 @@ async function doExportDuet(): Promise<void> {
   } finally {
     busy.value = false
     progress.value = ''
+  }
+}
+
+async function exportMigrationSnapshot() {
+  const p = project.value,
+    snapshot = p?.migrationSnapshot
+  if (!p || !snapshot) return
+  busy.value = true
+  try {
+    const { comparison: _comparison, migrationSnapshot: _snapshot, ...original } = p
+    const legacy = { ...original, schemaVersion: snapshot.schemaVersion, sheet: snapshot.sheet }
+    const result = await exportDuet([legacy], { embedMedia: true })
+    if (!result.ok) {
+      warnings.value = [result.error]
+      return
+    }
+    result.value.schemaVersion = snapshot.schemaVersion
+    downloadText(JSON.stringify(result.value), `${p.title}-升级前-v${snapshot.schemaVersion}.duet`)
+    warnings.value = result.value.warnings
+  } finally {
+    busy.value = false
   }
 }
 
@@ -196,10 +227,20 @@ async function doExportHtml(): Promise<void> {
   warnings.value = []
   progress.value = t('export.exporting')
   try {
+    if (portable.value && current.comparison && current.sheet.layout.presentation?.enabled) {
+      if (!embedMedia.value) {
+        warnings.value = [
+          '演示网页需要内嵌媒体才能离线切换。请开启内嵌媒体，或取消“包含作品切换与步骤”。',
+        ]
+        return
+      }
+      runtimeFrames.value = exportFrames(current)
+    }
     const result = await inPresentView(
       async (root) =>
         exportReadonlyHtml(current, {
           embedMedia: embedMedia.value,
+          portable: runtimeFrames.value.length > 0,
           presentRoot: root,
           onProgress: (label) => {
             progress.value = label
@@ -217,7 +258,10 @@ async function doExportHtml(): Promise<void> {
     const name = safeName('html')
     downloadText(result.value, name, 'text/html')
     ui.notify(t('export.done', { name }), 'success')
+  } catch (error) {
+    warnings.value = [error instanceof Error ? error.message : String(error)]
   } finally {
+    runtimeFrames.value = []
     busy.value = false
     progress.value = ''
   }
@@ -233,6 +277,13 @@ useModalFocus(dialogRoot, close)
 
 <template>
   <Teleport to="body">
+    <div
+      v-if="runtimeFrames.length && project"
+      style="position: fixed; left: -100000px; top: 0; pointer-events: none"
+      aria-hidden="true"
+    >
+      <PresentationExport :project="project" :frames="runtimeFrames" />
+    </div>
     <div v-if="open" class="mask" @click.self="close">
       <div
         ref="dialogRoot"
@@ -269,6 +320,32 @@ useModalFocus(dialogRoot, close)
             ><span class="option__hint">{{ t('studio.reportExportHint') }}</span></span
           >
         </label>
+        <label v-if="project?.sheet.layout.presentation?.enabled" class="option"
+          ><input v-model="portable" type="checkbox" :disabled="busy" /><span class="option__text"
+            ><span class="option__label">网页包含作品切换与演示步骤</span
+            ><span class="option__hint"
+              >导出所有测试题的可见场景与作品；超过 120
+              个画面组合时，请取消此项导出当前题的阅读页。</span
+            ></span
+          ></label
+        >
+        <label v-if="project?.sheet.layout.presentation?.enabled && !reportExport" class="option"
+          ><input v-model="currentStep" type="checkbox" :disabled="busy" /><span
+            class="option__text"
+            ><span class="option__label">图片只保留当前步骤</span
+            ><span class="option__hint"
+              >默认显示完整场景；勾选后保留当前隐藏和聚焦状态。</span
+            ></span
+          ></label
+        >
+        <button
+          v-if="project?.migrationSnapshot"
+          class="option"
+          :disabled="busy"
+          @click="exportMigrationSnapshot"
+        >
+          下载升级前的恢复工程（v{{ project.migrationSnapshot.schemaVersion }}）
+        </button>
         <ul class="actions">
           <li>
             <button class="action" type="button" :disabled="busy" @click="doExportDuet">

@@ -30,6 +30,8 @@ import { useSettingsStore } from './useSettingsStore'
 import { useHistoryStore } from './useHistoryStore'
 import { useProjectsStore } from './useProjectsStore'
 import type { Command, NewModuleInput } from '@/types/commands'
+import type { ContentSelection } from '@/types/presentation'
+import { projectSelection } from '@/services/comparisonContent'
 import type {
   CellRef,
   LayoutConfig,
@@ -52,6 +54,10 @@ export const useProjectStore = defineStore('project', () => {
   const history = useHistoryStore()
 
   const current = ref<Project | null>(null)
+  const contentSelection = ref<ContentSelection>()
+  const editingProject = computed(() =>
+    current.value ? projectSelection(current.value, contentSelection.value) : null,
+  )
   const openIds = ref<string[]>([])
   const saving = ref(false)
   const lastSavedAt = ref<number | null>(null)
@@ -152,7 +158,7 @@ export const useProjectStore = defineStore('project', () => {
     const before = current.value
     if (!before) return err('当前没有打开的项目')
 
-    const applied = applyCommandResult(before, command)
+    const applied = applyCommandResult(before, command, contentSelection.value)
     if (!applied.ok) {
       lastError.value = applied.error
       return applied
@@ -185,7 +191,7 @@ export const useProjectStore = defineStore('project', () => {
 
     let working = before
     for (const command of commands) {
-      const applied = applyCommandResult(working, command)
+      const applied = applyCommandResult(working, command, contentSelection.value)
       if (!applied.ok) {
         lastError.value = applied.error
         return applied
@@ -261,6 +267,7 @@ export const useProjectStore = defineStore('project', () => {
     }
 
     current.value = deepClone(project)
+    contentSelection.value = undefined
     history.clear()
     dirty.value = false
     lastError.value = null
@@ -335,7 +342,10 @@ export const useProjectStore = defineStore('project', () => {
   /** 切换置顶 */
   async function togglePinned(id: string): Promise<void> {
     if (current.value?.id === id) {
-      dispatch({ t: 'project/patch', patch: { pinned: !current.value.pinned } }, { transient: true })
+      dispatch(
+        { t: 'project/patch', patch: { pinned: !current.value.pinned } },
+        { transient: true },
+      )
     }
     const project = projects.byId(id)
     if (!project) return
@@ -346,7 +356,7 @@ export const useProjectStore = defineStore('project', () => {
 
   /** 复制项目 */
   async function duplicate(id: string): Promise<Result<Project, string>> {
-    const source = projects.byId(id)
+    const source = current.value?.id === id ? current.value : projects.byId(id)
     if (!source) return err('项目不存在')
 
     const copy = duplicateProject(source)
@@ -388,11 +398,17 @@ export const useProjectStore = defineStore('project', () => {
   // ————————————————————————————————————————————————————————
 
   function setSideField(sideId: SideId, patch: Record<string, unknown>): void {
-    dispatch({ t: 'side/patch', sideId, patch }, { label: '修改对比方', coalesceKey: `side:${sideId}` })
+    dispatch(
+      { t: 'side/patch', sideId, patch },
+      { label: '修改对比方', coalesceKey: `side:${sideId}` },
+    )
   }
 
   function setRowLabel(rowId: string, label: string): void {
-    dispatch({ t: 'row/patch', rowId, patch: { label } }, { label: '修改行标题', coalesceKey: `row-label:${rowId}` })
+    dispatch(
+      { t: 'row/patch', rowId, patch: { label } },
+      { label: '修改行标题', coalesceKey: `row-label:${rowId}` },
+    )
   }
 
   /**
@@ -424,18 +440,13 @@ export const useProjectStore = defineStore('project', () => {
 
   /** 调整左右宽度比（用户拖动中轴） */
   function patchLayout(patch: Partial<LayoutConfig>): void {
-    dispatch(
-      { t: 'layout/patch', patch },
-      { label: '调整布局', coalesceKey: 'layout' },
-    )
+    dispatch({ t: 'layout/patch', patch }, { label: '调整布局', coalesceKey: 'layout' })
   }
 
   function addModule(ref: CellRef, input: NewModuleInput, at?: number): Result<Project, string> {
     const module = createModule(input)
     const command: Command =
-      at === undefined
-        ? { t: 'module/add', ref, module }
-        : { t: 'module/add', ref, module, at }
+      at === undefined ? { t: 'module/add', ref, module } : { t: 'module/add', ref, module, at }
     return dispatch(command, { label: '添加模块' })
   }
 
@@ -463,7 +474,7 @@ export const useProjectStore = defineStore('project', () => {
 
   /** 复制一个模块（同格内追加副本） */
   function duplicateModule(ref: ModuleRef): Result<Project, string> {
-    const project = current.value
+    const project = editingProject.value
     if (!project) return err('当前没有打开的项目')
 
     const row = project.sheet.rows.find((item) => item.id === ref.rowId)
@@ -498,7 +509,10 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   /** 编辑模块内容：coalesceKey 让连续输入只占用一步撤销 */
-  function patchModuleData(ref: ModuleRef, patch: Record<string, unknown>): Result<Project, string> {
+  function patchModuleData(
+    ref: ModuleRef,
+    patch: Record<string, unknown>,
+  ): Result<Project, string> {
     return dispatch(
       { t: 'module/data', ref, patch },
       { label: '编辑内容', coalesceKey: `data:${ref.moduleId}` },
@@ -618,6 +632,8 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   return {
+    contentSelection,
+    editingProject,
     // state
     current,
     openIds,

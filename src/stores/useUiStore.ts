@@ -44,6 +44,7 @@ export const useUiStore = defineStore('ui', () => {
    */
   const exportOpen = ref(false)
   const presentationExport = ref<'scene' | 'report' | null>(null)
+  const presentationCurrentStep = ref(false)
 
   // —— 命令面板（M3 使用，M0 先留出状态位） ——
   const commandPaletteOpen = ref(false)
@@ -128,6 +129,7 @@ export const useUiStore = defineStore('ui', () => {
     activeDialog,
     exportOpen,
     presentationExport,
+    presentationCurrentStep,
     commandPaletteOpen,
     hasToasts,
     compactShell,

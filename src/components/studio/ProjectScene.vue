@@ -14,6 +14,9 @@ const props = defineProps<{
   total: number
   reading: boolean
   editing: boolean
+  focusIds?: string[]
+  concealedIds?: string[]
+  focused?: boolean
 }>()
 const emit = defineEmits<{ select: [content: ResolvedContent]; overflow: [id: string] }>()
 const { t } = useI18n()
@@ -68,16 +71,21 @@ function contents(id: string) {
       :index="index"
       :total="total"
       :title="section.title"
-      :kicker="`${String(index + 1).padStart(2, '0')} / ${t(section.shared ? 'studio.shared' : 'studio.report')}`"
+      :kicker="`${String(index + 1).padStart(2, '0')} / ${comparison.caseTitle || t(section.shared ? 'studio.shared' : 'studio.report')}`"
       :note="comparison.title"
       :reading="isReading"
     >
       <div class="project-scene__body" :class="{ 'project-scene__body--shared': section.shared }">
+        <p v-if="section.shared && comparison.conditions" class="project-scene__conditions">
+          {{ comparison.conditions }}
+        </p>
         <StageComparison
           v-if="section.metrics.length"
           :participants="comparison.participants"
           :metrics="section.metrics"
           :caption="section.title"
+          :focus-ids="focusIds"
+          :concealed-ids="concealedIds"
         />
         <template v-else-if="section.shared">
           <div
@@ -103,12 +111,30 @@ function contents(id: string) {
             v-for="p in comparison.participants"
             :key="p.id"
             class="project-scene__participant"
+            :class="{
+              'project-scene__participant--dim': focusIds?.length && !focusIds.includes(p.id),
+              'project-scene__participant--concealed': concealedIds?.includes(p.id),
+              'project-scene__participant--excluded':
+                focused && focusIds?.length && !focusIds.includes(p.id),
+            }"
             :data-tone="p.tone"
             :data-side-id="p.id"
             :data-export-name="p.name"
             :data-export-version="p.version"
           >
             <StageIdentity :participant="p" />
+            <p
+              v-if="section.entries.find((e) => e.participantId === p.id)?.sampleTitle"
+              class="project-scene__sample"
+            >
+              {{ section.entries.find((e) => e.participantId === p.id)?.sampleTitle }}
+            </p>
+            <p
+              v-if="section.entries.find((e) => e.participantId === p.id)?.conditions"
+              class="project-scene__note"
+            >
+              {{ section.entries.find((e) => e.participantId === p.id)?.conditions }}
+            </p>
             <p v-if="p.description" class="project-scene__note">{{ p.description }}</p>
             <div
               v-for="content in contents(p.id)"
@@ -124,16 +150,23 @@ function contents(id: string) {
               <ModuleView
                 v-else
                 :module="content.module"
-                :side-id="p.id"
+                :side-id="content.clockId"
                 :accent="`var(--d-${p.tone})`"
                 readonly
               />
             </div>
             <div
-              v-if="!contents(p.id).length && visibleContents.length"
+              v-if="
+                section.entries.find((e) => e.participantId === p.id)?.missingSample ||
+                (!contents(p.id).length && visibleContents.length)
+              "
               class="project-scene__missing"
             >
-              {{ t('studio.missing') }}
+              {{
+                section.entries.find((e) => e.participantId === p.id)?.missingSample
+                  ? '本题未提供样本'
+                  : t('studio.missing')
+              }}
             </div>
           </section>
         </div>
@@ -152,11 +185,49 @@ function contents(id: string) {
   width: 100%;
   animation: duet-fade-in var(--d-enter) var(--d-ease) both;
 }
+.project-scene__sample {
+  color: var(--d-muted);
+  font-size: 1cqw;
+  margin: -0.5cqw 0 0.7cqw;
+  letter-spacing: 0.03em;
+}
+.project-scene__conditions {
+  color: var(--d-muted);
+  font-size: 1cqw;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  padding-bottom: 1.5cqw;
+  margin-bottom: 2cqw;
+  border-bottom: 1px solid var(--d-line);
+}
+.project-scene__participant {
+  transition: opacity var(--d-enter) var(--d-ease);
+}
+.project-scene__participant--dim {
+  opacity: 0.35;
+}
+.project-scene__participant--concealed {
+  visibility: hidden;
+}
+.project-scene__participant--excluded {
+  display: none;
+}
+.project-scene__pair:has(.project-scene__participant--excluded) {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 70%;
+  margin: auto;
+}
+@media (max-width: 700px) {
+  .project-scene__sample {
+    font-size: 13px;
+    margin: 0 0 18px;
+  }
+}
 .project-scene__note {
   color: var(--d-muted);
   font-size: 1cqw;
   line-height: 1.7;
-  margin: -0.6cqw 0 1.5cqw;
+  margin: -0.6cqw 0 1.1cqw;
   overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {

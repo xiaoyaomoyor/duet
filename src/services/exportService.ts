@@ -16,7 +16,7 @@ import { deepClone } from '@/lib/clone'
 import { err, ok, type Result } from '@/lib/result'
 import { APP } from '@/app.config'
 import { parseProjectFile, serializeProjects, type ProjectFileEnvelope } from './projectService'
-import { validateProject } from '@/types/validate'
+import { validateProject, collectAssetIds } from '@/types/validate'
 import { SCHEMA_VERSION } from '@/types/project'
 import type { Asset, Project } from '@/types/project'
 
@@ -246,42 +246,7 @@ export async function importDuet(
 // —————————————————————————————————————————————————————————
 
 /** 收集项目引用的全部 assetId（与 validate.collectAssetIds 同源，此处再导出一次便于就近使用） */
-function collectReferencedAssetIds(project: Project): Set<string> {
-  const ids = new Set<string>()
-
-  const visit = (value: unknown): void => {
-    if (value === null || typeof value !== 'object') return
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item)
-      return
-    }
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-      if (key === 'waveform') continue
-      // i 标志必不可少：字段名是 `assetId`（小写开头）
-      if (/assetId$/i.test(key) && typeof item === 'string' && item) {
-        ids.add(item)
-        continue
-      }
-      visit(item)
-    }
-  }
-
-  for (const side of project.sheet.sides) {
-    if (side.toolRef.kind === 'inline' && side.toolRef.iconAssetId) {
-      ids.add(side.toolRef.iconAssetId)
-    }
-  }
-  for (const row of project.sheet.rows) {
-    for (const cell of Object.values(row.cells)) {
-      for (const module of cell.modules) {
-        visit(module.data)
-        visit(module.props)
-      }
-    }
-  }
-
-  return ids
-}
+const collectReferencedAssetIds = collectAssetIds
 
 /** 供 UI 展示的导出体积估算（不实际序列化，避免大项目卡顿） */
 export function estimateDuetSize(projects: readonly Project[], embedMedia = true): number {

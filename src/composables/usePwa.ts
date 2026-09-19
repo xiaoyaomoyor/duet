@@ -96,7 +96,7 @@ export function startPwa(): void {
       ui.notify(t('pwa.updateReady'), 'info', {
         duration: 0,
         actionLabel: t('pwa.reload'),
-        onAction: () => void updateServiceWorker?.(true),
+        onAction: () => void applyUpdate(),
       })
     },
 
@@ -130,6 +130,16 @@ export async function install(): Promise<boolean> {
 
 /** 立即应用更新 */
 export async function applyUpdate(): Promise<void> {
+  const { useProjectStore } = await import('@/stores/useProjectStore')
+  const project = useProjectStore()
+  if (project.current?.ui.mode === 'present') {
+    useUiStore().notify('请先结束演示，再应用更新。', 'info')
+    return
+  }
+  if (project.dirty || project.saving) {
+    await project.flush()
+    if (project.dirty || project.lastError) return
+  }
   await updateServiceWorker?.(true)
 }
 

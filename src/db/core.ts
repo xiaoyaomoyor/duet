@@ -32,6 +32,7 @@ export function openDatabase(
       try {
         upgrade(db, event.oldVersion, tx)
       } catch (error) {
+        tx.abort()
         reject(asError(error, '数据库升级失败'))
       }
     }
@@ -44,8 +45,7 @@ export function openDatabase(
     }
 
     request.onerror = () => reject(asError(request.error, '打开数据库失败'))
-    request.onblocked = () =>
-      reject(new Error('数据库被其他标签页占用，请关闭其他窗口后重试'))
+    request.onblocked = () => reject(new Error('数据库被其他标签页占用，请关闭其他窗口后重试'))
   })
 }
 
@@ -81,7 +81,11 @@ export function getAll<T>(db: IDBDatabase, store: string): Promise<T[]> {
 }
 
 /** 读取单条记录 */
-export function getOne<T>(db: IDBDatabase, store: string, key: IDBValidKey): Promise<T | undefined> {
+export function getOne<T>(
+  db: IDBDatabase,
+  store: string,
+  key: IDBValidKey,
+): Promise<T | undefined> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readonly')
     const request = tx.objectStore(store).get(key)
@@ -92,11 +96,7 @@ export function getOne<T>(db: IDBDatabase, store: string, key: IDBValidKey): Pro
 }
 
 /** 写入单条记录（新增或覆盖） */
-export async function putOne<T>(
-  db: IDBDatabase,
-  store: string,
-  value: T,
-): Promise<void> {
+export async function putOne<T>(db: IDBDatabase, store: string, value: T): Promise<void> {
   const tx = db.transaction(store, 'readwrite')
   tx.objectStore(store).put(value as unknown as Record<string, unknown>)
   await promisifyTransaction(tx)
@@ -118,11 +118,7 @@ export async function putMany<T>(
 }
 
 /** 删除单条记录 */
-export async function deleteOne(
-  db: IDBDatabase,
-  store: string,
-  key: IDBValidKey,
-): Promise<void> {
+export async function deleteOne(db: IDBDatabase, store: string, key: IDBValidKey): Promise<void> {
   const tx = db.transaction(store, 'readwrite')
   tx.objectStore(store).delete(key)
   await promisifyTransaction(tx)
