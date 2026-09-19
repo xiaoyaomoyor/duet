@@ -34,6 +34,7 @@ const ui = useUiStore()
 const settings = useSettingsStore()
 
 const embedMedia = ref(true)
+const reportExport = ref(true)
 const busy = ref(false)
 const progress = ref('')
 const warnings = ref<string[]>([])
@@ -72,11 +73,17 @@ function nextFrames(count = 2): Promise<void> {
  * 在演示视图下执行 fn，结束后无条件还原视图态。
  * @param fn 收到展示态画布根节点（已等渲染完成）
  */
-async function inPresentView<T>(fn: (root: HTMLElement) => Promise<T>): Promise<T | null> {
+async function inPresentView<T>(
+  fn: (root: HTMLElement) => Promise<T>,
+  report = reportExport.value,
+): Promise<T | null> {
   const current = project.value
   if (!current) return null
 
   const previousMode = current.ui.mode
+  const previousExport = ui.presentationExport
+  if (current.sheet.layout.presentation?.enabled)
+    ui.presentationExport = report ? 'report' : 'scene'
   const needsSwitch = previousMode !== 'present'
 
   if (needsSwitch) store.setMode('present')
@@ -98,9 +105,12 @@ async function inPresentView<T>(fn: (root: HTMLElement) => Promise<T>): Promise<
     await nextFrames(1)
     return await fn(root)
   } catch (error) {
-    warnings.value = [t('export.failed', { message: error instanceof Error ? error.message : String(error) })]
+    warnings.value = [
+      t('export.failed', { message: error instanceof Error ? error.message : String(error) }),
+    ]
     return null
   } finally {
+    ui.presentationExport = previousExport
     if (needsSwitch) store.setMode('edit')
   }
 }
@@ -186,14 +196,16 @@ async function doExportHtml(): Promise<void> {
   warnings.value = []
   progress.value = t('export.exporting')
   try {
-    const result = await inPresentView(async (root) =>
-      exportReadonlyHtml(current, {
-        embedMedia: embedMedia.value,
-        presentRoot: root,
-        onProgress: (label) => {
-          progress.value = label
-        },
-      }),
+    const result = await inPresentView(
+      async (root) =>
+        exportReadonlyHtml(current, {
+          embedMedia: embedMedia.value,
+          presentRoot: root,
+          onProgress: (label) => {
+            progress.value = label
+          },
+        }),
+      true,
     )
 
     if (!result) return
@@ -222,7 +234,13 @@ useModalFocus(dialogRoot, close)
 <template>
   <Teleport to="body">
     <div v-if="open" class="mask" @click.self="close">
-      <div ref="dialogRoot" class="dialog" role="dialog" aria-modal="true" :aria-label="t('export.title')">
+      <div
+        ref="dialogRoot"
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('export.title')"
+      >
         <header class="dialog__head">
           <h2 class="dialog__title">{{ t('export.title') }}</h2>
           <button
@@ -244,6 +262,13 @@ useModalFocus(dialogRoot, close)
           </span>
         </label>
 
+        <label v-if="project?.sheet.layout.presentation?.enabled" class="option">
+          <input v-model="reportExport" type="checkbox" :disabled="busy" />
+          <span class="option__text"
+            ><span class="option__label">{{ t('studio.reportExport') }}</span
+            ><span class="option__hint">{{ t('studio.reportExportHint') }}</span></span
+          >
+        </label>
         <ul class="actions">
           <li>
             <button class="action" type="button" :disabled="busy" @click="doExportDuet">

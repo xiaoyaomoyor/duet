@@ -99,8 +99,7 @@ export interface Asset {
 
 /** 媒体来源：本地资源或外链 */
 export type MediaSource =
-  | { kind: 'asset'; assetId: string }
-  | { kind: 'url'; url: string; mirror?: boolean }
+  { kind: 'asset'; assetId: string } | { kind: 'url'; url: string; mirror?: boolean }
 
 // ——————————————————————————————————————————————————————————
 // 对比项目
@@ -210,6 +209,8 @@ export interface Row {
 }
 
 export interface LayoutConfig {
+  /** R2 additive presentation settings; v8 content stays intact, no model migration. */
+  presentation?: { enabled: boolean; theme: 'ink' | 'paper' } | undefined
   /**
    * 中轴间距 px。
    *

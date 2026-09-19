@@ -33,7 +33,7 @@
        * **仅用于首帧**的镜像——它是缓存而不是真源，读不到就退回跟随系统。
        */
       ;(function () {
-        var THEMES = { dark: '#0a0a0b', light: '#fafafa', 'violet-dark': '#0b0714' }
+        var THEMES = { dark: '#101414', light: '#f2f0e9', 'violet-dark': '#101414' }
 
         var stored = null
         try {
@@ -53,6 +53,7 @@
 
         var root = document.documentElement
         root.dataset.theme = resolved
+        root.dataset.designTheme = resolved === 'light' ? 'paper' : 'ink'
         root.style.colorScheme = resolved === 'light' ? 'light' : 'dark'
         root.style.backgroundColor = THEMES[resolved]
       })()

@@ -1,0 +1,168 @@
+/* R2 bridge: existing controls share the tested design palette, including Teleports. */
+:root[data-design-theme],
+[data-project-stage] {
+  --bg-void: var(--d-bg);
+  --bg-base: var(--d-bg);
+  --bg-surface: var(--d-surface);
+  --bg-surface-2: var(--d-bg);
+  --bg-elevated: var(--d-raised);
+  --bg-hover: var(--d-raised);
+  --bg-active: var(--d-raised);
+  --border-subtle: var(--d-line);
+  --border-default: var(--d-line);
+  --border-strong: var(--d-faint);
+  --text-primary: var(--d-text);
+  --text-secondary: var(--d-muted);
+  --text-muted: var(--d-muted);
+  --text-disabled: var(--d-faint);
+  --text-inverse: var(--d-bg);
+  --accent-500: var(--d-accent);
+  --accent-300: var(--d-accent);
+  --accent-solid: var(--d-accent);
+  --accent-solid-hover: var(--d-accent);
+  --accent-fg: var(--d-accent-ink);
+  --accent-soft: var(--d-raised);
+  --accent-ring: var(--d-focus);
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --danger: var(--d-danger);
+  --font-sans: var(--d-font);
+  --shadow-pop: var(--d-shadow);
+}
+html[data-design-theme] body {
+  font-family: var(--d-font);
+}
+.mask {
+  background: #050907a8 !important;
+  backdrop-filter: blur(6px);
+  padding: 24px;
+}
+.mask > [aria-modal='true'] {
+  border: 1px solid var(--d-line);
+  border-radius: 14px !important;
+  box-shadow: var(--d-shadow);
+  max-height: calc(100dvh - 48px);
+}
+.mask .editor-dialog {
+  width: min(960px, 100%) !important;
+  background: var(--d-surface);
+}
+.mask .editor-dialog .editor-dialog__head {
+  padding: 22px 28px;
+  background: var(--d-surface);
+}
+.mask .editor-dialog .editor-dialog__body {
+  padding: 24px 28px;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 28px;
+}
+.mask .editor-dialog .sec--basics {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+.mask .editor-dialog .sec--content {
+  grid-column: 1;
+  grid-row: 2;
+}
+.mask .editor-dialog .sec--options {
+  grid-column: 2;
+  grid-row: 2;
+}
+.mask .editor-dialog .editor-dialog__body--wide {
+  display: flex;
+  flex-direction: column;
+}
+.mask .editor-dialog .sec {
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+}
+.mask .editor-dialog .sec__head {
+  border-bottom: 1px solid var(--d-line);
+  padding: 10px 0 14px;
+}
+.mask .editor-dialog .sec__body {
+  padding: 16px 0;
+}
+.mask .editor-dialog .options {
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+.mask .editor-dialog .editor-dialog__foot {
+  padding: 16px 28px;
+}
+.topbar {
+  background: var(--d-bg) !important;
+}
+.gallery-card {
+  background: var(--d-surface);
+  box-shadow: none;
+}
+.gallery-card__band {
+  opacity: 0.25;
+  height: 2px !important;
+}
+.u-selected {
+  background: var(--d-raised);
+  color: var(--d-text);
+}
+body:has(.studio--clean) .toasts {
+  display: none;
+}
+@media (max-width: 700px) {
+  .mask .editor-dialog .editor-dialog__body {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+  }
+  .mask {
+    padding: 12px;
+  }
+}
+
+.mask input[type='checkbox'],
+.mask input[type='range'],
+.studio input[type='checkbox'] {
+  accent-color: var(--d-accent);
+}
+
+.mask .editor-dialog .editor-dialog__stage-note {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--d-muted);
+}
+.mask .editor-dialog:has(.editor-dialog__stage-note) .sec--basics {
+  grid-row: 2;
+}
+.mask .editor-dialog:has(.editor-dialog__stage-note) .sec--content,
+.mask .editor-dialog:has(.editor-dialog__stage-note) .sec--options {
+  grid-row: 3;
+}
+[data-exporting] .project-scene {
+  animation: none !important;
+}
+
+.mask .editor-dialog[aria-modal] {
+  background: var(--d-surface);
+  overflow: hidden;
+}
+.mask .editor-dialog .option {
+  align-items: flex-start;
+  gap: 12px;
+}
+.mask .editor-dialog .option__label {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.mask .editor-dialog .option__check {
+  flex: none;
+  margin-top: 4px;
+}
+.mask .editor-dialog .option:has(.option__control) {
+  flex-direction: column;
+  align-items: stretch;
+}

@@ -51,7 +51,10 @@ test.describe('M1 项目生命周期', () => {
 
     // 侧栏出现该项目，且显示行数
     await expect(
-      page.getByRole('complementary').getByRole('button', { name: /音乐对比/ }).first(),
+      page
+        .getByRole('complementary')
+        .getByRole('button', { name: /音乐对比/ })
+        .first(),
     ).toBeVisible()
     // v0.5.0 起模板多一行「标题」（工具名卡片变成了普通模块）
     await expect(page.getByRole('complementary').getByText('5 行')).toBeVisible()
@@ -286,7 +289,7 @@ test.describe('M1 设置面板', () => {
     await confirmButton.click()
 
     // 清空后回到空状态（路由会被带回 /compare）
-    await expect(page.getByRole('heading', { name: '从一次对比开始' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '从一场演示开始' })).toBeVisible()
     await expect(page.getByRole('complementary').getByText('共 0 个项目')).toBeVisible()
   })
 })

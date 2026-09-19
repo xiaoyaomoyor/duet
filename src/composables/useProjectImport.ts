@@ -19,6 +19,7 @@ import { useI18n } from 'vue-i18n'
 import { importDuet } from '@/services/exportService'
 import { persistProject } from '@/services/projectService'
 import { useProjectsStore } from '@/stores/useProjectsStore'
+import { useProjectStore } from '@/stores/useProjectStore'
 import { useUiStore } from '@/stores/useUiStore'
 import { APP } from '@/app.config'
 
@@ -76,6 +77,8 @@ export function useProjectImport() {
       if (notes.length > 0) ui.notify(notes.join('；'), 'warning')
 
       await projects.load()
+      const first = result.value.projects[0]
+      if (first) await useProjectStore().open(first.id)
     } catch (error) {
       ui.notify(error instanceof Error ? error.message : String(error), 'danger')
     } finally {

@@ -4,7 +4,9 @@
  * 纪律：所有 UI 文案集中在此；.vue 模板中禁止中文字面量（§14.3）。
  */
 import { showcaseZh } from './showcase'
+import { studioZh } from './studio'
 export default {
+  studio: studioZh,
   showcase: showcaseZh,
   app: {
     name: '对奏',
@@ -79,7 +81,8 @@ export default {
   },
 
   compare: {
-    emptyTitle: '从一次对比开始',    emptyDesc: '选择一个模板，快速搭建两侧的对比框架',
+    emptyTitle: '从一次对比开始',
+    emptyDesc: '选择一个模板，快速搭建两侧的对比框架',
     untitled: '未命名对比',
     addFirstModule: '从下方添加第一个模块',
     nothingToPresent: '还没有可展示的内容',
@@ -117,7 +120,8 @@ export default {
     showNote: '显示备注',
     anonymize: '匿名处理',
     anonymousTool: '工具 {n}',
-    anonymizeHint: '长图与只读网页会保持打码；演示时点击黑框可临时显现。工程文件保留原始信息，便于继续编辑。',
+    anonymizeHint:
+      '长图与只读网页会保持打码；演示时点击黑框可临时显现。工程文件保留原始信息，便于继续编辑。',
     anonymizeName: '遮住工具名称',
     anonymizeVersion: '遮住版本号',
     anonymizeIcon: '遮住 LOGO（显示为黑块）',
@@ -241,7 +245,7 @@ export default {
     title: '设置',
     appearance: '外观',
     theme: '主题',
-    themeHint: '「跟随系统」会随系统的深浅色偏好自动切换',
+    themeHint: '工作区使用墨色／纸白；舞台项目的风格独立保存。紫夜仅用于兼容画布。',
     themeSystem: '跟随系统',
     themeDark: '暗',
     themeLight: '亮',
@@ -386,7 +390,8 @@ export default {
   },
 
   audioConsole: {
-    editorHint: '这个模块没有需要填写的内容：它在编辑视图里就是控制台本身。把两侧都加上音频后即可同步播放。',
+    editorHint:
+      '这个模块没有需要填写的内容：它在编辑视图里就是控制台本身。把两侧都加上音频后即可同步播放。',
   },
 
   tagList: {
@@ -436,7 +441,8 @@ export default {
     urlPlaceholder: 'https://…（对方页面的可嵌入地址）',
     urlHint: '只支持 http/https 地址',
     height: '高度（像素）',
-    sandboxNote: '嵌入的页面在沙箱中运行，无法访问本应用的任何数据。若对方站点禁止嵌入，这里会显示空白。',
+    sandboxNote:
+      '嵌入的页面在沙箱中运行，无法访问本应用的任何数据。若对方站点禁止嵌入，这里会显示空白。',
   },
 
   timeline: {

@@ -20,11 +20,13 @@ import { useRoute } from 'vue-router'
 import AppIcon from '@/components/common/AppIcon.vue'
 import AppLogo from '@/components/common/AppLogo.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
+import { useUiStore } from '@/stores/useUiStore'
 import { APP } from '@/app.config'
 
 const { t } = useI18n()
 const route = useRoute()
 const project = useProjectStore()
+const ui = useUiStore()
 
 /**
  * 当前页面。
@@ -73,6 +75,15 @@ function togglePresent(): void {
     </div>
 
     <nav class="topbar__group topbar__group--end" :aria-label="t('nav.pages')">
+      <button
+        v-if="project.current?.sheet.layout.presentation?.enabled"
+        class="topbar__action"
+        type="button"
+        :aria-pressed="ui.studioProjects"
+        @click="ui.studioProjects = !ui.studioProjects"
+      >
+        {{ t('studio.projectList') }}
+      </button>
       <RouterLink
         class="topbar__nav"
         :to="{ name: 'showcase' }"
@@ -116,6 +127,7 @@ function togglePresent(): void {
         不是"我在哪一页"的状态。没有打开项目时禁用。
       -->
       <button
+        v-if="!project.current?.sheet.layout.presentation?.enabled"
         class="topbar__action"
         type="button"
         :disabled="!project.hasProject"

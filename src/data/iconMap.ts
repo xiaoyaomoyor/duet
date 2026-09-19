@@ -24,6 +24,7 @@ import {
   Box,
   Check,
   ChevronDown,
+  ChevronUp,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -135,6 +136,7 @@ export const ICONS: Record<string, LucideIcon> = {
   'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,
   'chevron-down': ChevronDown,
+  'chevron-up': ChevronUp,
 
   // —— 应用外壳 ——
   settings: Settings,

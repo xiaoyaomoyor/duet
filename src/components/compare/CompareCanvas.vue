@@ -179,7 +179,9 @@ const backgroundVars = computed(() => {
 })
 
 /** 演示视图下是否保留背景图案（默认关） */
-const showBackground = computed(() => !isReadonly.value || layout.value.backgroundInPresent === true)
+const showBackground = computed(
+  () => !isReadonly.value || layout.value.backgroundInPresent === true,
+)
 
 /**
  * 画布这里要不要画图案。
@@ -247,8 +249,7 @@ function insertRowAt(index: number): void {
  *                因此这次操作仍然只占一步撤销。
  */
 type PickerState =
-  | { kind: 'cell'; ref: CellRef; scope: 'side' | 'common' }
-  | { kind: 'common'; at: number }
+  { kind: 'cell'; ref: CellRef; scope: 'side' | 'common' } | { kind: 'common'; at: number }
 
 const picker = ref<PickerState | null>(null)
 
@@ -288,7 +289,10 @@ function onPickModule(type: string): void {
 
 /** 格内重排：一次原子命令，只占一步撤销 */
 function onModulesReorder(ref: CellRef, next: ModuleInstance[]): void {
-  store.reorderModules(ref, next.map((module) => module.id))
+  store.reorderModules(
+    ref,
+    next.map((module) => module.id),
+  )
 }
 
 function modulesOf(row: Row, sideId: SideId): ModuleInstance[] {
@@ -305,9 +309,7 @@ function modulesOf(row: Row, sideId: SideId): ModuleInstance[] {
 const visibleRows = computed<Row[]>(() => {
   if (!isReadonly.value) return rows.value
   return rows.value.filter((row) =>
-    sides.value.some((side) =>
-      modulesOf(row, side.id).some((module) => isPresentable(module)),
-    ),
+    sides.value.some((side) => modulesOf(row, side.id).some((module) => isPresentable(module))),
   )
 })
 
@@ -351,11 +353,9 @@ function onDuplicateModule(ref: ModuleRef): void {
   <div class="canvas-wrap">
     <div
       ref="canvasEl"
-      class="canvas"
-      :class="[
-        backgroundClass,
-        { 'canvas--bg-hidden': !drawPattern, 'canvas--bg-page': pageFill },
-      ]"
+      class="canvas legacy-theme"
+      :data-theme="accentTheme"
+      :class="[backgroundClass, { 'canvas--bg-hidden': !drawPattern, 'canvas--bg-page': pageFill }]"
       :style="[canvasStyle, backgroundVars]"
     >
       <!--
@@ -385,7 +385,7 @@ function onDuplicateModule(ref: ModuleRef): void {
             :project-id="project.id"
             :show-numbers="showRowNumbers"
             :dimmed-side-ids="dimmedSideIds"
-          :common-accent="commonAccent"
+            :common-accent="commonAccent"
             @insert="insertRowAt"
             @add-common="openCommonPicker"
             @toggle-collapse="store.toggleRowCollapsed"

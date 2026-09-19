@@ -24,7 +24,8 @@
  */
 
 :root,
-:root[data-theme='violet-dark'] {
+:root[data-theme='violet-dark'],
+.legacy-theme[data-theme='violet-dark'] {
   color-scheme: dark;
 
   /* —— 背景层级 —— */
@@ -177,7 +178,8 @@
 /* ————————————————————————————————————————————————————————————
  * 暗（中性黑）：不带色相的中性灰阶，适合长时间阅读与录屏
  * ———————————————————————————————————————————————————————————— */
-:root[data-theme='dark'] {
+:root[data-theme='dark'],
+.legacy-theme[data-theme='dark'] {
   color-scheme: dark;
 
   --bg-void: #000;
@@ -244,7 +246,8 @@
  * 注意这里的阴影比暗色主题**更淡但有更大的扩散**：
  * 亮色下的黑阴影特别显脏，靠柔和的大范围阴影表达层级才自然。
  * ———————————————————————————————————————————————————————————— */
-:root[data-theme='light'] {
+:root[data-theme='light'],
+.legacy-theme[data-theme='light'] {
   color-scheme: light;
 
   --bg-void: #e9e9ee;

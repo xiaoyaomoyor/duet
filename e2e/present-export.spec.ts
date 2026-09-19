@@ -7,7 +7,7 @@
  *   3. 三种导出都能产出文件，且长图**不是空白**
  */
 import { expect, test, type Page } from '@playwright/test'
-import {contentRows, fillModuleText } from './helpers'
+import { contentRows, fillModuleText } from './helpers'
 
 const RED_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8Dwn4EIwDiqkL4KAcxhA/1kF5WvAAAAAElFTkSuQmCC'
@@ -99,7 +99,10 @@ test.describe('M3 演示视图', () => {
 
     // 再添加一个模块并隐藏它
     await cell.locator('.canvas__add-module').first().click()
-    await page.getByRole('dialog', { name: '选择模块类型' }).getByRole('button', { name: '文字' }).click()
+    await page
+      .getByRole('dialog', { name: '选择模块类型' })
+      .getByRole('button', { name: '文字' })
+      .click()
     const secondCard = cell.locator('.card').nth(1)
     await fillModuleText(page, secondCard, '这段不该出现')
     await secondCard.locator('[aria-label="在演示视图隐藏"]').click()
@@ -146,10 +149,7 @@ test.describe('M3 导出', () => {
 
     await page.getByRole('button', { name: '导出' }).click()
     const downloadPromise = page.waitForEvent('download')
-    await page
-      .getByRole('dialog', { name: '导出' })
-      .getByRole('button', { name: /长图/ })
-      .click()
+    await page.getByRole('dialog', { name: '导出' }).getByRole('button', { name: /长图/ }).click()
 
     const download = await downloadPromise
     expect(download.suggestedFilename()).toMatch(/\.png$/)
@@ -221,17 +221,11 @@ test.describe('M3 导出', () => {
 
     await page.getByRole('button', { name: '导出' }).click()
     const downloadPromise = page.waitForEvent('download')
-    await page
-      .getByRole('dialog', { name: '导出' })
-      .getByRole('button', { name: /长图/ })
-      .click()
+    await page.getByRole('dialog', { name: '导出' }).getByRole('button', { name: /长图/ }).click()
     await downloadPromise
 
     // 对话框关闭后应回到编辑视图
-    await page
-      .getByRole('dialog', { name: '导出' })
-      .getByRole('button', { name: '关闭' })
-      .click()
+    await page.getByRole('dialog', { name: '导出' }).getByRole('button', { name: '关闭' }).click()
     await expect(page.locator('.present')).toBeHidden()
     await expect(page.locator('.canvas__add-module').first()).toBeVisible()
   })
@@ -264,19 +258,25 @@ test.describe('M3 导出', () => {
     const confirmDialog = page.getByRole('alertdialog')
     await confirmDialog.locator('input[type="text"]').fill('DELETE')
     await confirmDialog.getByRole('button', { name: '清空所有数据' }).click()
-    await expect(page.getByRole('heading', { name: '从一次对比开始' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '从一场演示开始' })).toBeVisible()
 
     // 导入刚导出的文件
-    await page.locator('input[type="file"]').first().setInputFiles({
-      name: 'roundtrip.duet',
-      mimeType: 'application/json',
-      buffer: Buffer.from(fileText, 'utf8'),
-    })
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'roundtrip.duet',
+        mimeType: 'application/json',
+        buffer: Buffer.from(fileText, 'utf8'),
+      })
 
     // 侧栏出现导入的项目，打开后内容仍在
     const sidebar = page.getByRole('complementary')
     await expect(sidebar.getByRole('button', { name: /空白对比/ }).first()).toBeVisible()
-    await sidebar.getByRole('button', { name: /空白对比/ }).first().click()
+    await sidebar
+      .getByRole('button', { name: /空白对比/ })
+      .first()
+      .click()
     // 第一行现在是「标题」行，内容行从第二行起（contentRows 会跳过它）；
     // 该行左右两格各有一个 module-view，因此还要 .first()
     await expect(contentRows(page).first().locator('.module-view').first()).toContainText(

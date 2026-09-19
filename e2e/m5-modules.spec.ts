@@ -10,7 +10,7 @@
  * 因此由 `scripts/check-pwa.mjs` 在 `npm run build` 之后校验，不放在这里。
  */
 import { expect, test, type Page } from '@playwright/test'
-import {contentRows, addedCard, editModule, fillModuleText, renameModule } from './helpers'
+import { contentRows, addedCard, editModule, fillModuleText, renameModule } from './helpers'
 
 async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
   await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
@@ -208,7 +208,7 @@ test.describe('M5 设置面板：备份与恢复', () => {
     const dialog = page.getByRole('alertdialog')
     await dialog.locator('input[type="text"]').fill('DELETE')
     await dialog.getByRole('button', { name: '清空所有数据' }).click()
-    await expect(page.getByRole('heading', { name: '从一次对比开始' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '从一场演示开始' })).toBeVisible()
 
     // —— 从备份恢复 ——
     await openStoragePanel(page)

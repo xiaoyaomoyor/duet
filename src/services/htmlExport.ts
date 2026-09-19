@@ -108,6 +108,12 @@ async function serializePresentRoot(
   const clone = root.cloneNode(true) as HTMLElement
   const warnings: string[] = []
 
+  // A scene export must not carry hidden scenes or their private media into the file.
+  for (const scene of clone.querySelectorAll<HTMLElement>('.project-scene')) {
+    if (scene.style.display === 'none') scene.remove()
+  }
+  for (const transport of clone.querySelectorAll('.stage-media__transport')) transport.remove()
+
   // 画布会继承演示容器的变量；脱离容器后仍应保持同样的尺寸和配色。
   const computed = getComputedStyle(root)
   for (const property of Array.from(computed)) {
@@ -264,6 +270,10 @@ function buildDocument(input: {
 }): string {
   const meta = describeProject(input.project, input.root)
   const theme = document.documentElement.dataset.theme ?? 'violet-dark'
+  const designTheme =
+    input.root.dataset.designTheme ??
+    document.documentElement.dataset.designTheme ??
+    (theme === 'light' ? 'paper' : 'ink')
   const language = document.documentElement.lang || 'zh-CN'
   const warningBlock =
     input.warnings.length > 0
@@ -271,11 +281,11 @@ function buildDocument(input: {
       : ''
 
   return `<!doctype html>
-<html lang="${escapeHtml(language)}" data-theme="${escapeHtml(theme)}">
+<html lang="${escapeHtml(language)}" data-theme="${escapeHtml(theme)}" data-design-theme="${escapeHtml(designTheme)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="${theme === 'light' ? 'light' : 'dark'}">
+<meta name="color-scheme" content="${designTheme === 'paper' ? 'light' : 'dark'}">
 <title>${escapeHtml(input.title)} · ${APP.nameZh} ${APP.nameEn}</title>
 <meta name="generator" content="${APP.nameZh} ${APP.nameEn} v${APP.version}">
 <style>

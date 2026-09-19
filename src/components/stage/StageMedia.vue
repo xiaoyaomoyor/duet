@@ -2,13 +2,18 @@
 import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import type { StageParticipant } from './types'
-defineProps<{
-  participant: StageParticipant
-  playing?: boolean
-  current?: number
-  duration?: number
-  error?: boolean
-}>()
+withDefaults(
+  defineProps<{
+    participant: StageParticipant
+    playing?: boolean
+    current?: number
+    duration?: number
+    error?: boolean
+    showPlayer?: boolean
+    showCover?: boolean
+  }>(),
+  { showPlayer: true, showCover: true },
+)
 const emit = defineEmits<{ toggle: []; seek: [seconds: number] }>()
 const { t } = useI18n()
 function time(value = 0): string {
@@ -26,7 +31,7 @@ function time(value = 0): string {
     :data-playing="playing || undefined"
     :aria-label="participant.track"
   >
-    <div class="stage-media__art">
+    <div v-if="showCover !== false" class="stage-media__art">
       <img v-if="participant.artwork" :src="participant.artwork" :alt="participant.track" />
       <div v-else class="stage-media__empty">
         <AppIcon name="music" :size="36" /><span>{{ t('showcase.noCover') }}</span
@@ -41,7 +46,7 @@ function time(value = 0): string {
       </div>
       <span>{{ participant.source && duration ? time(duration) : '—' }}</span>
     </div>
-    <div class="stage-media__transport">
+    <div v-if="showPlayer !== false" class="stage-media__transport">
       <button
         type="button"
         class="stage-media__play"

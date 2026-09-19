@@ -33,10 +33,18 @@ const THEME_OPTIONS: ThemeOption[] = [
     id: 'system',
     labelKey: 'settings.themeSystem',
     split: true,
-    swatch: ['#0b0714', '#1c1c1f', '#c9c9cf', '#60a5fa'],
+    swatch: ['#101414', '#191e1d', '#eeeae2', '#d9bd91'],
   },
-  { id: 'dark', labelKey: 'settings.themeDark', swatch: ['#0a0a0b', '#1c1c1f', '#f4f4f5', '#60a5fa'] },
-  { id: 'light', labelKey: 'settings.themeLight', swatch: ['#fafafa', '#ffffff', '#18181b', '#6d28d9'] },
+  {
+    id: 'dark',
+    labelKey: 'settings.themeDark',
+    swatch: ['#101414', '#191e1d', '#eeeae2', '#d9bd91'],
+  },
+  {
+    id: 'light',
+    labelKey: 'settings.themeLight',
+    swatch: ['#f2f0e9', '#fbf9f3', '#222c2c', '#6f512a'],
+  },
   {
     id: 'violet-dark',
     labelKey: 'settings.themeVioletDark',
@@ -97,7 +105,11 @@ async function updateMotion(value: 'auto' | 'always' | 'never'): Promise<void> {
           {{ t(option.labelKey) }}
           <!-- 跟随系统时把"实际落到了哪个主题"写出来，避免用户以为没生效 -->
           <span v-if="option.id === 'system'" class="theme__resolved">
-            {{ t(`settings.theme${effective === 'light' ? 'Light' : effective === 'dark' ? 'Dark' : 'VioletDark'}`) }}
+            {{
+              t(
+                `settings.theme${effective === 'light' ? 'Light' : effective === 'dark' ? 'Dark' : 'VioletDark'}`,
+              )
+            }}
           </span>
         </span>
 

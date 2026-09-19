@@ -94,6 +94,7 @@ function paint(resolved: ResolvedThemeId): void {
   const el = root()
   if (!el) return
   el.dataset.theme = resolved
+  el.dataset.designTheme = resolved === 'light' ? 'paper' : 'ink'
   el.style.colorScheme = THEME_COLOR_SCHEME[resolved]
 }
 

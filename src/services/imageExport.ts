@@ -119,12 +119,10 @@ export async function exportElementToPng(
   if (maxScale < scale) {
     const adjusted = Math.max(1, Math.floor(maxScale * 10) / 10)
     scale = adjusted as 1 | 2
-    warnings.push(
-      `内容尺寸 ${width}×${height} 超过浏览器画布上限，倍率已自动降到 ${scale}×。`,
-    )
+    warnings.push(`内容尺寸 ${width}×${height} 超过浏览器画布上限，倍率已自动降到 ${scale}×。`)
   }
 
-  const backgroundColor = options.backgroundColor ?? readBackgroundColor()
+  const backgroundColor = options.backgroundColor ?? readBackgroundColor(root)
 
   options.onProgress?.('渲染画布…')
 
@@ -155,7 +153,8 @@ export async function exportElementToDataUrl(
     const dataUrl = await toPng(root, {
       width: Math.ceil(rect.width),
       height: Math.ceil(rect.height),
-      backgroundColor: options.backgroundColor ?? readBackgroundColor(),
+      backgroundColor: options.backgroundColor ?? readBackgroundColor(root),
+      style: { margin: '0' },
       pixelRatio: scale,
       cacheBust: true,
     })
@@ -193,6 +192,9 @@ async function safeToBlob(
         backgroundColor: options.backgroundColor,
         pixelRatio: options.scale,
         cacheBust: true,
+        // Computed auto margins become pixel offsets when cloned into an SVG.
+        // The exported image starts at the canvas edge, not its position in the workspace.
+        style: { margin: '0' },
         /*
          * 过滤掉不该出现在导出图里的节点。
          *
@@ -285,9 +287,9 @@ async function tryInlineImage(img: HTMLImageElement): Promise<boolean> {
 }
 
 /** 读取当前主题的底色，避免导出图透明或泛白 */
-function readBackgroundColor(): string {
+function readBackgroundColor(root: HTMLElement = document.documentElement): string {
   if (typeof document === 'undefined') return '#0b0714'
-  const value = getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim()
+  const value = getComputedStyle(root).getPropertyValue('--bg-base').trim()
   return value || '#0b0714'
 }
 

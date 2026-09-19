@@ -4,7 +4,9 @@
  * 注意：内置工具名（Suno、Kling…）不做翻译，见 §14.3。
  */
 import { showcaseEn } from './showcase'
+import { studioEn } from './studio'
 export default {
+  studio: studioEn,
   showcase: showcaseEn,
   app: {
     name: 'Duet',
@@ -110,7 +112,8 @@ export default {
     version: 'Version',
     note: 'Note',
     icon: 'Icon',
-    iconHint: 'Uses the tool’s own icon by default; you can upload one that applies to this side only.',
+    iconHint:
+      'Uses the tool’s own icon by default; you can upload one that applies to this side only.',
     visibleParts: 'Visible parts',
     showIcon: 'Show icon',
     showName: 'Show name',
@@ -222,7 +225,8 @@ export default {
       'Built-in tools are not stored in the database — this saves a local override (only the fields you changed are pinned; the rest still follow app updates).',
     resetBuiltin: 'Reset to default',
     overridden: 'Locally modified',
-    chipHint: 'Click the name to edit, the check to disable — built-in and custom tools behave the same',
+    chipHint:
+      'Click the name to edit, the check to disable — built-in and custom tools behave the same',
     searchPlaceholder: 'Search tools…',
     noCustom: 'No custom tools yet',
     countSummary: '{builtin} built-in · {custom} custom · {disabled} disabled',
@@ -244,7 +248,8 @@ export default {
     title: 'Settings',
     appearance: 'Appearance',
     theme: 'Theme',
-    themeHint: '“Follow system” switches automatically with your OS light/dark preference',
+    themeHint:
+      'The workspace uses Ink / Paper; each stage project keeps its own theme. Violet applies to the compatibility canvas.',
     themeSystem: 'Follow system',
     themeDark: 'Dark',
     themeLight: 'Light',
@@ -355,9 +360,11 @@ export default {
     restart: 'Back to start',
     hint: 'Both sides start at the same instant — solo one, or nudge an offset',
     degrade: {
-      'no-audio-context': 'This browser cannot play audio in sync — fell back to independent playback',
+      'no-audio-context':
+        'This browser cannot play audio in sync — fell back to independent playback',
       'source-node-failed': 'Could not create audio nodes — fell back to independent playback',
-      'cross-origin': 'Media comes from another site without CORS — mirror it locally to enable sync',
+      'cross-origin':
+        'Media comes from another site without CORS — mirror it locally to enable sync',
       'no-tracks': 'Both sides need audio to play in sync',
     },
   },
@@ -469,9 +476,11 @@ export default {
     leftPlaceholder: 'Paste the left side',
     rightPlaceholder: 'Paste the right side',
     lineCount: '{count} lines',
-    oneSidedHint: 'Only one side is filled in — the result shows as a whole block added or removed.',
+    oneSidedHint:
+      'Only one side is filled in — the result shows as a whole block added or removed.',
     identical: 'Both sides are identical',
-    truncated: 'Content is too large; shown as a whole-block replacement without line-by-line comparison.',
+    truncated:
+      'Content is too large; shown as a whole-block replacement without line-by-line comparison.',
     tableLabel: 'Code differences',
     showWhenEqual: 'Show a note when identical',
     ignoreTrailingWhitespace: 'Ignore trailing whitespace',
@@ -494,7 +503,8 @@ export default {
   dialog: {
     typeToConfirm: 'Type {text} to confirm',
     deleteProjectTitle: 'Delete this comparison?',
-    deleteProjectMessage: '“{title}” will be removed from this device. You can undo within 10 seconds.',
+    deleteProjectMessage:
+      '“{title}” will be removed from this device. You can undo within 10 seconds.',
   },
 
   topbar: {
@@ -706,7 +716,8 @@ export default {
     commonAccentAuto: 'Midpoint of both sides',
     groupNumber: 'Numbering',
     showNumbers: 'Show row and module numbers',
-    showNumbersHint: 'Row numbers sit at the top-left of a row; module numbers (2.2) on each module.',
+    showNumbersHint:
+      'Row numbers sit at the top-left of a row; module numbers (2.2) on each module.',
     groupBackground: 'Background',
     backgroundFill: 'Fill',
     fillPattern: 'Content only',

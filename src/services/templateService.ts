@@ -8,6 +8,7 @@
 import { uuid } from '@/lib/id'
 import { deepClone } from '@/lib/clone'
 import { moduleTitle } from '@/i18n/helper'
+import { t } from '@/i18n/helper'
 import { presetIdOfColor } from '@/data/accentPresets'
 import {
   SCHEMA_VERSION,
@@ -78,6 +79,45 @@ export interface ProjectTemplate {
 
 /** 内置模板（不落库；用户自建模板走 templates 存储） */
 export const BUILTIN_TEMPLATES: readonly ProjectTemplate[] = [
+  ...(['music', 'image', 'generic'] as const).map((kind): ProjectTemplate => ({
+    id: `stage-${kind}`,
+    category: kind,
+    nameKey: `studio.${kind}Name`,
+    descKey: `studio.${kind}Desc`,
+    accent: ['#d9bd91', '#9bc6bc'],
+    fields: [
+      {
+        kind: 'full',
+        label: 'studio.prompt',
+        field: { type: 'text', titleKey: 'modules.text', props: { size: 'large' } },
+      },
+      {
+        kind: 'paired',
+        label:
+          kind === 'image'
+            ? 'studio.images'
+            : kind === 'music'
+              ? 'studio.works'
+              : 'studio.observations',
+        field: {
+          type: kind === 'music' ? 'audio' : kind === 'image' ? 'image' : 'text',
+          titleKey: '',
+          props: { fit: 'contain', ratio: '16/9' },
+        },
+      },
+      {
+        kind: 'paired',
+        label: 'studio.observations',
+        field: { type: kind === 'music' ? 'lyrics' : 'text', titleKey: '' },
+      },
+      { kind: 'paired', label: 'studio.dimensions', field: { type: 'keyValue', titleKey: '' } },
+      {
+        kind: 'full',
+        label: 'studio.conclusion',
+        field: { type: 'text', titleKey: '', props: { size: 'large' } },
+      },
+    ],
+  })),
   {
     id: 'music',
     category: 'music',
@@ -207,14 +247,31 @@ export function instantiateTemplate(
    */
   const rows = [
     createTitleRow(sideAId, sideBId),
-    ...template.fields.map((entry) => createRow(entry, sideAId, sideBId)),
+    ...template.fields.map((entry) =>
+      createRow(
+        { ...entry, ...(entry.label?.startsWith('studio.') ? { label: t(entry.label) } : {}) },
+        sideAId,
+        sideBId,
+      ),
+    ),
   ]
+
+  if (template.id.startsWith('stage-')) {
+    for (const row of rows.slice(1))
+      for (const cell of Object.values(row.cells))
+        for (const module of cell.modules) module.title = ''
+  }
 
   const sheet: Sheet = {
     id: uuid(),
     sides,
     rows,
-    layout: deepClone(DEFAULT_LAYOUT),
+    layout: {
+      ...deepClone(DEFAULT_LAYOUT),
+      ...(template.id.startsWith('stage-')
+        ? { presentation: { enabled: true, theme: 'ink' as const } }
+        : {}),
+    },
   }
 
   return {
@@ -244,10 +301,7 @@ export function createBlankProject(name: string, accent = DEFAULT_ACCENT_PAIR): 
      * 空白对比也保留「标题」行（v0.5.0）：工具名卡片现在是普通模块，
      * 连它一起清掉的话，新建的空白对比连"这是哪两个工具"都写不了。
      */
-    project.sheet.rows = [createTitleRow(
-      project.sheet.sides[0].id,
-      project.sheet.sides[1].id,
-    )]
+    project.sheet.rows = [createTitleRow(project.sheet.sides[0].id, project.sheet.sides[1].id)]
     return project
   }
 
@@ -293,7 +347,8 @@ export function createRow(
  * 抽成函数是因为模板实例化与老工程迁移都要用它，两处必须是同一个形状。
  */
 export function createTitleRow(sideAId: SideId, sideBId: SideId): Row {
-  const make = (): ModuleInstance => createModuleInstance({ type: 'title', titleKey: 'modules.title' })
+  const make = (): ModuleInstance =>
+    createModuleInstance({ type: 'title', titleKey: 'modules.title' })
   return {
     id: uuid(),
     kind: 'paired',

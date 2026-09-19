@@ -21,12 +21,14 @@ import CompareCanvas from '@/components/compare/CompareCanvas.vue'
 import CompareToolbar from '@/components/compare/CompareToolbar.vue'
 import InspectorPanel from '@/components/editor/InspectorPanel.vue'
 import PresentOverlay from '@/components/present/PresentOverlay.vue'
+import ProjectStudio from '@/components/studio/ProjectStudio.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useProjectsStore } from '@/stores/useProjectsStore'
 import { useUiStore } from '@/stores/useUiStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { APP } from '@/app.config'
 
+defineOptions({ inheritAttrs: false })
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -187,6 +189,10 @@ function onPresentExit(): void {
   <div class="compare" :class="{ 'compare--fill': store.current !== null }" :style="configStyle">
     <div v-if="loading" class="compare__loading">{{ t('common.loading') }}</div>
 
+    <ProjectStudio
+      v-else-if="store.current?.sheet.layout.presentation?.enabled"
+      :project="store.current"
+    />
     <template v-else-if="store.current">
       <!--
         对比页工具条：保存状态 / 切视图 / 对比配置 / 导入 / 导出。
@@ -249,7 +255,7 @@ function onPresentExit(): void {
 
   <!-- 演示视图：独立遮罩层（§9.2） -->
   <PresentOverlay
-    v-if="store.current && isPresent"
+    v-if="store.current && isPresent && !store.current.sheet.layout.presentation?.enabled"
     :project="store.current"
     @exit="onPresentExit"
   />

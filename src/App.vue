@@ -11,6 +11,7 @@
  */
 import { onMounted, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
 import { APP } from '@/app.config'
 import { startPwa } from '@/composables/usePwa'
@@ -24,6 +25,7 @@ const project = useProjectStore()
 const projects = useProjectsStore()
 const settings = useSettingsStore()
 const ui = useUiStore()
+const route = useRoute()
 
 // 同步浏览器标签页标题（语言切换时自动更新）
 watchEffect(() => {
@@ -35,7 +37,7 @@ watchEffect(() => {
 onMounted(() => {
   void (async () => {
     await projects.load()
-    await project.restoreLastPosition()
+    if (!route.params.projectId && !project.current) await project.restoreLastPosition()
     await settings.ensurePersistentStorage()
   })()
 

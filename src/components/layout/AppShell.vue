@@ -24,6 +24,7 @@ import TabBar from './TabBar.vue'
 import ExportDialog from '@/components/export/ExportDialog.vue'
 import AppToasts from '@/components/common/AppToasts.vue'
 import { useUiStore } from '@/stores/useUiStore'
+import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts'
 import { applySidebarWidth } from '@/lib/theme'
@@ -33,6 +34,11 @@ const { t } = useI18n()
 const route = useRoute()
 const ui = useUiStore()
 const settings = useSettingsStore()
+const project = useProjectStore()
+const studio = computed(
+  () =>
+    route.meta.layout === 'compare' && project.current?.sheet.layout.presentation?.enabled === true,
+)
 
 useGlobalShortcuts()
 
@@ -131,17 +137,32 @@ onBeforeUnmount(() => {
 
 <template>
   <RouterView v-if="route.meta.layout === 'showcase'" />
-  <div v-else class="shell" :class="{ 'shell--compact': ui.sidebarCollapsed }">
-    <TopBar class="shell__topbar" />
+  <div
+    v-else
+    class="shell"
+    :class="{
+      'shell--compact': ui.sidebarCollapsed,
+      'shell--studio': studio && !ui.studioProjects,
+    }"
+  >
+    <TopBar class="shell__topbar" :inert="studio && project.current?.ui.mode === 'present'" />
 
-    <ProjectSidebar class="shell__sidebar" :aria-label="sectionTitle" />
+    <ProjectSidebar
+      v-show="!studio || ui.studioProjects"
+      :inert="studio && project.current?.ui.mode === 'present'"
+      class="shell__sidebar"
+      :aria-label="sectionTitle"
+    />
 
     <!--
       拖拽中缝。只在展开态出现：折叠后它会把 48px 的窄条再切一刀。
       用 role="separator" + aria-valuenow 让屏幕阅读器知道它是可调节的分隔条。
     -->
     <div
-      v-if="!ui.sidebarCollapsed"
+      v-if="
+        !ui.sidebarCollapsed &&
+        (!studio || (ui.studioProjects && project.current?.ui.mode !== 'present'))
+      "
       class="shell__resizer u-split u-split--v"
       role="separator"
       aria-orientation="vertical"
@@ -160,7 +181,7 @@ onBeforeUnmount(() => {
     />
 
     <main class="shell__main">
-      <TabBar v-if="showTabs" />
+      <TabBar v-if="showTabs && !studio" />
       <div class="shell__content u-scroll-y">
         <RouterView />
       </div>
@@ -191,6 +212,9 @@ onBeforeUnmount(() => {
  */
 .shell--compact {
   grid-template-columns: var(--size-sidebar-collapsed) 1fr;
+}
+.shell--studio {
+  grid-template-columns: 0 minmax(0, 1fr);
 }
 
 .shell__topbar {

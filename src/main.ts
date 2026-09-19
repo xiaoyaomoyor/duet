@@ -17,6 +17,8 @@ import './modules'
 import './styles/tokens.css'
 import './styles/base.css'
 import './styles/animations.css'
+import './styles/design.css'
+import './styles/workspace.css'
 
 /**
  * 应用启动（对奏 Duet）
@@ -36,6 +38,7 @@ async function boot(): Promise<void> {
   // 设置存于 IndexedDB，必须在挂载前完成，否则会先渲染默认主题再跳变
   const settings = useSettingsStore(pinia)
   await settings.load()
+  await router.isReady()
 
   app.mount('#app')
 

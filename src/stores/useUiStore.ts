@@ -22,6 +22,7 @@ export interface Toast {
 export const useUiStore = defineStore('ui', () => {
   // —— 布局 ——
   const sidebarCollapsed = ref(false)
+  const studioProjects = ref(false)
   const inspectorOpen = ref(false)
   /** 侧栏宽度（px）；持久化值在 settings 中，这里只存拖拽过程中的实时值 */
   const sidebarWidth = ref<number>(APP.sidebar.defaultWidth)
@@ -42,6 +43,7 @@ export const useUiStore = defineStore('ui', () => {
    * 事件传不上来，用一个布尔量通信是最省事也最不容易写错的做法。
    */
   const exportOpen = ref(false)
+  const presentationExport = ref<'scene' | 'report' | null>(null)
 
   // —— 命令面板（M3 使用，M0 先留出状态位） ——
   const commandPaletteOpen = ref(false)
@@ -116,6 +118,7 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     sidebarCollapsed,
+    studioProjects,
     sidebarWidth,
     sidebarDragging,
     inspectorWidth,
@@ -124,6 +127,7 @@ export const useUiStore = defineStore('ui', () => {
     toasts,
     activeDialog,
     exportOpen,
+    presentationExport,
     commandPaletteOpen,
     hasToasts,
     compactShell,

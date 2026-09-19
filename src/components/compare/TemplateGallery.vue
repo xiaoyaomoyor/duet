@@ -56,7 +56,8 @@ async function pick(templateId: string, name: string): Promise<void> {
 <template>
   <section class="gallery">
     <header class="gallery__head">
-      <h2 class="gallery__title">{{ t('compare.emptyTitle') }}</h2>
+      <span class="gallery__eyebrow">DUET / COMPARATIVE STUDIES</span>
+      <h2 class="gallery__title">{{ t('studio.templates') }}</h2>
       <p class="gallery__desc">{{ t('compare.emptyDesc') }}</p>
       <RouterLink class="gallery__import" :to="{ name: 'showcase' }"
         ><AppIcon name="palette" :size="14" />{{ t('showcase.entry') }} →</RouterLink
@@ -77,13 +78,27 @@ async function pick(templateId: string, name: string): Promise<void> {
     </header>
 
     <ul class="gallery__grid">
-      <li v-for="card in cards" :key="card.id">
+      <li
+        v-for="card in cards"
+        :key="card.id"
+        :class="{ gallery__legacy: !card.id.startsWith('stage-') }"
+      >
         <button
           class="gallery-card"
           type="button"
           :disabled="creating !== null"
           @click="pick(card.id, card.name)"
         >
+          <span
+            v-if="card.id.startsWith('stage-')"
+            class="gallery-card__preview"
+            :class="`gallery-card__preview--${card.id}`"
+            aria-hidden="true"
+          >
+            <span class="gallery-card__preview-head">DUET <i>01 — 02</i></span>
+            <span class="gallery-card__preview-pair"><i>A</i><i>B</i></span>
+            <span class="gallery-card__preview-lines"><i /><i /><i /></span>
+          </span>
           <span
             class="gallery-card__band"
             :style="{
@@ -95,7 +110,7 @@ async function pick(templateId: string, name: string): Promise<void> {
             <span class="gallery-card__name">{{ card.name }}</span>
             <span class="gallery-card__desc">{{ card.desc }}</span>
             <span class="gallery-card__modules">
-              <span v-for="key in card.modules" :key="key" class="gallery-card__chip">
+              <span v-for="(key, n) in card.modules" :key="n" class="gallery-card__chip">
                 {{ translate(key) }}
               </span>
             </span>
@@ -110,8 +125,81 @@ async function pick(templateId: string, name: string): Promise<void> {
 </template>
 
 <style scoped>
+.gallery__eyebrow {
+  display: block;
+  margin-bottom: 22px;
+  font: 10px var(--d-mono);
+  letter-spacing: 0.22em;
+  color: var(--d-muted);
+}
+.gallery-card__preview {
+  display: block;
+  padding: 24px;
+  background: var(--d-bg);
+  border-bottom: 1px solid var(--d-line);
+  aspect-ratio: 1.65;
+}
+.gallery-card__preview-head {
+  display: flex;
+  justify-content: space-between;
+  font: 9px var(--d-mono);
+  letter-spacing: 0.14em;
+  color: var(--d-muted);
+}
+.gallery-card__preview-head i {
+  font-style: normal;
+  font-size: 8px;
+}
+.gallery-card__preview-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 18px 0 12px;
+}
+.gallery-card__preview-pair i {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1.8;
+  border: 1px solid var(--d-line);
+  font: 28px var(--d-serif);
+  font-style: italic;
+  color: var(--d-a);
+  background: radial-gradient(ellipse at bottom, var(--d-raised), transparent);
+}
+.gallery-card__preview-pair i + i {
+  color: var(--d-b);
+}
+.gallery-card__preview-lines {
+  display: grid;
+  gap: 7px;
+}
+.gallery-card__preview-lines i {
+  height: 1px;
+  background: var(--d-line);
+}
+.gallery-card__preview--stage-image .gallery-card__preview-pair i {
+  aspect-ratio: 1.7;
+  background: linear-gradient(140deg, var(--d-raised) 50%, var(--d-surface) 50%);
+}
+.gallery-card__preview--stage-generic .gallery-card__preview-pair i {
+  border: 0;
+  border-bottom: 1px solid var(--d-line);
+  aspect-ratio: 2.2;
+}
+.gallery__legacy {
+  margin-top: 16px;
+}
+.gallery__legacy .gallery-card {
+  background: transparent;
+}
+.gallery__legacy .gallery-card__name {
+  font-size: 14px;
+}
+.gallery__legacy .gallery-card__modules {
+  display: none;
+}
 .gallery {
-  max-width: 880px;
+  max-width: 1160px;
   padding: var(--sp-12) var(--sp-8);
   margin: 0 auto;
 }
@@ -154,8 +242,21 @@ async function pick(templateId: string, name: string): Promise<void> {
 
 .gallery__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-4);
+}
+@media (max-width: 1000px) {
+  .gallery__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .gallery__grid {
+    grid-template-columns: 1fr;
+  }
+  .gallery {
+    padding: 32px 20px;
+  }
 }
 
 .gallery-card {

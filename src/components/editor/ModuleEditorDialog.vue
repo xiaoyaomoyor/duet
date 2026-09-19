@@ -26,12 +26,15 @@ import { useI18n } from 'vue-i18n'
 import AppIcon from '@/components/common/AppIcon.vue'
 import { getModule } from '@/modules/registry'
 import type { ModuleInstance, SideId } from '@/types/project'
+import type { ModuleOption } from '@/modules/types'
 
 const props = defineProps<{
   open: boolean
   module: ModuleInstance
   sideId: SideId
   accent: string
+  options?: ModuleOption[]
+  stage?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -44,7 +47,8 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const definition = computed(() => getModule(props.module.type))
-const hasOptions = computed(() => (definition.value?.options?.length ?? 0) > 0)
+const options = computed(() => props.options ?? definition.value?.options ?? [])
+const hasOptions = computed(() => options.value.length > 0)
 /** 该模块的编辑器要整幅宽度（自己就是双列的那种，如「标题」模块） */
 const editorWide = computed(() => definition.value?.editorWide === true)
 
@@ -125,11 +129,11 @@ function close(): void {
           </button>
         </header>
 
-        <div
-          class="editor-dialog__body"
-          :class="{ 'editor-dialog__body--wide': editorWide }"
-        >
+        <div class="editor-dialog__body" :class="{ 'editor-dialog__body--wide': editorWide }">
           <!-- ① 基本：标题（双列布局里落在右列上） -->
+          <p v-if="stage && module.type === 'title'" class="editor-dialog__stage-note">
+            {{ t('studio.compatibilityHint') }}
+          </p>
           <section class="sec sec--basics">
             <button
               class="sec__head"
@@ -216,7 +220,7 @@ function close(): void {
                 排成自适应网格后六行缩成两三行，且不必为每个选项留整行。
               -->
               <div class="options">
-                <label v-for="option in definition?.options ?? []" :key="option.key" class="option">
+                <label v-for="option in options" :key="option.key" class="option">
                   <span class="option__label">{{ t(option.labelKey) }}</span>
 
                   <select

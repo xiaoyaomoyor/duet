@@ -72,6 +72,7 @@ export function useGlobalShortcuts(): void {
       return
     }
 
+    if (project.current?.ui.mode === 'present') return
     if (isTypingTarget(event.target)) return
 
     const key = event.key.toLowerCase()

@@ -34,15 +34,13 @@ test.describe('应用外壳（M0）', () => {
 
     await expect(html).toHaveAttribute('lang', 'zh-CN')
 
-    const background = await page.evaluate(
-      () => getComputedStyle(document.body).backgroundColor,
-    )
+    const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
     expect(background).not.toBe('rgba(0, 0, 0, 0)')
 
     // 空状态与模板卡片
     // 注意：侧栏与主区各有一组模板卡片，断言必须限定在 <main> 内，否则会撞上 strict mode
     const main = page.getByRole('main')
-    await expect(page.getByRole('heading', { name: '从一次对比开始' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '从一场演示开始' })).toBeVisible()
     await expect(main.getByRole('button', { name: /音乐对比/ })).toBeVisible()
     await expect(main.getByRole('button', { name: /空白对比/ })).toBeVisible()
 

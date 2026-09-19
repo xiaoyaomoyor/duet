@@ -122,6 +122,15 @@ export function validateSheet(value: unknown, path = 'sheet'): Result<Sheet, str
   }
 
   if (!isPlainObject(value.layout)) return err(`${path}.layout：缺失或非法`)
+  const presentation = value.layout.presentation
+  if (
+    presentation !== undefined &&
+    (!isPlainObject(presentation) ||
+      typeof presentation.enabled !== 'boolean' ||
+      !['ink', 'paper'].includes(String(presentation.theme)))
+  ) {
+    return err(`${path}.layout.presentation：非法的舞台外观`)
+  }
 
   return ok(value as unknown as Sheet)
 }
