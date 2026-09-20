@@ -9,10 +9,29 @@ import {
   withTitleRow,
 } from '@/db/schema'
 import { withComparison } from './comparisonContent'
+import { SCHEMA_VERSION } from '@/types/project'
 
 /** Same pure migration for imports and IDB; all writes happen after validation. */
 export function migrateProject(project: Project): Project {
-  if (project.schemaVersion >= 9) return withComparison(project)
+  if (project.schemaVersion >= 9) {
+    const p = deepClone(withComparison(project))
+    p.schemaVersion = SCHEMA_VERSION
+    p.sheet.sides.forEach((s, n) => {
+      s.catalogueLabel ??= String.fromCharCode(65 + n)
+    })
+    if (p.sheet.sides.length > 2)
+      p.sheet.layout.presentation = {
+        enabled: true,
+        theme: p.sheet.layout.presentation?.theme ?? 'ink',
+      }
+    if (project.schemaVersion < SCHEMA_VERSION && !p.migrationSnapshot)
+      p.migrationSnapshot = {
+        schemaVersion: project.schemaVersion,
+        sheet: deepClone(project.sheet),
+        ...(project.comparison ? { comparison: deepClone(project.comparison) } : {}),
+      }
+    return p
+  }
   const p = deepClone(project)
   const snapshot = { schemaVersion: project.schemaVersion, sheet: deepClone(project.sheet) }
   if (p.schemaVersion < 3)
@@ -32,5 +51,9 @@ export function migrateProject(project: Project): Project {
   if (p.schemaVersion < 7) p.sheet.rows = withTitleRow(p.sheet.rows) as Row[]
   if (p.schemaVersion < 8) layout = withoutColumnRatio(layout)
   p.sheet.layout = layout as unknown as LayoutConfig
-  return { ...withComparison(p), migrationSnapshot: snapshot }
+  const result = { ...withComparison(p), migrationSnapshot: snapshot }
+  result.sheet.sides.forEach((s, n) => {
+    s.catalogueLabel ??= String.fromCharCode(65 + n)
+  })
+  return result
 }

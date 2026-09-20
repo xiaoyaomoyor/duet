@@ -1,4 +1,5 @@
 import type { Cell, Project, Row } from '@/types/project'
+import { SCHEMA_VERSION } from '@/types/project'
 import type { ComparisonContent, ContentSelection, PresentationRuntime } from '@/types/presentation'
 import { deepClone } from '@/lib/clone'
 import { uuid } from '@/lib/id'
@@ -35,7 +36,14 @@ export function withComparison(project: Project): Project {
   )
   return {
     ...project,
-    schemaVersion: 9,
+    schemaVersion: SCHEMA_VERSION,
+    sheet: {
+      ...project.sheet,
+      sides: project.sheet.sides.map((s, n) => ({
+        ...s,
+        catalogueLabel: s.catalogueLabel ?? String.fromCharCode(65 + n),
+      })) as Project['sheet']['sides'],
+    },
     ...(project.schemaVersion < 9
       ? {
           migrationSnapshot: {

@@ -23,7 +23,13 @@ import type {
   SideId,
 } from './project'
 
+export type ParticipantCommand =
+  | { t: 'participant/add'; name: string }
+  | { t: 'participant/remove'; id: string }
+  | { t: 'participant/reorder'; ids: string[] }
+
 export type Command =
+  | ParticipantCommand
   | { t: 'comparison/replace'; content: ComparisonContent }
   // —— 项目级 ——
   | { t: 'project/patch'; patch: Partial<Pick<Project, 'title' | 'tags' | 'pinned'>> }
@@ -75,6 +81,9 @@ export interface CellPatchTarget {
 
 /** 命令类型名（用于日志、历史合并键与调试） */
 export const COMMAND_TYPES = [
+  'participant/add',
+  'participant/remove',
+  'participant/reorder',
   'comparison/replace',
   'project/patch',
   'ui/patch',

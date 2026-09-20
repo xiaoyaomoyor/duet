@@ -111,10 +111,18 @@ export function validateSheet(value: unknown, path = 'sheet'): Result<Sheet, str
   if (!isNonEmptyString(value.id)) return err(`${path}.id：缺失或非法`)
   if (!Array.isArray(value.sides)) return err(`${path}.sides：必须是数组`)
   if (value.sides.length < 2) return err(`${path}.sides：至少需要两侧`)
+  if (value.sides.length > 6) return err(`${path}.sides：最多支持六个对象`)
+  const labels = new Set<string>()
 
   for (const [index, side] of value.sides.entries()) {
     const result = validateSide(side, `${path}.sides[${index}]`)
     if (!result.ok) return result
+    const label = result.value.catalogueLabel
+    if (label !== undefined) {
+      if (!/^[A-F]$/.test(label) || labels.has(label))
+        return err(`${path}.sides：对象标记必须唯一且为 A—F`)
+      labels.add(label)
+    }
   }
 
   if (!Array.isArray(value.rows)) return err(`${path}.rows：必须是数组`)
@@ -172,10 +180,15 @@ export function validateProject(value: unknown): Result<Project, string> {
       typeof snapshot.schemaVersion !== 'number' ||
       !Number.isInteger(snapshot.schemaVersion) ||
       snapshot.schemaVersion < 1 ||
-      snapshot.schemaVersion > 8 ||
+      snapshot.schemaVersion > 9 ||
       !validateSheet(snapshot.sheet).ok
     )
       return err('升级前快照损坏，无法保证恢复，请重新导入原始工程')
+    if (snapshot.comparison !== undefined) {
+      const restored = { ...value, sheet: snapshot.sheet } as unknown as Project
+      const checked = validateComparison(snapshot.comparison, restored)
+      if (!checked.ok) return checked
+    }
   }
 
   // 补齐可选字段，保证下游不必到处判空

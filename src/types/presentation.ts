@@ -56,4 +56,7 @@ export interface PresentationRuntime extends ContentSelection {
 export interface MigrationSnapshot {
   schemaVersion: number
   sheet: Sheet
+  comparison?: ComparisonContent
 }
+
+export type ComparisonView = 'overview' | 'pair' | 'single'

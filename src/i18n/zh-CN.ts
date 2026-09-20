@@ -10,7 +10,7 @@ export default {
   showcase: showcaseZh,
   app: {
     name: '对奏',
-    tagline: '让两个工具，同台演奏同一道题',
+    tagline: '让不同工具，同台演奏同一道题',
   },
 
   common: {

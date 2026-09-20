@@ -10,7 +10,7 @@ export default {
   showcase: showcaseEn,
   app: {
     name: 'Duet',
-    tagline: 'Same prompt. Two tools. One stage',
+    tagline: 'Same prompt. Multiple tools. One stage',
   },
 
   common: {

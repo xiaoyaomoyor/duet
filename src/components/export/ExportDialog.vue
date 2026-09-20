@@ -166,7 +166,12 @@ async function exportMigrationSnapshot() {
   busy.value = true
   try {
     const { comparison: _comparison, migrationSnapshot: _snapshot, ...original } = p
-    const legacy = { ...original, schemaVersion: snapshot.schemaVersion, sheet: snapshot.sheet }
+    const legacy = {
+      ...original,
+      schemaVersion: snapshot.schemaVersion,
+      sheet: snapshot.sheet,
+      ...(snapshot.comparison ? { comparison: snapshot.comparison } : {}),
+    }
     const result = await exportDuet([legacy], { embedMedia: true })
     if (!result.ok) {
       warnings.value = [result.error]

@@ -178,6 +178,7 @@ async function serializePresentRoot(
     media.removeAttribute('hidden')
     media.classList.add('duet-export-media')
     if (media.tagName === 'AUDIO') {
+      media.closest('.project-audio')?.querySelector('.stage-media__transport')?.remove()
       const audio = media.closest('.audio')
       audio?.querySelector('.player')?.remove()
       audio?.querySelector('.audio__body')?.append(media)
@@ -326,6 +327,7 @@ audio.duet-export-media { height: 42px !important; min-height: 42px; margin-top:
 .duet-player select, .duet-player button { background: var(--d-bg); border: 1px solid var(--d-line); color: var(--d-text); border-radius: 6px; padding: 8px 12px; max-width: 240px; }
 [data-export-frame][hidden] { display: none !important; }
 [data-runtime-export] { width: 100% !important; }
+[data-runtime-export] .project-audio audio { width: 100%; height: 34px; margin-top: 10px; }
 [data-reading=true] .stage-frame { aspect-ratio: auto; min-height: 56.25cqw; height: auto; }
 .duet-warnings li { margin: 2px 0; }
 </style>
@@ -337,7 +339,7 @@ audio.duet-export-media { height: 42px !important; min-height: 42px; margin-top:
 </div>
 ${warningBlock}
 <div class="duet-readonly-canvas">${input.bodyHtml}</div>
-${input.portable ? `<script>${input.hydration};\n${PORTABLE_PLAYER}</script>` : ''}
+${input.portable ? `<script>Promise.resolve(${input.hydration || 'undefined'}).then(()=>{${PORTABLE_PLAYER}})</script>` : ''}
 </body>
 </html>`
 }

@@ -12,6 +12,7 @@ import { err, ok, type Result } from '@/lib/result'
 import { uuid } from '@/lib/id'
 import { projectSelection, commitSelection, defaultSelection } from './comparisonContent'
 import { validateComparison } from '@/types/validateComparison'
+import { editParticipants, type ParticipantCommand } from './participants'
 import type { ContentSelection } from '@/types/presentation'
 import type { Command, NewModuleInput } from '@/types/commands'
 import type {
@@ -36,6 +37,12 @@ export function applyCommandResult(
   command: Command,
   selection?: ContentSelection,
 ): Result<Project, string> {
+  if (
+    command.t === 'participant/add' ||
+    command.t === 'participant/remove' ||
+    command.t === 'participant/reorder'
+  )
+    return editParticipants(project, command)
   if (command.t === 'comparison/replace') {
     const checked = validateComparison(command.content, project)
     return checked.ok
@@ -64,7 +71,7 @@ export function applyCommandResult(
 
 function applySheetCommand(
   project: Project,
-  command: Exclude<Command, { t: 'comparison/replace' }>,
+  command: Exclude<Command, { t: 'comparison/replace' } | ParticipantCommand>,
 ): Result<Project, string> {
   switch (command.t) {
     case 'project/patch':

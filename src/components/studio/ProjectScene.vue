@@ -7,6 +7,7 @@ import StageComparison from '@/components/stage/StageComparison.vue'
 import ModuleView from '@/components/compare/ModuleView.vue'
 import ProjectAudio from './ProjectAudio.vue'
 import type { ResolvedComparison, ResolvedSection, ResolvedContent } from '@/services/sceneResolver'
+import type { ComparisonView } from '@/types/presentation'
 const props = defineProps<{
   comparison: ResolvedComparison
   section: ResolvedSection
@@ -17,8 +18,27 @@ const props = defineProps<{
   focusIds?: string[]
   concealedIds?: string[]
   focused?: boolean
+  viewMode?: ComparisonView
+  participantIds?: string[]
+  exporting?: boolean
+  referenceId?: string
 }>()
-const emit = defineEmits<{ select: [content: ResolvedContent]; overflow: [id: string] }>()
+const emit = defineEmits<{
+  select: [content: ResolvedContent]
+  overflow: [id: string]
+  inspect: [id: string]
+}>()
+const mode = computed(() => (props.reading ? 'overview' : (props.viewMode ?? 'overview')))
+const compact = computed(
+  () => props.comparison.participants.length > 2 && !props.reading && mode.value === 'overview',
+)
+const participants = computed(() =>
+  props.reading || mode.value === 'overview' || !props.participantIds?.length
+    ? props.comparison.participants
+    : props.participantIds
+        .map((id) => props.comparison.participants.find((p) => p.id === id)!)
+        .filter(Boolean),
+)
 const { t } = useI18n()
 const root = ref<HTMLElement | null>(null)
 const overflowing = ref(false)
@@ -58,15 +78,25 @@ onMounted(() => {
 })
 onBeforeUnmount(() => observer?.disconnect())
 function contents(id: string) {
-  return (
+  const all =
     props.section.entries
       .find((e) => e.participantId === id)
       ?.contents.filter((c) => c.visible && c.module.type !== 'title') ?? []
-  )
+  if (!compact.value || props.exporting) return all
+  const media = all.find((c) => ['audio', 'image', 'video'].includes(c.module.type))
+  return media ? [media] : all.slice(0, 1)
 }
 </script>
 <template>
-  <div ref="root" class="project-scene" :data-scene-id="section.id">
+  <div
+    ref="root"
+    class="project-scene"
+    :data-scene-id="section.id"
+    :data-view="mode"
+    :data-multi="(comparison.participants.length > 2 && !reading) || undefined"
+    :data-count="participants.length"
+    :data-reading="reading || undefined"
+  >
     <StageFrame
       :index="index"
       :total="total"
@@ -81,11 +111,13 @@ function contents(id: string) {
         </p>
         <StageComparison
           v-if="section.metrics.length"
-          :participants="comparison.participants"
+          :participants="participants"
           :metrics="section.metrics"
           :caption="section.title"
           :focus-ids="focusIds"
           :concealed-ids="concealedIds"
+          :reference-id="referenceId"
+          :paginate="!exporting && !reading"
         />
         <template v-else-if="section.shared">
           <div
@@ -102,13 +134,9 @@ function contents(id: string) {
             />
           </div>
         </template>
-        <div
-          v-else
-          class="project-scene__pair"
-          :style="{ '--participants': comparison.participants.length }"
-        >
+        <div v-else class="project-scene__pair" :style="{ '--participants': participants.length }">
           <section
-            v-for="p in comparison.participants"
+            v-for="p in participants"
             :key="p.id"
             class="project-scene__participant"
             :class="{
@@ -119,6 +147,7 @@ function contents(id: string) {
             }"
             :data-tone="p.tone"
             :data-side-id="p.id"
+            :data-compare-id="p.id"
             :data-export-name="p.name"
             :data-export-version="p.version"
           >
@@ -135,11 +164,14 @@ function contents(id: string) {
             >
               {{ section.entries.find((e) => e.participantId === p.id)?.conditions }}
             </p>
-            <p v-if="p.description" class="project-scene__note">{{ p.description }}</p>
+            <p v-if="participants.some((p) => !!p.description)" class="project-scene__note">
+              {{ p.description || '\u00a0' }}
+            </p>
             <div
               v-for="content in contents(p.id)"
               :key="content.module.id"
               class="project-scene__module"
+              :data-module-type="content.module.type"
               @dblclick="editing && emit('select', content)"
             >
               <ProjectAudio
@@ -155,6 +187,13 @@ function contents(id: string) {
                 readonly
               />
             </div>
+            <button
+              v-if="compact && !exporting"
+              class="project-scene__inspect no-export"
+              @click="emit('inspect', p.id)"
+            >
+              查看 {{ p.label }} 详情 <span aria-hidden="true">↗</span>
+            </button>
             <div
               v-if="
                 section.entries.find((e) => e.participantId === p.id)?.missingSample ||
@@ -358,6 +397,175 @@ function contents(id: string) {
   }
   .project-scene__participant > .identity {
     margin-bottom: 20px;
+  }
+}
+</style>
+<style scoped>
+.project-scene__inspect {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--d-line);
+  background: transparent;
+  color: var(--d-muted);
+  padding: 0.65cqw 0 0;
+  margin-top: 0.7cqw;
+  font-size: max(11px, 0.8cqw);
+  cursor: pointer;
+}
+.project-scene__inspect:hover {
+  color: var(--d-text);
+}
+.project-scene[data-view='single'] .project-scene__pair {
+  max-width: 70%;
+  margin: auto;
+}
+.project-scene[data-multi][data-view='overview'] .project-scene__pair {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1.6cqw 2.2cqw;
+}
+.project-scene[data-multi][data-view='overview'] .project-scene__participant {
+  grid-column: span 2;
+  font-size: 1.4cqw;
+}
+.project-scene[data-multi][data-view='overview'][data-count='4'] .project-scene__participant {
+  grid-column: span 3;
+}
+.project-scene[data-multi][data-view='overview'][data-count='5']
+  .project-scene__participant:nth-child(4) {
+  grid-column: 2 / span 2;
+}
+.project-scene[data-multi][data-view='overview'] .project-scene__participant > .identity {
+  margin-bottom: 0.6cqw;
+}
+.project-scene[data-multi][data-view='overview'] .project-scene__sample {
+  margin: 0 0 0.55cqw;
+  font-size: max(12px, 0.85cqw);
+}
+.project-scene[data-multi][data-view='overview'] .project-scene__note {
+  display: none;
+}
+.project-scene[data-multi][data-view='overview'] .project-scene__module + .project-scene__module {
+  display: none;
+}
+.project-scene[data-multi][data-view='overview'] :deep(.stage-media__art) {
+  height: 7.5cqw;
+  aspect-ratio: auto;
+}
+.project-scene[data-multi][data-view='overview'][data-count='3'] :deep(.stage-media__art) {
+  height: 18cqw;
+}
+.project-scene[data-multi][data-view='overview'] :deep(.stage-media__caption) {
+  margin: 0.65cqw 0;
+}
+.project-scene[data-multi][data-view='overview'] :deep(.stage-media__caption h3) {
+  font-size: max(12px, 1cqw);
+}
+.project-scene[data-multi][data-view='overview'] :deep(.stage-media__caption p) {
+  display: none;
+}
+.project-scene[data-multi][data-view='overview'] :deep(.stage-media__transport) {
+  margin-top: 0.5cqw;
+  gap: 0.7cqw;
+}
+.project-scene[data-multi][data-view='overview'] :deep(.stage-media__play) {
+  width: 30px;
+  height: 30px;
+}
+.project-scene[data-multi][data-view='overview'] :deep(.stage-media__timeline > div) {
+  font-size: max(10px, 0.65cqw);
+}
+.project-scene[data-multi][data-view='overview'] :deep(.image img),
+.project-scene[data-multi][data-view='overview'] :deep(video) {
+  max-height: 12cqw;
+  object-fit: contain;
+  width: 100%;
+}
+.project-scene[data-multi][data-view='overview'] :deep(.text),
+.project-scene[data-multi][data-view='overview'] :deep(.lyrics) {
+  font-size: max(14px, 1.1cqw);
+  max-height: 12cqw;
+  overflow: auto;
+}
+.project-scene[data-multi][data-view='overview'] .project-scene__missing {
+  min-height: 12cqw;
+}
+@media (max-width: 700px) {
+  .project-scene[data-multi][data-view='overview'] .project-scene__pair {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  .project-scene[data-multi][data-view='overview'] .project-scene__participant {
+    font-size: 22px;
+  }
+  .project-scene[data-multi][data-view='overview'] :deep(.stage-media__art),
+  .project-scene[data-multi][data-view='overview'][data-count='3'] :deep(.stage-media__art) {
+    height: 180px;
+  }
+  .project-scene[data-multi][data-view='overview'] :deep(.image img),
+  .project-scene[data-multi][data-view='overview'] :deep(video) {
+    max-height: 240px;
+  }
+  .project-scene[data-multi][data-view='overview'] :deep(.text),
+  .project-scene[data-multi][data-view='overview'] :deep(.lyrics) {
+    max-height: 200px;
+  }
+  .project-scene[data-view='single'] .project-scene__pair {
+    max-width: none;
+  }
+  .project-scene__inspect {
+    padding-top: 12px;
+    margin-top: 16px;
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 701px) {
+  .project-scene[data-multi][data-view='overview'] .project-scene__participant {
+    position: relative;
+  }
+  .project-scene[data-multi][data-view='overview'] .project-scene__participant > .identity {
+    padding-right: 90px;
+  }
+  .project-scene[data-multi][data-view='overview'] .project-scene__inspect {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: auto;
+    gap: 10px;
+    border: 0;
+    margin: 0;
+    padding: 4px 0;
+  }
+  .project-scene[data-multi][data-view='overview'] :deep(.stage-media__caption) {
+    padding-top: 0;
+    margin: 0.45cqw 0 0;
+  }
+  .project-scene[data-multi][data-view='overview'] :deep(.stage-media__transport) {
+    margin-top: 0.4cqw;
+    padding-top: 0.4cqw;
+  }
+  .project-scene[data-multi][data-view='overview'] :deep(.stage-frame__title) {
+    padding-block: 1.2cqw;
+  }
+  .project-scene[data-multi][data-view='overview'] .project-scene__participant--dim {
+    opacity: 0.6;
+  }
+}
+
+.project-scene[data-reading][data-count='3'] .project-scene__pair,
+.project-scene[data-reading][data-count='5'] .project-scene__pair,
+.project-scene[data-reading][data-count='6'] .project-scene__pair {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.project-scene[data-reading][data-count='4'] .project-scene__pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 700px) {
+  .project-scene[data-reading] .project-scene__pair {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

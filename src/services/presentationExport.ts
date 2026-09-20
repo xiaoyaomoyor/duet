@@ -2,6 +2,7 @@ import type { Project } from '@/types/project'
 import { resolveRuntime } from './comparisonContent'
 import type { PresentationRuntime } from '@/types/presentation'
 import { isPresentable } from '@/modules/visibility'
+import { MULTI_PLAYER } from './multiPlayer'
 
 export interface ExportFrame {
   scene: number
@@ -9,6 +10,7 @@ export interface ExportFrame {
   state: PresentationRuntime
   choices: Array<Array<{ id: string | null; title: string }>>
   defaults: Array<string | null>
+  factorized?: boolean
 }
 
 /** Bounded pre-rendering reuses the app renderer; the portable player only selects existing frames. */
@@ -44,6 +46,27 @@ export function exportFrames(project: Project, limit = 120): ExportFrame[] {
       // Anonymous exports have no identity mapping, including reveal steps.
       state.revealedIdentities = []
       const defaults = project.sheet.sides.map((p) => state.samples[p.id] ?? null)
+      if (project.sheet.sides.length > 2) {
+        const selections = [state.samples]
+        for (const [n, p] of project.sheet.sides.entries())
+          for (const option of choices[n]!)
+            if (option.id !== defaults[n]) selections.push({ ...state.samples, [p.id]: option.id })
+        for (const samples of selections) {
+          if (frames.length >= limit)
+            throw new Error(
+              `演示网页超过 ${limit} 个画面组合。请减少场景或作品，或导出静态阅读页。`,
+            )
+          frames.push({
+            scene: sceneIndex,
+            title: `${c.title} / ${scene.title}`,
+            choices,
+            defaults,
+            factorized: true,
+            state: { ...state, samples },
+          })
+        }
+        continue
+      }
       for (const a of choices[0]!)
         for (const b of choices[1]!) {
           if (frames.length >= limit)
@@ -67,8 +90,11 @@ export function exportFrames(project: Project, limit = 120): ExportFrame[] {
 }
 
 /** No project JSON is embedded. Text and choices come only from already sanitized rendered frames. */
-export const PORTABLE_PLAYER = String.raw`(()=>{
+export const PORTABLE_PLAYER =
+  MULTI_PLAYER +
+  String.raw`(()=>{
 const frames=[...document.querySelectorAll('[data-export-frame]')];if(!frames.length)return;
+if(frames[0].dataset.exportFactorized){duetMulti();return}
 const bar=document.createElement('nav');bar.className='duet-player';bar.setAttribute('aria-label','演示控制');
 const button=(text,fn)=>{const b=document.createElement('button');b.textContent=text;b.onclick=fn;bar.append(b);return b};
 const sceneSelect=document.createElement('select');sceneSelect.setAttribute('aria-label','演示场景');bar.append(sceneSelect);

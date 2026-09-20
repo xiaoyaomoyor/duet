@@ -14,6 +14,7 @@ import { collectAssetIds, validateProject } from '@/types/validate'
 import { exportFrames } from './presentationExport'
 import { openDatabase, promisifyTransaction } from '@/db/core'
 import { upgrade } from '@/db/schema'
+import { SCHEMA_VERSION } from '@/types/project'
 
 function fixture() {
   const p = createProject({ templateId: 'stage-music', name: 'R3' })
@@ -64,7 +65,7 @@ describe('R3 comparison content and reference safety', () => {
       if (!result.ok) return
       const migrated = result.value[0]!
       expect(p).toEqual(before)
-      expect(migrated.schemaVersion).toBe(9)
+      expect(migrated.schemaVersion).toBe(SCHEMA_VERSION)
       expect(migrated.migrationSnapshot?.sheet).toEqual(before.sheet)
       expect(collectAssetIds(migrated)).toContain('hidden-asset')
       expect(parseProjectFile(JSON.stringify(migrated))).toEqual(result)

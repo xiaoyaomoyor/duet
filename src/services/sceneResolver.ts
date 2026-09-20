@@ -59,13 +59,13 @@ export function resolveComparison(
   const testCase = project.comparison?.cases.find((c) => c.id === selected?.caseId)
   const participants = project.sheet.sides.map((side, index): StageParticipant => ({
     id: side.id,
-    label: String.fromCharCode(65 + index),
-    tone: index % 2 ? 'b' : 'a',
+    label: side.catalogueLabel ?? String.fromCharCode(65 + index),
+    tone: (side.catalogueLabel ?? String.fromCharCode(65 + index)).charCodeAt(0) % 2 ? 'a' : 'b',
     name:
       side.showName === false
         ? ''
         : side.anonymizeName && !runtime?.revealedIdentities.includes(side.id)
-          ? `${t('studio.anonymous')} ${String.fromCharCode(65 + index)}`
+          ? `${t('studio.anonymous')} ${side.catalogueLabel ?? String.fromCharCode(65 + index)}`
           : (side.labelOverride ?? resolveTool(side.toolRef).name),
     version:
       side.showVersion === false

@@ -17,7 +17,7 @@ import type { ComparisonContent, MigrationSnapshot } from './presentation'
  *   这是**破坏性**变更：旧 type 的实现已从注册表删除，
  *   不迁移就会命中"模块类型未注册"分支、表现为内容消失。
  */
-export const SCHEMA_VERSION = 9
+export const SCHEMA_VERSION = 10
 
 // ——————————————————————————————————————————————————————————
 // 工具（生产源）
@@ -111,6 +111,8 @@ export type ModuleTypeId = string
 
 export interface Side {
   id: SideId
+  /** Stable catalogue label; sorting never renumbers participant identities. */
+  catalogueLabel?: string
   toolRef: ToolRef
   /**
    * 主题色 hex。
@@ -330,7 +332,7 @@ export interface LayoutConfig {
 export interface Sheet {
   id: string
   /** v1 固定 2 侧；v2 允许 >2，渲染层按 sides.length 自适应列数 */
-  sides: [Side, Side]
+  sides: [Side, Side, ...Side[]]
   rows: Row[]
   layout: LayoutConfig
 }

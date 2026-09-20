@@ -11,8 +11,8 @@ const props = defineProps<{ project: Project; frames: ExportFrame[] }>()
 const { t } = useI18n(),
   tools = useToolsStore()
 provide('duet:stage-playback', useStagePlayback())
-const resolved = computed(() =>
-  props.frames.map((frame) => {
+const resolved = computed(() => {
+  const result = props.frames.map((frame) => {
     const comparison = resolveComparison(props.project, tools.resolve, t, frame.state, frame.state)
     const scene = props.project.comparison!.scenes.find((s) => s.id === frame.state.sceneId)!
     return {
@@ -23,8 +23,36 @@ const resolved = computed(() =>
         title: scene.title || comparison.sections.find((s) => s.id === scene.sectionId)!.title,
       },
     }
-  }),
-)
+  })
+  for (const item of result) {
+    if (!item.frame.factorized || item.section.shared) continue
+    const related = result.filter((r) => r.frame.scene === item.frame.scene)
+    if (
+      related.some((r) =>
+        r.section.contents.some(
+          (c) =>
+            c.visible &&
+            (!['title', 'keyValue', 'score'].includes(c.module.type) ||
+              (c.module.type === 'score' &&
+                (c.module.data as { showNumber?: boolean }).showNumber === false)),
+        ),
+      )
+    ) {
+      item.section.metrics = []
+      continue
+    }
+    const union = new Map(
+      result
+        .filter((r) => r.frame.scene === item.frame.scene)
+        .flatMap((r) => r.section.metrics)
+        .map((m) => [m.id, m]),
+    )
+    item.section.metrics = [...union.values()].map(
+      (m) => item.section.metrics.find((v) => v.id === m.id) ?? { ...m, values: {} },
+    )
+  }
+  return result
+})
 </script>
 <template>
   <div
@@ -39,6 +67,9 @@ const resolved = computed(() =>
       :data-export-scene="frame.scene"
       :data-export-step="frame.state.stepIndex"
       :data-export-title="frame.title"
+      :data-export-factorized="frame.factorized || undefined"
+      :data-export-ids="JSON.stringify(project.sheet.sides.map((p) => p.id))"
+      :data-export-labels="JSON.stringify(comparison.participants.map((p) => p.label))"
       :data-export-choices="JSON.stringify(frame.choices)"
       :data-export-defaults="JSON.stringify(frame.defaults)"
       :data-export-samples="
@@ -52,6 +83,7 @@ const resolved = computed(() =>
         :total="new Set(frames.map((f) => f.scene)).size"
         :reading="false"
         :editing="false"
+        exporting
         :focus-ids="frame.state.focusIds"
         :concealed-ids="frame.state.concealedIds"
       />

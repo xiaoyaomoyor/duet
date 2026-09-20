@@ -15,6 +15,7 @@ import { addCase, copySample, deleteSample } from '@/services/comparisonEditing'
 import { defaultSelection } from '@/services/comparisonContent'
 import { importFiles } from '@/services/assetService'
 import SampleArtwork from './SampleArtwork.vue'
+import ParticipantManager from './ParticipantManager.vue'
 import DButton from '@/components/design/DButton.vue'
 const props = defineProps<{ project: Project; selection: ContentSelection; sceneId: string }>()
 const emit = defineEmits<{
@@ -24,11 +25,19 @@ const emit = defineEmits<{
 }>()
 const store = useProjectStore(),
   ui = useUiStore()
-const tab = ref<'works' | 'story'>('works'),
+const tab = ref<'works' | 'story' | 'participants'>('works'),
   participantId = ref(props.project.sheet.sides[0].id)
 const content = computed(() => props.project.comparison!)
 const item = computed(() => content.value.cases.find((c) => c.id === props.selection.caseId)!)
-const entry = computed(() => item.value.entries[participantId.value]!)
+const entry = computed(
+  () => item.value.entries[participantId.value] ?? { samples: [], defaultSampleId: null },
+)
+watch(
+  () => props.project.sheet.sides,
+  (sides) => {
+    if (!sides.some((p) => p.id === participantId.value)) participantId.value = sides[0].id
+  },
+)
 const sample = computed(() =>
   entry.value.samples.find((s) => s.id === props.selection.samples[participantId.value]),
 )
@@ -238,6 +247,7 @@ async function duplicateScene() {
     <div class="collection__tabs">
       <button :aria-pressed="tab === 'works'" @click="tab = 'works'">测试题与作品</button
       ><button :aria-pressed="tab === 'story'" @click="tab = 'story'">演示编排</button>
+      <button :aria-pressed="tab === 'participants'" @click="tab = 'participants'">对比对象</button>
     </div>
     <template v-if="tab === 'works'">
       <label class="d-field"
@@ -269,10 +279,11 @@ async function duplicateScene() {
         >
       </div>
     </template>
-    <label class="d-field"
+    <ParticipantManager v-if="tab === 'participants'" :project="project" />
+    <label v-if="tab !== 'participants'" class="d-field"
       >参评工具<select v-model="participantId" class="d-input">
         <option v-for="(p, n) in project.sheet.sides" :key="p.id" :value="p.id">
-          {{ String.fromCharCode(65 + n) }} ·
+          {{ p.catalogueLabel ?? String.fromCharCode(65 + n) }} ·
           {{ p.labelOverride || (p.toolRef.kind === 'inline' ? p.toolRef.name : p.toolRef.toolId) }}
         </option>
       </select></label
@@ -402,7 +413,7 @@ async function duplicateScene() {
         >
       </div>
     </template>
-    <template v-else>
+    <template v-else-if="tab === 'story'">
       <p class="collection__hint">
         场景引用已有内容；复制场景不会复制作品。步骤逐次生效，回退会恢复对应状态。
       </p>
@@ -471,6 +482,7 @@ async function duplicateScene() {
               }}
               ·
               {{
+                project.sheet.sides.find((p) => p.id === step.participantId)?.catalogueLabel ??
                 String.fromCharCode(
                   65 + project.sheet.sides.findIndex((p) => p.id === step.participantId),
                 )

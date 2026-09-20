@@ -12,7 +12,7 @@ import type { CellRef, Project } from '@/types/project'
 import ProjectScene from './ProjectScene.vue'
 import CollectionPanel from './CollectionPanel.vue'
 import { defaultSelection, resolveRuntime, projectSelection } from '@/services/comparisonContent'
-import type { ContentSelection, PresentationRuntime } from '@/types/presentation'
+import type { ComparisonView, ContentSelection, PresentationRuntime } from '@/types/presentation'
 import DButton from '@/components/design/DButton.vue'
 import ModulePicker from '@/components/editor/ModulePicker.vue'
 import ModuleEditorDialog from '@/components/editor/ModuleEditorDialog.vue'
@@ -27,11 +27,62 @@ const collectionOpen = ref(false),
 const selection = ref<ContentSelection>(defaultSelection(props.project.comparison!))
 const presentationSceneId = ref(props.project.comparison!.scenes[0]?.id ?? '')
 const runtime = ref<PresentationRuntime | null>(null)
+const comparisonView = ref<ComparisonView>('overview')
+const referenceId = ref(''),
+  targetId = ref(props.project.sheet.sides[0].id)
+const viewIds = computed(() => {
+  const ids = props.project.sheet.sides.map((s) => s.id)
+  const target = ids.includes(targetId.value) ? targetId.value : ids[0]!
+  const reference =
+    ids.includes(referenceId.value) && referenceId.value !== target
+      ? referenceId.value
+      : ids.find((id) => id !== target)!
+  return comparisonView.value === 'single' ? [target] : [reference, target]
+})
+function setComparisonView(mode: ComparisonView, id?: string) {
+  player.pauseAll()
+  pauseMedia()
+  if (id) {
+    targetId.value = id
+    selectedId.value =
+      section.value?.entries.find((e) => e.participantId === id)?.contents[0]?.module.id ?? ''
+  }
+  comparisonView.value = mode
+  focused.value = false
+}
 const sceneDefinition = computed(() =>
   props.project.comparison!.scenes.find((s) => s.id === presentationSceneId.value),
 )
-const activeSelection = computed(() =>
-  present.value && runtime.value ? runtime.value : selection.value,
+const activeSelection = computed(() => {
+  const state = present.value && runtime.value ? runtime.value : selection.value
+  const item =
+    props.project.comparison!.cases.find((c) => c.id === state.caseId) ??
+    props.project.comparison!.cases[0]!
+  return {
+    ...state,
+    caseId: item.id,
+    samples: Object.fromEntries(
+      props.project.sheet.sides.map((p) => [
+        p.id,
+        Object.hasOwn(state.samples, p.id)
+          ? (state.samples[p.id] ?? null)
+          : (item.entries[p.id]?.defaultSampleId ?? null),
+      ]),
+    ),
+  }
+})
+watch(
+  () => props.project.sheet.sides,
+  (sides) => {
+    if (!sides.some((p) => p.id === referenceId.value)) referenceId.value = ''
+    if (!sides.some((p) => p.id === targetId.value)) targetId.value = sides[0].id
+  },
+)
+watch(
+  () => runtime.value?.focusIds[0],
+  (id) => {
+    if (id) targetId.value = id
+  },
 )
 const comparison = computed(() =>
   resolveComparison(
@@ -102,16 +153,29 @@ function toggleHelp() {
   pauseMedia()
 }
 function toggleFocusView() {
+  if (comparison.value.participants.length > 2) {
+    setComparisonView(
+      comparisonView.value === 'overview' ? 'single' : 'overview',
+      runtime.value?.focusIds[0] ?? targetId.value,
+    )
+    return
+  }
   if (!runtime.value?.focusIds.length && comparison.value.participants[0])
     focusParticipant(comparison.value.participants[0].id)
   focused.value = !focused.value
 }
 function focusParticipant(id: string) {
+  targetId.value = id
+  player.pauseAll()
+  pauseMedia()
   if (runtime.value)
     runtime.value = { ...runtime.value, focusIds: runtime.value.focusIds.includes(id) ? [] : [id] }
 }
 function toggleSelectedAudio() {
-  const p = runtime.value?.focusIds[0] ?? comparison.value.participants[0]?.id
+  const p =
+    comparisonView.value !== 'overview'
+      ? targetId.value
+      : (runtime.value?.focusIds[0] ?? comparison.value.participants[0]?.id)
   const content = section.value?.entries
     .find((e) => e.participantId === p)
     ?.contents.find((c) => c.module.type === 'audio' && c.visible)
@@ -186,6 +250,9 @@ watch(
     sceneId.value = ''
     selectedId.value = ''
     clean.value = false
+    comparisonView.value = 'overview'
+    referenceId.value = ''
+    targetId.value = props.project.sheet.sides[0].id
     overflowIds.value = new Set()
     player.pauseAll()
   },
@@ -287,9 +354,10 @@ function exit() {
     help.value = false
     return
   }
-  if (focused.value || runtime.value?.focusIds.length) {
+  if (focused.value || runtime.value?.focusIds.length || comparisonView.value !== 'overview') {
     focused.value = false
     if (runtime.value) runtime.value.focusIds = []
+    setComparisonView('overview')
     return
   }
   if (document.fullscreenElement) {
@@ -355,7 +423,9 @@ function keyboard(event: KeyboardEvent) {
     toggleSelectedAudio()
   }
   if (/^[1-6]$/.test(event.key)) {
-    const p = comparison.value.participants[Number(event.key) - 1]
+    const p = comparison.value.participants.find(
+      (p) => p.label === String.fromCharCode(64 + Number(event.key)),
+    )
     if (p) {
       event.preventDefault()
       focusParticipant(p.id)
@@ -370,10 +440,17 @@ function keyboard(event: KeyboardEvent) {
     void full()
   }
 }
+function exclusiveMedia(event: Event) {
+  if (!(event.target instanceof HTMLMediaElement)) return
+  root.value?.querySelectorAll<HTMLMediaElement>('audio,video').forEach((media) => {
+    if (media !== event.target) media.pause()
+  })
+}
 onMounted(() => {
   if (present.value && !runtime.value) restart()
   window.addEventListener('keydown', keyboard)
   document.addEventListener('visibilitychange', onVisibility)
+  root.value?.addEventListener('play', exclusiveMedia, true)
 })
 onBeforeUnmount(() => {
   player.pauseAll()
@@ -381,6 +458,7 @@ onBeforeUnmount(() => {
   store.contentSelection = undefined
   window.removeEventListener('keydown', keyboard)
   document.removeEventListener('visibilitychange', onVisibility)
+  root.value?.removeEventListener('play', exclusiveMedia, true)
 })
 function patchData(patch: Record<string, unknown>) {
   if (selected.value) {
@@ -570,6 +648,7 @@ function theme(value: 'ink' | 'paper') {
             </select></label
           ><DButton compact tone="quiet" @click="theme('ink')">{{ t('studio.restore') }}</DButton
           ><DButton
+            v-if="project.sheet.sides.length === 2"
             compact
             tone="quiet"
             @click="
@@ -637,6 +716,59 @@ function theme(value: 'ink' | 'paper') {
           ><DButton v-if="present" compact tone="quiet" @click="toggleHelp">快捷键</DButton>
         </div>
         <div
+          v-if="comparison.participants.length > 2 && !clean && !ui.presentationExport"
+          class="studio__selection studio__view-controls no-export"
+          role="group"
+          aria-label="观看方式"
+        >
+          <DButton
+            compact
+            tone="quiet"
+            :aria-pressed="comparisonView === 'overview'"
+            @click="setComparisonView('overview')"
+            >全体总览</DButton
+          >
+          <DButton
+            compact
+            tone="quiet"
+            :aria-pressed="comparisonView === 'pair'"
+            @click="setComparisonView('pair')"
+            >重点双人</DButton
+          >
+          <DButton
+            compact
+            tone="quiet"
+            :aria-pressed="comparisonView === 'single'"
+            @click="setComparisonView('single')"
+            >单项</DButton
+          >
+          <label
+            ><span>固定参照</span
+            ><select
+              v-model="referenceId"
+              aria-label="固定参照"
+              @change="setComparisonView(comparisonView)"
+            >
+              <option value="">不固定</option>
+              <option v-for="p in comparison.participants" :key="p.id" :value="p.id">
+                {{ p.label }} · {{ p.name }}
+              </option>
+            </select></label
+          >
+          <label v-if="comparisonView !== 'overview'"
+            ><span>当前对象</span
+            ><select
+              v-model="targetId"
+              aria-label="当前对象"
+              @change="setComparisonView(comparisonView)"
+            >
+              <option v-for="p in comparison.participants" :key="p.id" :value="p.id">
+                {{ p.label }} · {{ p.name }}
+              </option>
+            </select></label
+          >
+        </div>
+        <div
           v-if="help && present"
           class="studio__help no-export"
           role="region"
@@ -644,7 +776,7 @@ function theme(value: 'ink' | 'paper') {
         >
           <strong>演示控制</strong>
           <p>→ / 空格 下一步 · ← 上一步 · Home / End 首尾场景</p>
-          <p>P 试听 / 暂停 · 1 / 2 聚焦工具 · Enter 放大 · F 全屏 · Esc 逐层退出</p>
+          <p>P 试听 / 暂停 · 1—6 聚焦工具 · Enter 放大 · F 全屏 · Esc 逐层退出</p>
           <DButton compact @click="help = false">关闭帮助</DButton>
         </div>
         <p v-if="currentCase.conditions && !clean" class="studio__conditions">
@@ -665,6 +797,7 @@ function theme(value: 'ink' | 'paper') {
         >
           <template v-for="(s, n) in scenes" :key="s.id"
             ><ProjectScene
+              v-if="reading || s.id === section?.id"
               v-show="reading ? s.visible : s.id === section?.id"
               :comparison="comparison"
               :section="
@@ -675,6 +808,10 @@ function theme(value: 'ink' | 'paper') {
               :index="present && !reading ? navigationIndex : n"
               :total="present && !reading ? navigationTotal : scenes.length"
               :reading="reading"
+              :view-mode="ui.presentationExport === 'report' ? 'overview' : comparisonView"
+              :participant-ids="viewIds"
+              :reference-id="referenceId"
+              :exporting="!!ui.presentationExport"
               :editing="!present"
               :focus-ids="
                 present && !reading && (!ui.presentationExport || ui.presentationCurrentStep)
@@ -688,6 +825,7 @@ function theme(value: 'ink' | 'paper') {
               "
               :focused="focused && (!ui.presentationExport || ui.presentationCurrentStep)"
               @select="select"
+              @inspect="setComparisonView(referenceId ? 'pair' : 'single', $event)"
               @overflow="overflowIds.add($event)"
           /></template>
           <div v-if="present && !visible.length" class="studio__no-content">

@@ -12,10 +12,10 @@ export const APP = {
   nameEn: 'Duet',
   slug,
   /** 展示用名称：随语言切换，见 taglineZh/En */
-  taglineZh: '让两个工具，同台演奏同一道题。',
-  taglineEn: 'Same prompt. Two tools. One stage.',
+  taglineZh: '让不同工具，同台演奏同一道题。',
+  taglineEn: 'Same prompt. Multiple tools. One stage.',
   description: '专注内容横向对比的本地优先 Web 应用',
-  version: '0.8.0',
+  version: '0.9.0',
   /** 工程文件扩展名 */
   fileExt: 'duet',
   /** 工程文件 MIME（用于分享/拖拽识别） */
