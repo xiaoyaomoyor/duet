@@ -2,6 +2,7 @@ import { isPlainObject, validateCell } from './validate'
 import type { ComparisonContent } from './presentation'
 import type { Project } from './project'
 import { err, ok, type Result } from '@/lib/result'
+import { validAppearance } from './appearance'
 
 /** Validate inactive samples and references too; no silent loss through a permissive cast. */
 export function validateComparison(
@@ -92,6 +93,7 @@ export function validateComparison(
     )
   }
   for (const scene of content.scenes) {
+    if (scene?.appearance !== undefined && !validAppearance(scene.appearance)) return fail()
     if (
       !isPlainObject(scene) ||
       !id(scene.id) ||

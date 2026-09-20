@@ -365,6 +365,7 @@ export const MIGRATIONS: Migration[] = [
   },
   { to: 9, run: (_db, tx) => migrateProjectRecords(tx) },
   { to: 10, run: (_db, tx) => migrateProjectRecords(tx) },
+  { to: 11, run: (_db, tx) => migrateProjectRecords(tx) },
 ]
 
 /** 单个 sheet.layout 的 v7→v8 改写（导出是为了能直接单测） */

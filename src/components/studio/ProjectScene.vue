@@ -43,6 +43,14 @@ const { t } = useI18n()
 const root = ref<HTMLElement | null>(null)
 const overflowing = ref(false)
 let observer: ResizeObserver | undefined
+let measureFrame = 0
+function scheduleMeasure() {
+  if (measureFrame) return
+  measureFrame = requestAnimationFrame(() => {
+    measureFrame = 0
+    measure()
+  })
+}
 const visibleContents = computed(() =>
   props.section.contents.filter((c) => c.visible && c.module.type !== 'title'),
 )
@@ -64,19 +72,22 @@ watch(
   async () => {
     overflowing.value = false
     await nextTick()
-    measure()
+    scheduleMeasure()
   },
 )
 onMounted(() => {
-  observer = new ResizeObserver(measure)
+  observer = new ResizeObserver(scheduleMeasure)
   if (root.value) {
     observer.observe(root.value)
     const body = root.value.querySelector('.project-scene__body')
     if (body) observer.observe(body)
   }
-  void nextTick(measure)
+  void nextTick(scheduleMeasure)
 })
-onBeforeUnmount(() => observer?.disconnect())
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  cancelAnimationFrame(measureFrame)
+})
 function contents(id: string) {
   const all =
     props.section.entries
@@ -92,12 +103,19 @@ function contents(id: string) {
     ref="root"
     class="project-scene"
     :data-scene-id="section.id"
+    :data-design-theme="section.appearance.theme"
+    :data-palette="section.appearance.palette"
+    :data-typography="section.appearance.typography"
+    :data-media-layout="section.appearance.mediaLayout"
+    :data-title-align="section.appearance.titleAlign"
+    :data-texture="section.appearance.texture"
     :data-view="mode"
     :data-multi="(comparison.participants.length > 2 && !reading) || undefined"
     :data-count="participants.length"
     :data-reading="reading || undefined"
   >
     <StageFrame
+      :appearance="section.appearance"
       :index="index"
       :total="total"
       :title="section.title"

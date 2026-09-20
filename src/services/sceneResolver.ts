@@ -1,3 +1,5 @@
+import { resolveAppearance } from './appearance'
+import type { Appearance } from '@/types/appearance'
 import type { ModuleInstance, ModuleRef, Project, ToolRef } from '@/types/project'
 import { getModule } from '@/modules/registry'
 import { isPresentable } from '@/modules/visibility'
@@ -23,6 +25,7 @@ export interface ResolvedEntry {
   hidden: boolean
 }
 export interface ResolvedSection {
+  appearance: Appearance
   id: string
   title: string
   shared: boolean
@@ -52,6 +55,7 @@ export function resolveComparison(
   t: (key: string) => string,
   selection?: ContentSelection,
   runtime?: PresentationRuntime,
+  appearanceSceneId?: string,
 ): ResolvedComparison {
   const selected =
     selection ?? (project.comparison ? defaultSelection(project.comparison) : undefined)
@@ -104,6 +108,18 @@ export function resolveComparison(
     const active = contents.filter((c) => c.visible && c.module.type !== 'title')
     const metrics = row.kind === 'full' ? [] : resolveMetrics(entries)
     return {
+      appearance: resolveAppearance(
+        project,
+        project.comparison?.scenes.find(
+          (s) =>
+            s.id === (appearanceSceneId ?? runtime?.sceneId) &&
+            s.sectionId === row.id &&
+            s.caseId === testCase?.id,
+        )?.id ??
+          project.comparison?.scenes.find(
+            (s) => s.sectionId === row.id && s.caseId === testCase?.id,
+          )?.id,
+      ),
       id: row.id,
       title:
         row.label?.trim() ||
@@ -123,7 +139,7 @@ export function resolveComparison(
     caseId: testCase?.id ?? `${project.sheet.id}:default`,
     caseTitle: testCase?.title ?? '',
     conditions: testCase?.conditions ?? '',
-    theme: project.sheet.layout.presentation?.theme === 'paper' ? 'paper' : 'ink',
+    theme: resolveAppearance(project).theme,
     participants,
     sections,
   }

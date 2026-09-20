@@ -20,7 +20,7 @@ const source = computed(() =>
       ? { kind: 'url' as const, url: data.value.sourceUrl }
       : undefined,
 )
-const media = useResolvedMedia(source)
+const media = useResolvedMedia(source, { warmStart: true })
 const embedded = ref<string>()
 watch(
   () => data.value.assetId,
@@ -38,6 +38,7 @@ watch(
 )
 const cover = useResolvedMedia(
   computed(() => assetSource(data.value.coverAssetId || embedded.value)),
+  { warmStart: true },
 )
 const participant = computed<StageParticipant>(() => ({
   ...props.participant,

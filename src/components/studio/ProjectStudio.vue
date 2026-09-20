@@ -10,6 +10,7 @@ import { getModule } from '@/modules/registry'
 import { moduleTitle } from '@/i18n/helper'
 import type { CellRef, Project } from '@/types/project'
 import ProjectScene from './ProjectScene.vue'
+import AppearancePanel from './AppearancePanel.vue'
 import CollectionPanel from './CollectionPanel.vue'
 import { defaultSelection, resolveRuntime, projectSelection } from '@/services/comparisonContent'
 import type { ComparisonView, ContentSelection, PresentationRuntime } from '@/types/presentation'
@@ -21,6 +22,16 @@ const { t } = useI18n()
 const store = useProjectStore(),
   tools = useToolsStore(),
   ui = useUiStore()
+function togglePanel(panel: 'collection' | 'appearance') {
+  if (panel === 'appearance') {
+    appearanceOpen.value = !appearanceOpen.value
+    collectionOpen.value = false
+  } else {
+    collectionOpen.value = !collectionOpen.value
+    appearanceOpen.value = false
+  }
+}
+const appearanceOpen = ref(false)
 const collectionOpen = ref(false),
   help = ref(false),
   focused = ref(false)
@@ -50,6 +61,12 @@ function setComparisonView(mode: ComparisonView, id?: string) {
   comparisonView.value = mode
   focused.value = false
 }
+const appearanceSceneId = computed(() => {
+  const candidates = props.project.comparison!.scenes.filter(
+    (s) => s.sectionId === section.value?.id && s.caseId === activeSelection.value.caseId,
+  )
+  return candidates.find((s) => s.id === presentationSceneId.value)?.id ?? candidates[0]?.id ?? ''
+})
 const sceneDefinition = computed(() =>
   props.project.comparison!.scenes.find((s) => s.id === presentationSceneId.value),
 )
@@ -93,6 +110,7 @@ const comparison = computed(() =>
     present.value && !reading.value && !ui.presentationExport
       ? (runtime.value ?? undefined)
       : undefined,
+    presentationSceneId.value,
   ),
 )
 const playlist = computed(() =>
@@ -520,7 +538,10 @@ function toggleSection() {
   )
 }
 function theme(value: 'ink' | 'paper') {
-  store.patchLayout({ presentation: { enabled: true, theme: value } })
+  store.dispatch(
+    { t: 'appearance/set', appearance: { ...props.project.appearance, theme: value } },
+    { label: '修改项目风格' },
+  )
 }
 </script>
 <template>
@@ -531,7 +552,7 @@ function theme(value: 'ink' | 'paper') {
       'studio--present': present,
       'studio--clean': clean && present,
       'studio--properties': properties && !present,
-      'studio--collection': collectionOpen && !present,
+      'studio--collection': (collectionOpen || appearanceOpen) && !present,
     }"
     @play.capture="onPlay"
   >
@@ -571,8 +592,15 @@ function theme(value: 'ink' | 'paper') {
           v-if="!present"
           compact
           :aria-pressed="collectionOpen"
-          @click="collectionOpen = !collectionOpen"
+          @click="togglePanel('collection')"
           >作品与流程</DButton
+        >
+        <DButton
+          v-if="!present"
+          compact
+          :aria-pressed="appearanceOpen"
+          @click="togglePanel('appearance')"
+          >外观与版式</DButton
         >
         <DButton compact icon="export" @click="ui.openExport()">{{ t('export.menu') }}</DButton>
         <DButton
@@ -595,6 +623,13 @@ function theme(value: 'ink' | 'paper') {
       </div>
     </header>
     <div class="studio__layout">
+      <AppearancePanel
+        v-if="appearanceOpen && !present"
+        :project="project"
+        :scene-id="appearanceSceneId"
+        @scene="jumpScene"
+        @close="appearanceOpen = false"
+      />
       <CollectionPanel
         v-if="collectionOpen && !present"
         :project="project"

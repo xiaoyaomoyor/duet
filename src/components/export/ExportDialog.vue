@@ -10,7 +10,7 @@
  *   1. 导出必须有进度与失败原因（点完没反应是最差的体验）
  *   2. 视图切换必须成对出现（finally 里还原），否则用户会发现界面莫名其妙变了
  */
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import PresentationExport from '@/components/studio/PresentationExport.vue'
 import { exportFrames, type ExportFrame } from '@/services/presentationExport'
 const portable = ref(true)
@@ -23,7 +23,8 @@ import { useProjectStore } from '@/stores/useProjectStore'
 import { useUiStore } from '@/stores/useUiStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { duetFileName, exportDuet } from '@/services/exportService'
-import { exportElementToPng } from '@/services/imageExport'
+import { exportPagedPng } from '@/services/pagedImageExport'
+import { assetInventory, exportProjectBundle, type AssetInventory } from '@/services/projectBundle'
 import { exportReadonlyHtml } from '@/services/htmlExport'
 import { waitForMediaResolutions } from '@/composables/useResolvedMedia'
 import { loadLocalLogos } from '@/lib/localLogos'
@@ -38,6 +39,40 @@ const store = useProjectStore()
 const ui = useUiStore()
 const settings = useSettingsStore()
 
+const inventory = shallowRef<AssetInventory | null>(null)
+const inventoryError = ref('')
+const paginate = ref(false)
+const bundleBlocked = computed(
+  () =>
+    !inventory.value ||
+    !!inventory.value.missing.length ||
+    !!inventory.value.external ||
+    inventory.value.bytes > 128 * 1024 * 1024,
+)
+async function refreshInventory() {
+  inventory.value = null
+  inventoryError.value = ''
+  if (!project.value) return
+  try {
+    inventory.value = await assetInventory(project.value)
+  } catch (e) {
+    inventoryError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+async function doExportBundle() {
+  if (!project.value) return
+  busy.value = true
+  warnings.value = []
+  progress.value = '打包项目与本地媒体…'
+  try {
+    const r = await exportProjectBundle(project.value)
+    if (!r.ok) warnings.value = [r.error]
+    else downloadBlob(r.value, safeName('duetpack'))
+  } finally {
+    busy.value = false
+    progress.value = ''
+  }
+}
 const embedMedia = ref(true)
 const reportExport = ref(true)
 const busy = ref(false)
@@ -58,6 +93,7 @@ watch(
     warnings.value = []
     progress.value = ''
     embedMedia.value = true
+    void refreshInventory()
   },
 )
 
@@ -165,7 +201,12 @@ async function exportMigrationSnapshot() {
   if (!p || !snapshot) return
   busy.value = true
   try {
-    const { comparison: _comparison, migrationSnapshot: _snapshot, ...original } = p
+    const {
+      comparison: _comparison,
+      migrationSnapshot: _snapshot,
+      appearance: _appearance,
+      ...original
+    } = p
     const legacy = {
       ...original,
       schemaVersion: snapshot.schemaVersion,
@@ -197,7 +238,8 @@ async function doExportImage(): Promise<void> {
       document.body.dataset.exporting = '1'
       try {
         await nextFrames(1)
-        return await exportElementToPng(root, {
+        return await exportPagedPng(root, {
+          paginate: paginate.value,
           scale: settings.settings.exportScale,
           onProgress: (label) => {
             progress.value = label
@@ -214,7 +256,7 @@ async function doExportImage(): Promise<void> {
       return
     }
 
-    const name = safeName('png')
+    const name = safeName(result.value.extension)
     downloadBlob(result.value.blob, name)
     if (result.value.warnings.length > 0) warnings.value = result.value.warnings
     ui.notify(t('export.done', { name }), 'success')
@@ -351,7 +393,45 @@ useModalFocus(dialogRoot, close)
         >
           下载升级前的恢复工程（v{{ project.migrationSnapshot.schemaVersion }}）
         </button>
+        <label class="option"
+          ><input
+            aria-label="图片按场景分页"
+            v-model="paginate"
+            type="checkbox"
+            :disabled="busy"
+          /><span class="option__text"
+            ><span class="option__label">图片按场景分页</span
+            ><span class="option__hint"
+              >多页合并为 ZIP。超长报告会自动分页，保留导出倍率。</span
+            ></span
+          ></label
+        >
+        <div class="inventory" role="status">
+          <strong>素材交付检查</strong>
+          <p v-if="inventory">
+            本地 {{ inventory.assets.length }} 项 · {{ (inventory.bytes / 1048576).toFixed(1) }} MiB
+            · 缺失 {{ inventory.missing.length }} 项 · 外链 {{ inventory.external }} 项
+          </p>
+          <p v-else>{{ inventoryError || '正在检查…' }}</p>
+          <small
+            >完整素材包包含所有作品和恢复快照引用，限 128
+            MiB；外链需先镜像，在线嵌入页不随包离线。普通工程单个内嵌媒体上限 20 MiB。</small
+          >
+        </div>
         <ul class="actions">
+          <li>
+            <button
+              class="action"
+              type="button"
+              :disabled="busy || bundleBlocked"
+              @click="doExportBundle"
+            >
+              <AppIcon name="export" :size="16" class="action__icon" /><span class="action__text"
+                ><span class="action__label">完整素材包 .duetpack</span
+                ><span class="action__hint">工程与本地媒体一起交付，可直接导入恢复。</span></span
+              >
+            </button>
+          </li>
           <li>
             <button class="action" type="button" :disabled="busy" @click="doExportDuet">
               <AppIcon name="export" :size="16" class="action__icon" />
@@ -411,7 +491,20 @@ useModalFocus(dialogRoot, close)
   background: var(--bg-overlay);
 }
 
+.inventory {
+  padding: 12px 14px;
+  margin: 12px 0;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.inventory small {
+  color: var(--text-muted);
+}
 .dialog {
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
   width: min(520px, calc(100vw - 48px));
   padding: var(--sp-5);
   background: var(--bg-elevated);

@@ -1,4 +1,5 @@
 import type { Cell, Row, Sheet } from './project'
+import type { AppearancePatch } from './appearance'
 
 /** Participant identities live in sheet.sides; sheet.rows is the compatibility projection. */
 export interface Sample {
@@ -22,6 +23,7 @@ export type PresentationStep =
   | { id: string; kind: 'sample'; participantId: string; sampleId: string }
   | { id: string; kind: 'identity'; participantId: string }
 export interface PresentationScene {
+  appearance?: AppearancePatch
   id: string
   title: string
   caseId: string

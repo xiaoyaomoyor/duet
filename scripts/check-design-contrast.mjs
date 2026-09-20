@@ -16,7 +16,33 @@ const luminance = (hex) =>
     .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
     .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0)
 let failed = 0
-for (const [name, tokens] of Object.entries({ ink, paper })) {
+for (const [name, tokens] of Object.entries({
+  ink,
+  paper,
+  inkBlue: { ...ink, ...values(css.match(/\[data-palette=['"]blue['"]\]\s*\{([^}]+)\}/)[1]) },
+  paperBlue: {
+    ...paper,
+    ...values(
+      css.match(
+        /\[data-design-theme=['"]paper['"]\]\[data-palette=['"]blue['"]\]\s*\{([^}]+)\}/,
+      )[1],
+    ),
+  },
+  inkMono: {
+    ...ink,
+    '--d-accent': ink['--d-text'],
+    '--d-accent-ink': ink['--d-bg'],
+    '--d-a': ink['--d-text'],
+    '--d-b': ink['--d-muted'],
+  },
+  paperMono: {
+    ...paper,
+    '--d-accent': paper['--d-text'],
+    '--d-accent-ink': paper['--d-bg'],
+    '--d-a': paper['--d-text'],
+    '--d-b': paper['--d-muted'],
+  },
+})) {
   let count = 0
   for (const bg of ['bg', 'surface', 'raised']) {
     for (const fg of ['text', 'muted', 'faint', 'a', 'b', 'danger']) {

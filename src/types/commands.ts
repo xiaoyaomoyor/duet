@@ -1,4 +1,5 @@
 import type { ComparisonContent } from './presentation'
+import type { AppearancePatch } from './appearance'
 /**
  * 命令定义（唯一写入口，见施工文档 §8.3）
  *
@@ -29,6 +30,7 @@ export type ParticipantCommand =
   | { t: 'participant/reorder'; ids: string[] }
 
 export type Command =
+  | { t: 'appearance/set'; appearance: AppearancePatch | null; sceneId?: string }
   | ParticipantCommand
   | { t: 'comparison/replace'; content: ComparisonContent }
   // —— 项目级 ——
@@ -81,6 +83,7 @@ export interface CellPatchTarget {
 
 /** 命令类型名（用于日志、历史合并键与调试） */
 export const COMMAND_TYPES = [
+  'appearance/set',
   'participant/add',
   'participant/remove',
   'participant/reorder',

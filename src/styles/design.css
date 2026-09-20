@@ -125,3 +125,58 @@ textarea.d-input {
   --d-fast: 0ms;
   --d-enter: 0ms;
 }
+
+/* Curated R5 palettes: theme-specific contrast, never arbitrary colors. */
+[data-palette='blue'] {
+  --d-accent: #aac8ec;
+  --d-accent-ink: #14202f;
+  --d-a: #aac8ec;
+  --d-b: #c2b8e4;
+}
+[data-design-theme='paper'][data-palette='blue'] {
+  --d-accent: #355b82;
+  --d-accent-ink: #ffffff;
+  --d-a: #355b82;
+  --d-b: #66508b;
+}
+[data-palette='mono'] {
+  --d-accent: var(--d-text);
+  --d-accent-ink: var(--d-bg);
+  --d-a: var(--d-text);
+  --d-b: var(--d-muted);
+}
+[data-typography='editorial'] .stage-frame__title h1 {
+  font-family: Georgia, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif;
+  letter-spacing: 0.015em;
+}
+[data-title-align='center'] .stage-frame__title {
+  text-align: center;
+}
+[data-texture='subtle'] .stage-frame {
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 79px,
+    color-mix(in srgb, var(--d-line) 18%, transparent) 80px
+  );
+}
+@media (min-width: 701px) {
+  [data-media-layout='sleeve']:not([data-view='overview'][data-multi])
+    .stage-media:has(.stage-media__art) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 1.5cqw;
+    align-items: center;
+  }
+  [data-media-layout='sleeve']:not([data-view='overview'][data-multi]) .stage-media__art {
+    grid-row: 1 / 3;
+    aspect-ratio: 1;
+  }
+  [data-media-layout='sleeve']:not([data-view='overview'][data-multi]) .stage-media__caption {
+    align-self: end;
+    padding: 0;
+  }
+  [data-media-layout='sleeve']:not([data-view='overview'][data-multi]) .stage-media__transport {
+    align-self: start;
+  }
+}

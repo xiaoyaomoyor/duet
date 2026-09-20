@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Appearance } from '@/types/appearance'
 import { APP } from '@/app.config'
 defineProps<{
   index: number
@@ -6,6 +7,7 @@ defineProps<{
   title: string
   kicker: string
   note: string
+  appearance?: Appearance
   reading?: boolean
 }>()
 </script>
@@ -17,10 +19,12 @@ defineProps<{
     :aria-label="title"
   >
     <header class="stage-frame__head">
-      <span class="stage-frame__brand"
+      <span v-if="appearance?.showBrand !== false" class="stage-frame__brand"
         >{{ APP.nameEn.toLowerCase() }}<span> / </span>{{ APP.nameZh }}</span
       ><span class="stage-frame__edition">LISTEN. COMPARE. DISCOVER.</span
-      ><span class="stage-frame__series">{{ note }}</span>
+      ><span v-if="appearance?.showProjectTitle !== false" class="stage-frame__series">{{
+        note
+      }}</span>
     </header>
     <div class="stage-frame__title">
       <p>{{ kicker }}</p>
@@ -28,7 +32,9 @@ defineProps<{
     </div>
     <div class="stage-frame__content"><slot /></div>
     <footer class="stage-frame__foot">
-      <span>{{ APP.nameEn.toUpperCase() }} — COMPARISON STUDIES</span>
+      <span v-if="appearance?.showBrand !== false"
+        >{{ APP.nameEn.toUpperCase() }} — COMPARISON STUDIES</span
+      >
       <div class="stage-frame__steps" aria-hidden="true">
         <i v-for="n in total" :key="n" :class="{ current: n === index + 1 }" />
       </div>

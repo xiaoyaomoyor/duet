@@ -12,6 +12,7 @@ import { err, ok, type Result } from '@/lib/result'
 import { uuid } from '@/lib/id'
 import { projectSelection, commitSelection, defaultSelection } from './comparisonContent'
 import { validateComparison } from '@/types/validateComparison'
+import { setAppearance } from './appearance'
 import { editParticipants, type ParticipantCommand } from './participants'
 import type { ContentSelection } from '@/types/presentation'
 import type { Command, NewModuleInput } from '@/types/commands'
@@ -37,6 +38,8 @@ export function applyCommandResult(
   command: Command,
   selection?: ContentSelection,
 ): Result<Project, string> {
+  if (command.t === 'appearance/set')
+    return setAppearance(project, command.appearance, command.sceneId)
   if (
     command.t === 'participant/add' ||
     command.t === 'participant/remove' ||
@@ -71,7 +74,7 @@ export function applyCommandResult(
 
 function applySheetCommand(
   project: Project,
-  command: Exclude<Command, { t: 'comparison/replace' } | ParticipantCommand>,
+  command: Exclude<Command, { t: 'comparison/replace' | 'appearance/set' } | ParticipantCommand>,
 ): Result<Project, string> {
   switch (command.t) {
     case 'project/patch':

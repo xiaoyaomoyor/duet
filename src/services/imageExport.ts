@@ -5,7 +5,7 @@
  *   1. 网络字体未就绪 → 截图里字体回退     → 导出前 await document.fonts.ready
  *   2. 图片未解码完 → 大片空白             → 导出前等待所有 <img> 的 load/error
  *   3. 外链图片跨域 → canvas 被污染、直接失败 → 导出前把外链内联为 data URI
- *   4. 尺寸超过浏览器上限（约 16384px）     → 自动降倍率并告知用户
+ *   4. 长报告由 pagedImageExport 分页，单图接口超限时降倍率并告知用户
  *   5. 隐藏滚动容器导致只截到首屏          → 导出期临时解除高度限制
  */
 
@@ -28,6 +28,9 @@ const MEDIA_WAIT_TIMEOUT_MS = 8000
 const EXPORT_RENDER_TIMEOUT_MS = 30_000
 
 export interface ExportImageOptions {
+  /** Explicit bounded viewport for paginated capture. */
+  captureWidth?: number
+  captureHeight?: number
   /** 像素倍率 */
   scale?: 1 | 2
   /** 背景色（不传则读取 CSS 变量 --bg-base） */
@@ -111,14 +114,14 @@ export async function exportElementToPng(
 
   // 尺寸与倍率
   const rect = root.getBoundingClientRect()
-  const width = Math.max(1, Math.ceil(root.scrollWidth || rect.width))
-  const height = Math.max(1, Math.ceil(root.scrollHeight || rect.height))
+  const width = Math.max(1, Math.ceil(options.captureWidth ?? (root.scrollWidth || rect.width)))
+  const height = Math.max(1, Math.ceil(options.captureHeight ?? (root.scrollHeight || rect.height)))
 
-  let scale = options.scale ?? 2
+  let scale: number = options.scale ?? 2
   const maxScale = Math.min(MAX_CANVAS_EDGE / width, MAX_CANVAS_EDGE / height)
   if (maxScale < scale) {
-    const adjusted = Math.max(1, Math.floor(maxScale * 10) / 10)
-    scale = adjusted as 1 | 2
+    const adjusted = Math.min(scale, maxScale)
+    scale = adjusted
     warnings.push(`内容尺寸 ${width}×${height} 超过浏览器画布上限，倍率已自动降到 ${scale}×。`)
   }
 
@@ -154,9 +157,19 @@ export async function exportElementToDataUrl(
       width: Math.ceil(rect.width),
       height: Math.ceil(rect.height),
       backgroundColor: options.backgroundColor ?? readBackgroundColor(root),
-      style: { margin: '0', border: '0' },
+      style: {
+        margin: '0',
+        border: '0',
+        position: 'relative',
+        left: '0',
+        top: '0',
+        right: 'auto',
+        bottom: 'auto',
+        insetInline: '0 auto',
+        insetBlock: '0 auto',
+      },
       pixelRatio: scale,
-      cacheBust: true,
+      cacheBust: false,
     })
     return ok(dataUrl)
   } catch (error) {
@@ -172,6 +185,7 @@ async function safeToBlob(
   root: HTMLElement,
   options: { width: number; height: number; backgroundColor: string; scale: number },
 ): Promise<Result<Blob, string>> {
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
     /*
      * 给 html-to-image 加一道超时兜底。
@@ -191,10 +205,21 @@ async function safeToBlob(
         height: options.height,
         backgroundColor: options.backgroundColor,
         pixelRatio: options.scale,
-        cacheBust: true,
+        // Blob URLs are immutable; appending a cache-buster makes them unreadable.
+        cacheBust: false,
         // Computed auto margins become pixel offsets when cloned into an SVG.
         // The exported image starts at the canvas edge, not its position in the workspace.
-        style: { margin: '0', border: '0' },
+        style: {
+          margin: '0',
+          border: '0',
+          position: 'relative',
+          left: '0',
+          top: '0',
+          right: 'auto',
+          bottom: 'auto',
+          insetInline: '0 auto',
+          insetBlock: '0 auto',
+        },
         /*
          * 过滤掉不该出现在导出图里的节点。
          *
@@ -211,7 +236,7 @@ async function safeToBlob(
           !(node instanceof Element && node.classList.contains('no-export')),
       }),
       new Promise<never>((_resolve, reject) => {
-        setTimeout(
+        timer = setTimeout(
           () => reject(new Error(`渲染超过 ${EXPORT_RENDER_TIMEOUT_MS / 1000} 秒仍未完成`)),
           EXPORT_RENDER_TIMEOUT_MS,
         )
@@ -225,6 +250,8 @@ async function safeToBlob(
     return err(
       `导出失败：${describeExportError(error)}。若内容包含外链图片，请先"镜像"为本地资源后重试。`,
     )
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
   }
 }
 
@@ -272,7 +299,10 @@ function waitForImage(img: HTMLImageElement): Promise<void> {
 async function tryInlineImage(img: HTMLImageElement): Promise<boolean> {
   const src = img.currentSrc || img.src
   try {
-    const response = await fetch(src, { mode: 'cors' })
+    const response = await fetch(src, {
+      mode: 'cors',
+      signal: AbortSignal.timeout(MEDIA_WAIT_TIMEOUT_MS),
+    })
     if (!response.ok) return false
     const blob = await response.blob()
     const dataUrl = await blobToDataUrl(blob)

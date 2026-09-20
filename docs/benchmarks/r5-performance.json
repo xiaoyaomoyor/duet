@@ -1,0 +1,68 @@
+{
+  "version": "0.10.0",
+  "date": "2026-09-20",
+  "os": "Windows 11 10.0.26200",
+  "cpu": "Intel Core i9-13900H",
+  "memoryGiB": 32,
+  "build": "production",
+  "method": "Headless Edge, local WAV assets; two requestAnimationFrame callbacks after each change. No concurrent test workers during measurement. First 30 switches measured; continuous frame intervals recorded across the run.",
+  "records": [
+    {
+      "browser": "153.0.4234.32",
+      "viewport": "1920x1080",
+      "fixture": "6 participants x 10 unique local WAV assets (12s), 2 shared SVG covers",
+      "switches": 50,
+      "measured": 30,
+      "p95SwitchMs": 37.19999999925494,
+      "p95FrameMs": 18.300000000000182,
+      "maxFrameMs": 30.300000000000182,
+      "before": {
+        "media": 6,
+        "urls": 8
+      },
+      "after": {
+        "media": 6,
+        "urls": 17
+      },
+      "active": 0
+    },
+    {
+      "browser": "153.0.4234.32",
+      "viewport": "1920x1080",
+      "fixture": "6 participants x 10 unique local WAV assets, 30 keyboard scene switches (listen / notes)",
+      "switches": 30,
+      "measured": 30,
+      "p95SwitchMs": 55.59999999962747,
+      "p95FrameMs": 36.399999999999636,
+      "maxFrameMs": 42.5,
+      "before": {
+        "media": 6,
+        "urls": 8
+      },
+      "after": {
+        "media": 6,
+        "urls": 8
+      },
+      "active": 0
+    },
+    {
+      "browser": "153.0.4234.32",
+      "viewport": "1920x1080",
+      "fixture": "6 participants x 10 unique local WAV assets (12s), 2 shared SVG covers",
+      "switches": 100,
+      "measured": 30,
+      "p95SwitchMs": 30.399999998509884,
+      "p95FrameMs": 12.399999999999636,
+      "maxFrameMs": 30.299999999999727,
+      "before": {
+        "media": 6,
+        "urls": 8
+      },
+      "after": {
+        "media": 6,
+        "urls": 17
+      },
+      "active": 0
+    }
+  ]
+}

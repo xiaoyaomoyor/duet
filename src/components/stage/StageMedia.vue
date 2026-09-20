@@ -208,6 +208,7 @@ function time(value = 0): string {
   border-radius: 2px;
   background: linear-gradient(to right, var(--tone) var(--progress), var(--d-line) var(--progress));
   cursor: pointer;
+  accent-color: var(--tone);
   margin: 7px 0 10px;
 }
 .stage-media__timeline input::-webkit-slider-thumb {

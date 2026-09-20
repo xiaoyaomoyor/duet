@@ -20,7 +20,7 @@
  */
 
 import { onUnmounted, reactive, shallowRef, toValue, watch, type MaybeRefOrGetter } from 'vue'
-import { resolveMedia, type MediaError } from '@/services/mediaResolver'
+import { resolveMedia, peekMedia, type MediaError } from '@/services/mediaResolver'
 import type { MediaSource } from '@/types/project'
 
 const pendingResolutions = new Set<Promise<void>>()
@@ -48,7 +48,10 @@ export function sourceKey(source: MediaSource | undefined): string {
 /**
  * @param source 取值函数：返回 undefined 表示"未选择媒体"，不触发解析
  */
-export function useResolvedMedia(source: MaybeRefOrGetter<MediaSource | undefined>): ResolvedMedia {
+export function useResolvedMedia(
+  source: MaybeRefOrGetter<MediaSource | undefined>,
+  options: { warmStart?: boolean } = {},
+): ResolvedMedia {
   const state = reactive<Omit<ResolvedMedia, 'retry'>>({
     src: null,
     status: 'idle',
@@ -65,6 +68,22 @@ export function useResolvedMedia(source: MaybeRefOrGetter<MediaSource | undefine
     if (!current) {
       state.src = null
       state.status = 'idle'
+      state.error = undefined
+      return
+    }
+
+    // Warm scenes render with their final media on the first Vue pass. Avoid an empty-cover
+    // render followed by another layout just to await an already cached URL.
+    // Opt in for stage-owned tracks. Legacy synchronized players retain their asynchronous
+    // registration order while edit/present renderers hand over the same side's clock.
+    const ready = options.warmStart
+      ? current.kind === 'url'
+        ? current.url
+        : peekMedia(current.assetId)
+      : null
+    if (ready) {
+      state.src = ready
+      state.status = 'ready'
       state.error = undefined
       return
     }

@@ -16,6 +16,7 @@
  */
 import { ref, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { importProjectBundle } from '@/services/projectBundle'
 import { importDuet } from '@/services/exportService'
 import { persistProject } from '@/services/projectService'
 import { useProjectsStore } from '@/stores/useProjectsStore'
@@ -29,7 +30,7 @@ export function useProjectImport() {
   const projects = useProjectsStore()
 
   /** 文件选择框的 accept：工程文件优先，JSON 作为兜底 */
-  const accept = `.${APP.fileExt},application/json`
+  const accept = `.${APP.fileExt},.duetpack,application/json`
 
   let inputEl: HTMLInputElement | null = null
   const importing = ref(false)
@@ -52,8 +53,9 @@ export function useProjectImport() {
 
     importing.value = true
     try {
-      const text = await file.text()
-      const result = await importDuet(text)
+      const result = file.name.toLowerCase().endsWith('.duetpack')
+        ? await importProjectBundle(file)
+        : await importDuet(await file.text())
       if (!result.ok) {
         ui.notify(t('export.failed', { message: result.error }), 'danger')
         return

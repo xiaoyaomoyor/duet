@@ -13,6 +13,7 @@ import { SCHEMA_VERSION, type Project, type Sheet, type Side, type Row, type Cel
 import type { Result } from '@/lib/result'
 import { ok, err } from '@/lib/result'
 import { migrateProject } from '@/services/projectMigration'
+import { validAppearance } from './appearance'
 import { validateComparison } from './validateComparison'
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -166,6 +167,8 @@ export function validateProject(value: unknown): Result<Project, string> {
   if (!isNonEmptyString(value.id)) return err('项目：缺少 id')
   if (typeof value.title !== 'string') return err('项目：title 必须是字符串')
   if (!isPlainObject(value.ui)) return err('项目：缺少 ui 状态')
+  if (value.appearance !== undefined && !validAppearance(value.appearance))
+    return err('项目外观包含非法字段')
 
   const sheetResult = validateSheet(value.sheet)
   if (!sheetResult.ok) return sheetResult
@@ -180,7 +183,7 @@ export function validateProject(value: unknown): Result<Project, string> {
       typeof snapshot.schemaVersion !== 'number' ||
       !Number.isInteger(snapshot.schemaVersion) ||
       snapshot.schemaVersion < 1 ||
-      snapshot.schemaVersion > 9 ||
+      snapshot.schemaVersion > 10 ||
       !validateSheet(snapshot.sheet).ok
     )
       return err('升级前快照损坏，无法保证恢复，请重新导入原始工程')
