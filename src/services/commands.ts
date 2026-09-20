@@ -56,16 +56,20 @@ export function applyCommandResult(
   }
   if (project.comparison && /^(row|cell|module|modules)\//.test(command.t)) {
     const context = selection ?? defaultSelection(project.comparison)
-    if ('ref' in command) {
+    const targets =
+      'ref' in command
+        ? [command.ref]
+        : command.t === 'module/move'
+          ? [command.from, command.to]
+          : []
+    for (const target of targets) {
       const item = project.comparison.cases.find((c) => c.id === context.caseId)
-      const section = item?.sections.find((s) => s.id === command.ref.rowId)
+      const section = item?.sections.find((s) => s.id === target.rowId)
       if (
         section?.kind === 'paired' &&
-        !item?.entries[command.ref.sideId]?.samples.some(
-          (s) => s.id === context.samples[command.ref.sideId],
-        )
+        !item?.entries[target.sideId]?.samples.some((s) => s.id === context.samples[target.sideId])
       )
-        return err('本题未提供样本，请先在“作品与流程”中添加作品')
+        return err('本题未提供样本，请先在作品库中添加作品')
     }
     const projected = projectSelection(project, context)
     const edited = applySheetCommand(projected, command)
@@ -287,7 +291,7 @@ function moveModule(
   if (!module) return err(`模块不存在：${from.moduleId}`)
 
   // 先移除
-  const removed = applyCommandResult(project, { t: 'module/remove', ref: from })
+  const removed = removeModule(project, from)
   if (!removed.ok) return removed
 
   // 再插入到目标位置

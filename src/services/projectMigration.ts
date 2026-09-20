@@ -37,6 +37,7 @@ export function migrateProject(project: Project): Project {
         sheet: deepClone(project.sheet),
         ...(project.comparison ? { comparison: deepClone(project.comparison) } : {}),
         ...(project.appearance ? { appearance: deepClone(project.appearance) } : {}),
+        ...(project.workspace ? { workspace: project.workspace } : {}),
       }
     return p
   }

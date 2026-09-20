@@ -8,7 +8,7 @@ import { readZip } from '../src/lib/zip'
 test('R5 presets inherit, reset, persist and share without content', async ({ page }, info) => {
   await page.setViewportSize({ width: 1920, height: 1080 })
   await importFixture(page, multiFixture(2))
-  await page.locator('.studio__outline button').filter({ hasText: '作品试听' }).click()
+  await page.locator('.studio__outline button').filter({ hasText: '六种回声，逐一聆听' }).click()
   await page.getByRole('button', { name: '外观与版式', exact: true }).click()
   const panel = page.getByRole('complementary', { name: '外观与版式' }),
     scene = page.locator('.project-scene:visible')
@@ -37,7 +37,7 @@ test('R5 presets inherit, reset, persist and share without content', async ({ pa
   expect(JSON.stringify(style)).not.toMatch(/Suno|assetId|case-six|回声|Take A/)
   await expect(page.locator('.studio__project small')).toHaveText('已保存')
   await page.reload()
-  await page.locator('.studio__outline button').filter({ hasText: '作品试听' }).click()
+  await page.locator('.studio__outline button').filter({ hasText: '六种回声，逐一聆听' }).click()
   await expect(scene).toHaveAttribute('data-palette', 'blue')
   await page.getByRole('button', { name: '外观与版式', exact: true }).click()
   await panel.getByRole('button', { name: '删除预设 我的冷调评测', exact: true }).click()

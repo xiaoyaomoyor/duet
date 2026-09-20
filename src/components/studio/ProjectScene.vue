@@ -7,6 +7,9 @@ import StageComparison from '@/components/stage/StageComparison.vue'
 import ModuleView from '@/components/compare/ModuleView.vue'
 import ProjectAudio from './ProjectAudio.vue'
 import type { ResolvedComparison, ResolvedSection, ResolvedContent } from '@/services/sceneResolver'
+import DButton from '@/components/design/DButton.vue'
+import { moduleTitle } from '@/i18n/helper'
+import type { CellRef } from '@/types/project'
 import type { ComparisonView } from '@/types/presentation'
 const props = defineProps<{
   comparison: ResolvedComparison
@@ -22,10 +25,13 @@ const props = defineProps<{
   participantIds?: string[]
   exporting?: boolean
   referenceId?: string
+  selectedId?: string | undefined
 }>()
 const emit = defineEmits<{
   select: [content: ResolvedContent]
-  overflow: [id: string]
+  edit: [content: ResolvedContent]
+  add: [ref: CellRef]
+  overflow: [id: string, overflowing: boolean]
   inspect: [id: string]
 }>()
 const mode = computed(() => (props.reading ? 'overview' : (props.viewMode ?? 'overview')))
@@ -52,7 +58,7 @@ function scheduleMeasure() {
   })
 }
 const visibleContents = computed(() =>
-  props.section.contents.filter((c) => c.visible && c.module.type !== 'title'),
+  props.section.contents.filter((c) => (props.editing || c.visible) && c.module.type !== 'title'),
 )
 const isReading = computed(() => props.reading || overflowing.value)
 function measure() {
@@ -64,13 +70,14 @@ function measure() {
   )
   if (nodes.some((n) => n.getBoundingClientRect().bottom > foot.top - 12)) {
     overflowing.value = true
-    emit('overflow', props.section.id)
+    emit('overflow', props.section.id, true)
   }
 }
 watch(
   () => props.section,
   async () => {
     overflowing.value = false
+    emit('overflow', props.section.id, false)
     await nextTick()
     scheduleMeasure()
   },
@@ -92,10 +99,20 @@ function contents(id: string) {
   const all =
     props.section.entries
       .find((e) => e.participantId === id)
-      ?.contents.filter((c) => c.visible && c.module.type !== 'title') ?? []
-  if (!compact.value || props.exporting) return all
+      ?.contents.filter((c) => (props.editing || c.visible) && c.module.type !== 'title') ?? []
+  if (!compact.value || props.exporting || props.editing) return all
   const media = all.find((c) => ['audio', 'image', 'video'].includes(c.module.type))
   return media ? [media] : all.slice(0, 1)
+}
+function selectContent(event: MouseEvent, content: ResolvedContent, edit = false) {
+  if (
+    !props.editing ||
+    (event.target instanceof HTMLElement &&
+      event.target.closest('button,input,select,textarea,a,audio,video,[contenteditable]'))
+  )
+    return
+  if (edit) emit('edit', content)
+  else emit('select', content)
 }
 </script>
 <template>
@@ -103,6 +120,8 @@ function contents(id: string) {
     ref="root"
     class="project-scene"
     :data-scene-id="section.id"
+    :data-layout="section.layout ?? 'general'"
+    :data-editing="editing || undefined"
     :data-design-theme="section.appearance.theme"
     :data-palette="section.appearance.palette"
     :data-typography="section.appearance.typography"
@@ -127,23 +146,66 @@ function contents(id: string) {
         <p v-if="section.shared && comparison.conditions" class="project-scene__conditions">
           {{ comparison.conditions }}
         </p>
-        <StageComparison
-          v-if="section.metrics.length"
-          :participants="participants"
-          :metrics="section.metrics"
-          :caption="section.title"
-          :focus-ids="focusIds"
-          :concealed-ids="concealedIds"
-          :reference-id="referenceId"
-          :paginate="!exporting && !reading"
-        />
+        <div v-if="section.metrics.length">
+          <StageComparison
+            :participants="participants"
+            :metrics="section.metrics"
+            :caption="section.title"
+            :focus-ids="focusIds"
+            :concealed-ids="concealedIds"
+            :reference-id="referenceId"
+            :paginate="!exporting && !reading"
+          />
+          <div v-if="editing" class="project-scene__metric-editors no-export">
+            <button
+              v-for="content in section.contents"
+              :key="content.module.id"
+              :aria-pressed="selectedId === content.module.id"
+              @click="emit('select', content)"
+              @dblclick="emit('edit', content)"
+            >
+              {{ comparison.participants.find((p) => p.id === content.ref.sideId)?.label }} ·
+              {{ content.module.title || moduleTitle(content.module.type) }}
+            </button>
+            <DButton
+              v-for="p in participants"
+              :key="p.id"
+              compact
+              tone="quiet"
+              :aria-label="'为 ' + p.label + ' 添加模块'"
+              @click="emit('add', { rowId: section.id, sideId: p.id })"
+              >＋ {{ p.label }}</DButton
+            >
+          </div>
+        </div>
         <template v-else-if="section.shared">
           <div
             v-for="content in visibleContents"
             :key="content.module.id"
             class="project-scene__module"
-            @dblclick="editing && emit('select', content)"
+            :class="{
+              'project-scene__module--selected': editing && selectedId === content.module.id,
+              'project-scene__module--hidden': editing && content.module.hidden,
+            }"
+            :data-module-id="content.module.id"
+            @click="selectContent($event, content)"
+            @dblclick="selectContent($event, content, true)"
           >
+            <button
+              v-if="editing"
+              class="project-scene__edit no-export"
+              :aria-label="'编辑' + (content.module.title || moduleTitle(content.module.type))"
+              @click.stop="emit('edit', content)"
+            >
+              编辑
+            </button>
+            <p v-if="editing && !content.visible" class="project-scene__placeholder">
+              {{
+                content.module.hidden
+                  ? '已隐藏 · 仅编辑时显示'
+                  : '待填写 · ' + moduleTitle(content.module.type)
+              }}
+            </p>
             <ModuleView
               :module="content.module"
               :side-id="content.ref.sideId"
@@ -151,6 +213,14 @@ function contents(id: string) {
               readonly
             />
           </div>
+          <DButton
+            v-if="editing"
+            compact
+            tone="quiet"
+            class="project-scene__add no-export"
+            @click="emit('add', { rowId: section.id, sideId: comparison.participants[0]!.id })"
+            >＋ 添加共同内容</DButton
+          >
         </template>
         <div v-else class="project-scene__pair" :style="{ '--participants': participants.length }">
           <section
@@ -190,8 +260,29 @@ function contents(id: string) {
               :key="content.module.id"
               class="project-scene__module"
               :data-module-type="content.module.type"
-              @dblclick="editing && emit('select', content)"
+              :class="{
+                'project-scene__module--selected': editing && selectedId === content.module.id,
+                'project-scene__module--hidden': editing && content.module.hidden,
+              }"
+              :data-module-id="content.module.id"
+              @click="selectContent($event, content)"
+              @dblclick="selectContent($event, content, true)"
             >
+              <button
+                v-if="editing"
+                class="project-scene__edit no-export"
+                :aria-label="'编辑' + (content.module.title || moduleTitle(content.module.type))"
+                @click.stop="emit('edit', content)"
+              >
+                编辑
+              </button>
+              <p v-if="editing && !content.visible" class="project-scene__placeholder">
+                {{
+                  content.module.hidden
+                    ? '已隐藏 · 仅编辑时显示'
+                    : '待填写 · ' + moduleTitle(content.module.type)
+                }}
+              </p>
               <ProjectAudio
                 v-if="content.module.type === 'audio'"
                 :content="content"
@@ -205,6 +296,15 @@ function contents(id: string) {
                 readonly
               />
             </div>
+            <DButton
+              v-if="editing"
+              compact
+              tone="quiet"
+              class="project-scene__add no-export"
+              :aria-label="'为 ' + p.label + ' 添加模块'"
+              @click="emit('add', { rowId: section.id, sideId: p.id })"
+              >＋ 添加内容</DButton
+            >
             <button
               v-if="compact && !exporting"
               class="project-scene__inspect no-export"
@@ -227,7 +327,10 @@ function contents(id: string) {
             </div>
           </section>
         </div>
-        <div v-if="!visibleContents.length && !section.identity" class="project-scene__empty">
+        <div
+          v-if="!visibleContents.length && !section.identity && !editing"
+          class="project-scene__empty"
+        >
           <span>—</span>
           <h2>{{ t('studio.empty') }}</h2>
           <p v-if="editing">{{ t('studio.emptyHint') }}</p>
@@ -237,6 +340,114 @@ function contents(id: string) {
   </div>
 </template>
 <style scoped>
+.project-scene__module {
+  position: relative;
+}
+.project-scene[data-editing] .project-scene__module {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 8px;
+  margin-inline: -8px;
+}
+.project-scene[data-editing] .project-scene__module:hover {
+  border-color: var(--d-line);
+}
+.project-scene[data-editing] .project-scene__module--selected {
+  border-color: var(--d-accent);
+}
+.project-scene__module--hidden {
+  opacity: 0.55;
+}
+.project-scene__edit {
+  position: absolute;
+  top: -12px;
+  right: 8px;
+  z-index: 2;
+  background: var(--d-surface);
+  border: 1px solid var(--d-line);
+  border-radius: 4px;
+  padding: 4px 9px;
+  color: var(--d-text);
+  font-size: 11px;
+  opacity: 0;
+}
+.project-scene__module:hover .project-scene__edit,
+.project-scene__module:focus-within .project-scene__edit {
+  opacity: 1;
+}
+.project-scene__placeholder {
+  color: var(--d-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 12px 0;
+}
+.project-scene__add {
+  margin-top: 16px;
+  width: 100%;
+  border: 1px dashed var(--d-line);
+  min-height: 38px;
+}
+.project-scene[data-editing][data-multi][data-view='overview']
+  .project-scene__module
+  + .project-scene__module {
+  display: block;
+}
+@media (min-width: 701px) {
+  .project-scene[data-layout='listening'][data-media-layout='wide']:not([data-multi])
+    :deep(.stage-media__art) {
+    aspect-ratio: 16 / 7;
+    max-height: 18cqw;
+  }
+  .project-scene[data-layout='listening'][data-media-layout='wide']:not([data-multi]):has(
+      .project-scene__module + .project-scene__module
+    )
+    :deep(.stage-media__art) {
+    aspect-ratio: 16 / 5;
+    max-height: 12cqw;
+  }
+  .project-scene[data-layout='listening']:not([data-multi]) :deep(.stage-frame__title) {
+    padding-block: 1.3cqw;
+  }
+  .project-scene[data-layout='listening']:not([data-multi])
+    .project-scene__participant
+    > .identity {
+    margin-bottom: 0.9cqw;
+  }
+}
+.project-scene[data-layout='listening'] .project-scene__module + .project-scene__module {
+  margin-top: 1.2cqw;
+  padding-top: 1cqw;
+}
+@media (max-width: 700px) {
+  .project-scene[data-layout='listening'][data-media-layout='wide']:not([data-multi])
+    :deep(.stage-media__art) {
+    aspect-ratio: 16 / 10;
+    max-height: none;
+  }
+  .project-scene[data-layout='listening'] .project-scene__module + .project-scene__module {
+    margin-top: 24px;
+    padding-top: 18px;
+  }
+}
+.project-scene__metric-editors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.project-scene__metric-editors > button {
+  font-size: 11px;
+  color: var(--d-muted);
+  padding: 8px;
+  border: 1px solid var(--d-line);
+  border-radius: 4px;
+}
+.project-scene__metric-editors > button[aria-pressed='true'] {
+  border-color: var(--d-accent);
+  color: var(--d-text);
+}
+
 .project-scene {
   container-type: inline-size;
   width: 100%;

@@ -4,7 +4,7 @@ import type { ModuleInstance, ModuleRef, Project, ToolRef } from '@/types/projec
 import { getModule } from '@/modules/registry'
 import { isPresentable } from '@/modules/visibility'
 import type { StageParticipant, StageMetric } from '@/components/stage/types'
-import type { ContentSelection, PresentationRuntime } from '@/types/presentation'
+import type { ContentSelection, PresentationRuntime, SceneLayout } from '@/types/presentation'
 import { projectSelection, defaultSelection } from './comparisonContent'
 
 export interface ResolvedContent {
@@ -25,6 +25,8 @@ export interface ResolvedEntry {
   hidden: boolean
 }
 export interface ResolvedSection {
+  layout?: SceneLayout
+  sceneId?: string
   appearance: Appearance
   id: string
   title: string
@@ -108,6 +110,9 @@ export function resolveComparison(
     const active = contents.filter((c) => c.visible && c.module.type !== 'title')
     const metrics = row.kind === 'full' ? [] : resolveMetrics(entries)
     return {
+      layout:
+        project.comparison?.scenes.find((s) => s.id === (appearanceSceneId ?? runtime?.sceneId))
+          ?.layout ?? 'general',
       appearance: resolveAppearance(
         project,
         project.comparison?.scenes.find(

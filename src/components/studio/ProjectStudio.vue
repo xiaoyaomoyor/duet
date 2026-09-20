@@ -12,11 +12,17 @@ import type { CellRef, Project } from '@/types/project'
 import ProjectScene from './ProjectScene.vue'
 import AppearancePanel from './AppearancePanel.vue'
 import CollectionPanel from './CollectionPanel.vue'
-import { defaultSelection, resolveRuntime, projectSelection } from '@/services/comparisonContent'
+import { defaultSelection, resolveRuntime } from '@/services/comparisonContent'
 import type { ComparisonView, ContentSelection, PresentationRuntime } from '@/types/presentation'
 import DButton from '@/components/design/DButton.vue'
 import ModulePicker from '@/components/editor/ModulePicker.vue'
-import ModuleEditorDialog from '@/components/editor/ModuleEditorDialog.vue'
+import StudioModuleDialog from './StudioModuleDialog.vue'
+import SceneNavigator from './SceneNavigator.vue'
+import DDialog from '@/components/design/DDialog.vue'
+import { deepClone } from '@/lib/clone'
+import { duplicateScene, moveScene, removeScene, moduleDestinations } from '@/services/sceneEditing'
+import type { ComparisonContent, PresentationScene } from '@/types/presentation'
+import '@/styles/studio-editor.css'
 const props = defineProps<{ project: Project }>()
 const { t } = useI18n()
 const store = useProjectStore(),
@@ -30,6 +36,7 @@ function togglePanel(panel: 'collection' | 'appearance') {
     collectionOpen.value = !collectionOpen.value
     appearanceOpen.value = false
   }
+  properties.value = true
 }
 const appearanceOpen = ref(false)
 const collectionOpen = ref(false),
@@ -37,6 +44,28 @@ const collectionOpen = ref(false),
   focused = ref(false)
 const selection = ref<ContentSelection>(defaultSelection(props.project.comparison!))
 const presentationSceneId = ref(props.project.comparison!.scenes[0]?.id ?? '')
+let editContext: {
+  selection: ContentSelection
+  scene: string
+  module: string
+  view: 'theatre' | 'reading'
+} | null = null
+const deleteSceneOpen = ref(false),
+  removeSceneContent = ref(false),
+  moveModuleOpen = ref(false),
+  moveTarget = ref('')
+const collectionTab = ref<'works' | 'story' | 'participants'>('works')
+function openCollection(tab: 'works' | 'story' | 'participants' = 'works') {
+  collectionTab.value = tab
+  collectionOpen.value = true
+  appearanceOpen.value = false
+  properties.value = true
+}
+function toggleProperties() {
+  properties.value = !properties.value
+  collectionOpen.value = false
+  appearanceOpen.value = false
+}
 const runtime = ref<PresentationRuntime | null>(null)
 const comparisonView = ref<ComparisonView>('overview')
 const referenceId = ref(''),
@@ -61,12 +90,7 @@ function setComparisonView(mode: ComparisonView, id?: string) {
   comparisonView.value = mode
   focused.value = false
 }
-const appearanceSceneId = computed(() => {
-  const candidates = props.project.comparison!.scenes.filter(
-    (s) => s.sectionId === section.value?.id && s.caseId === activeSelection.value.caseId,
-  )
-  return candidates.find((s) => s.id === presentationSceneId.value)?.id ?? candidates[0]?.id ?? ''
-})
+const appearanceSceneId = computed(() => presentationSceneId.value)
 const sceneDefinition = computed(() =>
   props.project.comparison!.scenes.find((s) => s.id === presentationSceneId.value),
 )
@@ -126,10 +150,12 @@ const playlist = computed(() =>
   ),
 )
 const navigationIndex = computed(() =>
-  present.value ? playlist.value.findIndex((s) => s.id === presentationSceneId.value) : index.value,
+  (present.value ? playlist.value : editingScenes.value).findIndex(
+    (s) => s.id === presentationSceneId.value,
+  ),
 )
 const navigationTotal = computed(() =>
-  present.value ? playlist.value.length : scenes.value.length,
+  present.value ? playlist.value.length : editingScenes.value.length,
 )
 const currentCase = computed(() =>
   props.project.comparison!.cases.find((c) => c.id === activeSelection.value.caseId)!,
@@ -141,14 +167,22 @@ function chooseSelection(value: ContentSelection) {
   selectedId.value = ''
   if (present.value && runtime.value)
     runtime.value = { ...runtime.value, ...value, transportState: 'paused' }
-  else selection.value = value
+  else {
+    const changedCase = selection.value.caseId !== value.caseId
+    selection.value = value
+    if (changedCase) {
+      const first = props.project.comparison!.scenes.find((s) => s.caseId === value.caseId)
+      presentationSceneId.value = first?.id ?? ''
+      sceneId.value = first?.sectionId ?? ''
+    }
+  }
 }
 function chooseCase(id: string) {
   chooseSelection(defaultSelection(props.project.comparison!, id))
-  if (present.value) {
-    const scene = playlist.value.find((s) => s.caseId === id)
-    if (scene) jumpScene(scene.id)
-  }
+  const scene = (present.value ? playlist.value : props.project.comparison!.scenes).find(
+    (s) => s.caseId === id,
+  )
+  if (scene) jumpScene(scene.id)
 }
 function jumpScene(id: string, step = 0) {
   const scene = props.project.comparison!.scenes.find((s) => s.id === id)
@@ -158,7 +192,15 @@ function jumpScene(id: string, step = 0) {
   focused.value = false
   presentationSceneId.value = id
   runtime.value = resolveRuntime(props.project.comparison!, id, step)
-  selection.value = { caseId: runtime.value.caseId, samples: { ...runtime.value.samples } }
+  if (!present.value) {
+    const base =
+      selection.value.caseId === scene.caseId
+        ? selection.value
+        : defaultSelection(props.project.comparison!, scene.caseId)
+    selection.value = { ...base, samples: { ...base.samples, ...scene.samples } }
+    runtime.value = null
+    selectedId.value = ''
+  }
   sceneId.value = scene.sectionId
 }
 function restart() {
@@ -203,7 +245,7 @@ const player = useStagePlayback()
 provide('duet:stage-playback', player)
 const projectId = computed(() => props.project.id)
 provide('duet:projectId', projectId)
-const sceneId = ref(''),
+const sceneId = ref(props.project.comparison!.scenes[0]?.sectionId ?? ''),
   selectedId = ref(''),
   propertyTab = ref<'content' | 'style'>('content')
 const view = ref<'theatre' | 'reading'>('theatre'),
@@ -211,13 +253,8 @@ const view = ref<'theatre' | 'reading'>('theatre'),
   expanded = ref(false),
   properties = ref(window.innerWidth > 1450)
 const present = computed(() => props.project.ui.mode === 'present')
-const section = computed(
-  () =>
-    comparison.value.sections.find(
-      (s) => s.id === (present.value ? sceneDefinition.value?.sectionId : sceneId.value),
-    ) ??
-    comparison.value.sections.find((s) => !s.identity) ??
-    comparison.value.sections[0],
+const section = computed(() =>
+  comparison.value.sections.find((s) => s.id === sceneDefinition.value?.sectionId),
 )
 const selected = computed(
   () =>
@@ -228,25 +265,75 @@ const definition = computed(() =>
   selected.value ? getModule(selected.value.module.type) : undefined,
 )
 const options = computed(() =>
-  section.value?.metrics.length
-    ? []
-    : (definition.value?.options ?? []).filter(
-        (option) =>
-          selected.value?.module.type !== 'audio' ||
-          !['layout', 'showWaveform'].includes(option.key),
-      ),
+  (definition.value?.options ?? []).filter(
+    (option) =>
+      selected.value?.module.type !== 'audio' || !['layout', 'showWaveform'].includes(option.key),
+  ),
 )
+const editingScenes = computed(() =>
+  props.project.comparison!.scenes.filter((s) => s.caseId === activeSelection.value.caseId),
+)
+const destinations = computed(() =>
+  selected.value
+    ? moduleDestinations(props.project, activeSelection.value, selected.value.module.type).filter(
+        (d) => d.rowId !== selected.value!.ref.rowId || d.sideId !== selected.value!.ref.sideId,
+      )
+    : [],
+)
+const moduleIndex = computed(
+  () =>
+    section.value?.entries
+      .find((e) => e.participantId === selected.value?.ref.sideId)
+      ?.contents.findIndex((c) => c.module.id === selected.value?.module.id) ?? -1,
+)
+const moduleCount = computed(
+  () =>
+    section.value?.entries.find((e) => e.participantId === selected.value?.ref.sideId)?.contents
+      .length ?? 0,
+)
+const editorContext = computed(() => {
+  const entry = section.value?.entries.find((e) => e.participantId === selected.value?.ref.sideId)
+  const p = comparison.value.participants.find((p) => p.id === selected.value?.ref.sideId)
+  return [
+    sceneDefinition.value?.title,
+    section.value?.shared ? '共同内容' : p?.name,
+    section.value?.shared ? '' : entry?.sampleTitle,
+  ]
+    .filter(Boolean)
+    .join(' / ')
+})
 const visible = computed(() => comparison.value.sections.filter((s) => s.visible))
-const scenes = computed(() =>
-  present.value || ui.presentationExport
-    ? visible.value
-    : comparison.value.sections.filter((s) => !s.identity || s.id === section.value?.id),
-)
-const index = computed(() => scenes.value.findIndex((s) => s.id === section.value?.id))
+const scenes = computed(() => {
+  if (!reading.value)
+    return section.value
+      ? [{ ...section.value, title: sceneDefinition.value?.title || section.value.title }]
+      : []
+  return editingScenes.value
+    .filter((scene) => !scene.hidden)
+    .flatMap((scene) => {
+      const state = resolveRuntime(props.project.comparison!, scene.id, scene.steps.length)
+      const comparison = resolveComparison(
+        props.project,
+        tools.resolve,
+        t,
+        state,
+        undefined,
+        scene.id,
+      )
+      const source = comparison.sections.find((s) => s.id === scene.sectionId)
+      return source?.visible
+        ? [{ ...source, sceneId: scene.id, title: scene.title || source.title }]
+        : []
+    })
+})
 const reading = computed(() =>
   ui.presentationExport ? ui.presentationExport === 'report' : view.value === 'reading',
 )
 const overflowIds = ref(new Set<string>())
+function onOverflow(id: string, overflowing: boolean) {
+  if (overflowing) overflowIds.value.add(id)
+  else overflowIds.value.delete(id)
+}
 const picker = ref<CellRef | null>(null)
 const root = ref<HTMLElement | null>(null)
 const volume = ref(0.8)
@@ -289,11 +376,28 @@ watch(present, (value) => {
         (s) => s.caseId === selection.value.caseId && s.sectionId === sceneId.value,
       ) ??
       playlist.value[0]
+    editContext = {
+      selection: deepClone(selection.value),
+      scene: presentationSceneId.value,
+      module: selectedId.value,
+      view: view.value,
+    }
     if (target) jumpScene(target.id)
   } else {
     runtime.value = null
     focused.value = false
     help.value = false
+    clean.value = false
+    if (editContext) {
+      const context = editContext
+      jumpScene(context.scene)
+      selection.value = context.selection
+      view.value = context.view
+      void nextTick(() => {
+        selectedId.value = context.module
+      })
+      editContext = null
+    }
   }
 })
 watch(
@@ -301,7 +405,15 @@ watch(
   (c) => {
     if (!c) return
     if (!c.cases.some((a) => a.id === selection.value.caseId)) selection.value = defaultSelection(c)
-    if (runtime.value && !c.scenes.some((s) => s.id === runtime.value!.sceneId)) restart()
+    if (!c.scenes.some((s) => s.id === presentationSceneId.value)) {
+      const fallback = c.scenes.find((s) => s.caseId === selection.value.caseId) ?? c.scenes[0]
+      if (fallback) jumpScene(fallback.id)
+      else {
+        presentationSceneId.value = ''
+        sceneId.value = ''
+        selectedId.value = ''
+      }
+    }
   },
 )
 watch([() => section.value?.id, present, view], () => {
@@ -342,9 +454,14 @@ function pauseMedia() {
   root.value?.querySelectorAll('audio,video').forEach((el) => (el as HTMLMediaElement).pause())
 }
 function select(content: ResolvedContent) {
+  if (content.ref.rowId !== section.value?.id) {
+    const scene = editingScenes.value.find((s) => s.sectionId === content.ref.rowId)
+    if (scene) jumpScene(scene.id)
+  }
   selectedId.value = content.module.id
   properties.value = true
-  player.pauseAll()
+  collectionOpen.value = false
+  appearanceOpen.value = false
 }
 function next(offset: number) {
   if (present.value && sceneDefinition.value && !ui.presentationExport) {
@@ -363,8 +480,11 @@ function next(offset: number) {
     if (target) jumpScene(target.id, offset < 0 ? target.steps.length : 0)
     return
   }
-  const item = scenes.value[Math.max(0, Math.min(scenes.value.length - 1, index.value + offset))]
-  if (item) sceneId.value = item.id
+  const item =
+    editingScenes.value[
+      Math.max(0, Math.min(editingScenes.value.length - 1, navigationIndex.value + offset))
+    ]
+  if (item) jumpScene(item.id)
   pauseMedia()
 }
 function exit() {
@@ -490,8 +610,25 @@ function patchData(patch: Record<string, unknown>) {
         (s) => s.id === activeSelection.value.samples[selected.value!.ref.sideId],
       )
       if (sample?.lyricsNeedReview)
-        ui.notify('音频已更换，请在“作品与流程”核对并确认保留的歌词。', 'info')
+        ui.notify('音频已更换，请在作品库核对并确认保留的歌词。', 'info')
     }
+  }
+}
+function patchFor(content: ResolvedContent) {
+  const projectId = props.project.id,
+    caseId = activeSelection.value.caseId,
+    sampleId = activeSelection.value.samples[content.ref.sideId]
+  return (patch: Record<string, unknown>) => {
+    if (
+      props.project.id !== projectId ||
+      activeSelection.value.caseId !== caseId ||
+      activeSelection.value.samples[content.ref.sideId] !== sampleId ||
+      selected.value?.module.id !== content.module.id
+    ) {
+      ui.notify('编辑位置已改变，未将素材写入其他作品。请回到原作品重试。', 'info')
+      return
+    }
+    patchData(patch)
   }
 }
 function patchProps(patch: Record<string, unknown>) {
@@ -507,6 +644,9 @@ function add(type: string) {
   const result = store.addModuleAt(target, type, moduleTitle(type))
   picker.value = null
   if (result.ok) {
+    properties.value = true
+    collectionOpen.value = false
+    appearanceOpen.value = false
     const next = resolveComparison(
       result.value,
       tools.resolve,
@@ -517,41 +657,95 @@ function add(type: string) {
       next?.entries.find((e) => e.participantId === target.sideId)?.contents.at(-1)?.module.id ?? ''
   }
 }
-async function addSection(shared: boolean) {
-  const result = shared ? store.insertCommonRowAt(props.project.sheet.rows.length) : store.addRow()
-  if (result.ok) {
-    sceneId.value = projectSelection(result.value, activeSelection.value).sheet.rows.at(-1)!.id
+function editScene(
+  fn: (content: ComparisonContent, scene: PresentationScene) => void,
+  label: string,
+) {
+  const content = deepClone(props.project.comparison!)
+  const scene = content.scenes.find((s) => s.id === presentationSceneId.value)
+  if (!scene) return false
+  fn(content, scene)
+  const result = store.dispatch({ t: 'comparison/replace', content }, { label })
+  if (!result.ok) ui.notify(result.error, 'danger')
+  return result.ok
+}
+async function copyScene() {
+  let id = ''
+  if (
+    editScene((content) => {
+      id = duplicateScene(content, presentationSceneId.value).id
+    }, '独立复制场景')
+  ) {
     await nextTick()
-    properties.value = true
+    jumpScene(id)
   }
 }
-function toggleSection() {
-  if (!section.value) return
-  const hide = section.value.contents.some((c) => !c.module.hidden)
-  store.dispatchMany(
-    section.value.contents.map((c) => ({
-      t: 'module/patch' as const,
-      ref: c.ref,
-      patch: { hidden: hide },
-    })),
-    { label: t('studio.hideSection') },
+function deleteScene() {
+  editScene(
+    (content) => removeScene(content, presentationSceneId.value, removeSceneContent.value),
+    '删除场景',
   )
+  deleteSceneOpen.value = false
+  removeSceneContent.value = false
 }
-function theme(value: 'ink' | 'paper') {
-  store.dispatch(
-    { t: 'appearance/set', appearance: { ...props.project.appearance, theme: value } },
-    { label: '修改项目风格' },
+function orderModule(offset: number) {
+  if (!selected.value) return
+  const result = store.dispatch(
+    {
+      t: 'module/move',
+      from: selected.value.ref,
+      to: selected.value.ref,
+      toIndex: moduleIndex.value + offset,
+    },
+    { label: '调整模块顺序' },
   )
+  if (!result.ok) ui.notify(result.error, 'danger')
+}
+async function transferModule() {
+  const target = destinations.value[Number(moveTarget.value)]
+  if (!selected.value || !target || moveTarget.value === '') return
+  const result = store.dispatch(
+    { t: 'module/move', from: selected.value.ref, to: target, toIndex: Number.MAX_SAFE_INTEGER },
+    { label: '移动模块' },
+  )
+  if (!result.ok) return ui.notify(result.error, 'danger')
+  moveModuleOpen.value = false
+  const scene = editingScenes.value.find((s) => s.sectionId === target.rowId)
+  if (scene) {
+    await nextTick()
+    jumpScene(scene.id)
+  }
+}
+function showMoveModule() {
+  moveTarget.value = ''
+  moveModuleOpen.value = true
+}
+function openPicker(ref: CellRef) {
+  const entry = currentCase.value.entries[ref.sideId]
+  if (
+    !section.value?.shared &&
+    !entry?.samples.some((s) => s.id === activeSelection.value.samples[ref.sideId])
+  ) {
+    openCollection('works')
+    ui.notify('请先为这个对象添加或选择一份作品，再填写内容。', 'info')
+    return
+  }
+  picker.value = ref
+}
+function editContent(content: ResolvedContent) {
+  select(content)
+  expanded.value = true
 }
 </script>
 <template>
   <section
     ref="root"
     class="studio"
+    :data-design-theme="comparison.theme"
     :class="{
       'studio--present': present,
       'studio--clean': clean && present,
-      'studio--properties': properties && !present,
+      'studio--properties': properties && !present && !collectionOpen && !appearanceOpen,
       'studio--collection': (collectionOpen || appearanceOpen) && !present,
     }"
     @play.capture="onPlay"
@@ -559,7 +753,18 @@ function theme(value: 'ink' | 'paper') {
     <header class="studio__bar no-export" v-show="!clean || !present">
       <div class="studio__project">
         <span class="d-kicker">{{ t('studio.title') }}</span>
-        <h1>{{ project.title }}</h1>
+        <input
+          class="studio__title-input"
+          aria-label="舞台名称"
+          :value="project.title"
+          :readonly="present"
+          @change="
+            store.dispatch({
+              t: 'project/patch',
+              patch: { title: ($event.target as HTMLInputElement).value },
+            })
+          "
+        />
         <small role="status">{{
           t(store.saving ? 'compare.saving' : store.dirty ? 'compare.unsaved' : 'compare.saved')
         }}</small>
@@ -581,19 +786,15 @@ function theme(value: 'ink' | 'paper') {
         <DButton compact :aria-pressed="reading" @click="view = reading ? 'theatre' : 'reading'">{{
           t(reading ? 'studio.preview' : 'studio.reading')
         }}</DButton>
-        <DButton
-          v-if="!present"
-          compact
-          :aria-pressed="properties"
-          @click="properties = !properties"
-          >{{ t('studio.showProperties') }}</DButton
-        >
+        <DButton v-if="!present" compact :aria-pressed="properties" @click="toggleProperties">{{
+          t('studio.showProperties')
+        }}</DButton>
         <DButton
           v-if="!present"
           compact
           :aria-pressed="collectionOpen"
-          @click="togglePanel('collection')"
-          >作品与流程</DButton
+          @click="collectionOpen ? (collectionOpen = false) : openCollection()"
+          >作品库</DButton
         >
         <DButton
           v-if="!present"
@@ -622,6 +823,10 @@ function theme(value: 'ink' | 'paper') {
         >
       </div>
     </header>
+    <div v-if="store.lastError" role="alert" class="studio__save-error no-export">
+      <span>未能保存：{{ store.lastError }}。当前内容仍保留在编辑器中。</span
+      ><DButton compact @click="store.flush()">重试保存</DButton>
+    </div>
     <div class="studio__layout">
       <AppearancePanel
         v-if="appearanceOpen && !present"
@@ -635,56 +840,21 @@ function theme(value: 'ink' | 'paper') {
         :project="project"
         :selection="activeSelection"
         :scene-id="presentationSceneId"
+        :initial-tab="collectionTab"
         @select="chooseSelection"
         @scene="jumpScene"
         @close="collectionOpen = false"
       />
-      <nav v-if="!present" class="studio__outline" :aria-label="t('studio.structure')">
-        <h2 class="d-kicker">{{ t('studio.structure') }}</h2>
-        <button
-          v-for="(s, n) in comparison.sections"
-          :key="s.id"
-          type="button"
-          :aria-current="s.id === section?.id ? 'step' : undefined"
-          @click="sceneId = s.id"
-        >
-          <span>{{ String(n + 1).padStart(2, '0') }}</span
-          ><strong>{{ s.identity ? t('studio.identity') : s.title }}</strong
-          ><small>{{
-            t(
-              s.identity
-                ? 'studio.identity'
-                : s.visible
-                  ? 'studio.shown'
-                  : s.contents.some((c) => c.module.hidden)
-                    ? 'studio.hidden'
-                    : 'studio.emptyBadge',
-            )
-          }}</small>
-        </button>
-        <div class="studio__outline-add">
-          <DButton compact tone="quiet" icon="plus" @click="addSection(false)">{{
-            t('studio.addSection')
-          }}</DButton
-          ><DButton compact tone="quiet" icon="plus" @click="addSection(true)">{{
-            t('studio.addShared')
-          }}</DButton>
-        </div>
-        <div class="studio__appearance">
-          <label class="d-field"
-            >{{ t('studio.theme')
-            }}<select
-              class="d-input"
-              :value="comparison.theme"
-              @change="theme(($event.target as HTMLSelectElement).value as 'ink' | 'paper')"
-            >
-              <option value="ink">{{ t('studio.ink') }}</option>
-              <option value="paper">{{ t('studio.paper') }}</option>
-            </select></label
-          ><DButton compact tone="quiet" @click="theme('ink')">{{ t('studio.restore') }}</DButton
-          >
-        </div>
-      </nav>
+      <SceneNavigator
+        v-if="!present"
+        :project="project"
+        :selection="activeSelection"
+        :scene-id="presentationSceneId"
+        :theme="comparison.theme"
+        @select="jumpScene"
+        @identity="openCollection('participants')"
+        @appearance="togglePanel('appearance')"
+      />
       <main class="studio__stage-scroll" :data-design-theme="comparison.theme">
         <div v-show="!clean && !ui.presentationExport" class="studio__selection no-export">
           <label
@@ -822,24 +992,20 @@ function theme(value: 'ink' | 'paper') {
           data-project-stage
           :data-design-theme="comparison.theme"
         >
-          <template v-for="(s, n) in scenes" :key="s.id"
+          <template v-for="(s, n) in scenes" :key="s.sceneId ?? s.id"
             ><ProjectScene
               v-if="reading || s.id === section?.id"
               v-show="reading ? s.visible : s.id === section?.id"
               :comparison="comparison"
-              :section="
-                present && !reading && sceneDefinition?.title
-                  ? { ...s, title: sceneDefinition.title }
-                  : s
-              "
-              :index="present && !reading ? navigationIndex : n"
-              :total="present && !reading ? navigationTotal : scenes.length"
+              :section="s"
+              :index="!reading ? navigationIndex : n"
+              :total="!reading ? navigationTotal : scenes.length"
               :reading="reading"
               :view-mode="ui.presentationExport === 'report' ? 'overview' : comparisonView"
               :participant-ids="viewIds"
               :reference-id="referenceId"
               :exporting="!!ui.presentationExport"
-              :editing="!present"
+              :editing="!present && !ui.presentationExport"
               :focus-ids="
                 present && !reading && (!ui.presentationExport || ui.presentationCurrentStep)
                   ? (runtime?.focusIds ?? [])
@@ -851,13 +1017,16 @@ function theme(value: 'ink' | 'paper') {
                   : []
               "
               :focused="focused && (!ui.presentationExport || ui.presentationCurrentStep)"
+              :selected-id="selected?.module.id"
               @select="select"
+              @edit="editContent"
+              @add="openPicker"
               @inspect="setComparisonView(referenceId ? 'pair' : 'single', $event)"
-              @overflow="overflowIds.add($event)"
+              @overflow="onOverflow"
           /></template>
-          <div v-if="present && !visible.length" class="studio__no-content">
-            <p>{{ t('studio.incomplete') }}</p>
-            <DButton class="no-export" @click="exit">{{ t('studio.exit') }}</DButton>
+          <div v-if="!section || (present && !playlist.length)" class="studio__no-content">
+            <p>{{ present ? t('studio.incomplete') : '从左侧添加一个场景，开始放入你的作品。' }}</p>
+            <DButton v-if="present" class="no-export" @click="exit">{{ t('studio.exit') }}</DButton>
           </div>
         </div>
         <footer v-if="!reading && scenes.length" class="studio__paging no-export">
@@ -903,54 +1072,93 @@ function theme(value: 'ink' | 'paper') {
         </footer>
       </main>
       <aside
-        v-if="properties && !present && section"
+        v-if="
+          properties && !collectionOpen && !appearanceOpen && !present && section && sceneDefinition
+        "
         class="studio__properties"
         :aria-label="t('studio.properties')"
       >
+        <header class="studio__inspector-head">
+          <span class="d-kicker">SCENE / 当前场景</span
+          ><DButton
+            compact
+            tone="quiet"
+            icon="close"
+            aria-label="关闭属性"
+            @click="toggleProperties"
+          />
+        </header>
         <label class="d-field"
-          >{{ t('studio.sectionName')
-          }}<input
+          >场景标题<input
             class="d-input"
-            :value="section.title"
-            @change="store.setRowLabel(section.id, ($event.target as HTMLInputElement).value)"
+            :value="sceneDefinition.title"
+            @change="
+              editScene((_c, s) => {
+                s.title = ($event.target as HTMLInputElement).value
+              }, '重命名场景')
+            "
         /></label>
         <div class="studio__row-actions">
           <DButton
             compact
             tone="quiet"
             icon="chevron-up"
-            :aria-label="t('studio.up')"
-            @click="
-              store.moveRow(
-                section.id,
-                Math.max(0, comparison.sections.findIndex((s) => s.id === section?.id) - 1),
-              )
-            "
-          /><DButton
+            aria-label="上移场景"
+            :disabled="navigationIndex <= 0"
+            @click="editScene((c) => moveScene(c, presentationSceneId, -1), '移动场景')"
+          />
+          <DButton
             compact
             tone="quiet"
             icon="chevron-down"
-            :aria-label="t('studio.down')"
-            @click="
-              store.moveRow(
-                section.id,
-                comparison.sections.findIndex((s) => s.id === section?.id) + 1,
-              )
-            "
-          /><DButton
+            aria-label="下移场景"
+            :disabled="navigationIndex >= navigationTotal - 1"
+            @click="editScene((c) => moveScene(c, presentationSceneId, 1), '移动场景')"
+          />
+          <DButton compact tone="quiet" @click="copyScene">复制场景</DButton>
+          <DButton
             compact
             tone="quiet"
-            :aria-label="t('studio.hideSection')"
-            @click="toggleSection"
-            >{{ t('studio.hideSection') }}</DButton
-          ><DButton
+            @click="
+              editScene((_c, s) => {
+                s.hidden = !s.hidden
+              }, '隐藏场景')
+            "
+            >{{ sceneDefinition.hidden ? '显示场景' : '隐藏场景' }}</DButton
+          >
+          <DButton
             compact
-            tone="danger"
+            tone="quiet"
             icon="trash"
-            :aria-label="t('studio.deleteSection')"
-            @click="store.removeRow(section.id)"
+            aria-label="删除场景"
+            @click="deleteSceneOpen = true"
           />
         </div>
+        <details class="studio__scene-settings">
+          <summary>版式与演示</summary>
+          <label class="d-field"
+            >场景版式<select
+              class="d-input"
+              :value="sceneDefinition.layout ?? 'general'"
+              @change="
+                editScene((_c, s) => {
+                  s.layout = ($event.target as HTMLSelectElement).value as 'general' | 'listening'
+                }, '修改场景版式')
+              "
+            >
+              <option value="general">通用组合</option>
+              <option v-if="!section.shared" value="listening">并置试听</option>
+            </select></label
+          >
+          <p>版式仅调整呈现，已有内容始终保留。</p>
+          <DButton compact tone="quiet" @click="openCollection('story')">编辑演示步骤</DButton>
+        </details>
+        <p
+          v-if="project.comparison!.scenes.filter((s) => s.sectionId === section!.id).length > 1"
+          class="studio__source-note"
+        >
+          此内容由多个场景共同引用。内容修改会同步；使用“复制场景”可独立编辑。
+        </p>
         <div class="studio__modules">
           <template v-for="entry in section.entries" :key="entry.participantId"
             ><div
@@ -987,7 +1195,7 @@ function theme(value: 'ink' | 'paper') {
                 compact
                 tone="quiet"
                 icon="plus"
-                @click="picker = { rowId: section.id, sideId: entry.participantId }"
+                @click="openPicker({ rowId: section.id, sideId: entry.participantId })"
                 >{{ t('studio.addModule') }}</DButton
               >
             </div></template
@@ -1011,7 +1219,8 @@ function theme(value: 'ink' | 'paper') {
               @click="expanded = true"
             />
           </div>
-          <div v-if="propertyTab === 'content'" class="studio__fields">
+          <div v-if="propertyTab === 'content'" class="studio__fields studio-editor-fields">
+            <p class="studio__context">{{ editorContext }}</p>
             <label class="d-field"
               >{{ t('module.titleLabel')
               }}<input
@@ -1028,7 +1237,7 @@ function theme(value: 'ink' | 'paper') {
               :module="selected.module"
               :side-id="selected.ref.sideId"
               :readonly="false"
-              :patch-data="patchData"
+              :patch-data="patchFor(selected)"
               :patch-props="patchProps"
             />
             <p v-else>{{ t('studio.unknown') }}</p>
@@ -1075,6 +1284,32 @@ function theme(value: 'ink' | 'paper') {
           <div class="studio__module-actions">
             <DButton
               compact
+              :disabled="selected.module.locked"
+              @click="store.duplicateModule(selected.ref)"
+              >复制模块</DButton
+            >
+            <DButton
+              compact
+              icon="chevron-up"
+              aria-label="上移模块"
+              :disabled="moduleIndex <= 0 || selected.module.locked"
+              @click="orderModule(-1)"
+            />
+            <DButton
+              compact
+              icon="chevron-down"
+              aria-label="下移模块"
+              :disabled="moduleIndex >= moduleCount - 1 || selected.module.locked"
+              @click="orderModule(1)"
+            />
+            <DButton
+              compact
+              :disabled="selected.module.locked || !destinations.length"
+              @click="showMoveModule"
+              >移动到…</DButton
+            >
+            <DButton
+              compact
               @click="store.patchModule(selected.ref, { hidden: !selected.module.hidden })"
               >{{ t(selected.module.hidden ? 'studio.show' : 'studio.hide') }}</DButton
             ><DButton
@@ -1102,20 +1337,66 @@ function theme(value: 'ink' | 'paper') {
       /><DButton compact @click="clean = false">{{ t('showcase.exitClean') }}</DButton
       ><DButton compact @click="exit">{{ t('studio.exit') }}</DButton>
     </div>
+    <DDialog
+      :open="deleteSceneOpen"
+      :theme="comparison.theme"
+      title="删除场景"
+      description="默认只移除演示页，内容保留，可通过“引用已有内容”再次使用。此操作可撤销。"
+      @close="deleteSceneOpen = false"
+    >
+      <label class="d-check"
+        ><input
+          v-model="removeSceneContent"
+          type="checkbox"
+          :disabled="
+            project.comparison!.scenes.filter((s) => s.sectionId === section?.id).length > 1
+          "
+        />同时删除本页全部作品的内容（仅限没有其他场景引用时）</label
+      >
+      <template #footer
+        ><DButton tone="danger" @click="deleteScene">确认删除场景</DButton></template
+      >
+    </DDialog>
+    <DDialog
+      :open="moveModuleOpen"
+      :theme="comparison.theme"
+      title="移动模块"
+      description="移动到同一测试题的兼容位置。内容与素材保留；共享来源的修改会同步到引用页面。"
+      @close="moveModuleOpen = false"
+    >
+      <label class="d-field"
+        >目标位置<select v-model="moveTarget" class="d-input">
+          <option value="">选择位置</option>
+          <option
+            v-for="(target, n) in destinations"
+            :key="target.rowId + target.sideId"
+            :value="String(n)"
+          >
+            {{ target.label }}
+          </option>
+        </select></label
+      >
+      <template #footer
+        ><DButton tone="primary" :disabled="moveTarget === ''" @click="transferModule"
+          >移动模块</DButton
+        ></template
+      >
+    </DDialog>
     <ModulePicker
       :open="!!picker"
       :scope="section?.shared ? 'common' : 'side'"
+      :theme="comparison.theme"
       @pick="add"
       @close="picker = null"
     />
-    <ModuleEditorDialog
+    <StudioModuleDialog
       v-if="selected"
       :open="expanded"
       :module="selected.module"
       :options="options"
-      stage
+      :theme="comparison.theme"
+      :context="editorContext"
       :side-id="selected.ref.sideId"
-      accent="var(--d-accent)"
       @close="expanded = false"
       @patch="store.patchModule(selected.ref, $event)"
       @patch-data="patchData"
@@ -1124,9 +1405,75 @@ function theme(value: 'ink' | 'paper') {
   </section>
 </template>
 <style scoped>
+.studio__save-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--d-danger);
+  color: var(--d-danger);
+  font-size: 12px;
+}
+.studio__project .d-kicker {
+  display: none;
+}
+.studio__title-input {
+  min-width: 80px;
+  max-width: 310px;
+  width: 240px;
+  font-size: 19px;
+  background: transparent;
+  color: var(--d-text);
+  border: 0;
+  border-bottom: 1px solid transparent;
+  padding: 2px 0;
+}
+.studio__title-input:focus {
+  border-color: var(--d-line);
+  outline: 0;
+}
+.studio__inspector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.studio__scene-settings {
+  font-size: 12px;
+  padding-block: 12px;
+  border-block: 1px solid var(--d-line);
+  margin-bottom: 18px;
+}
+.studio__scene-settings summary {
+  cursor: pointer;
+  color: var(--d-muted);
+}
+.studio__scene-settings label {
+  margin-top: 16px;
+}
+.studio__scene-settings p,
+.studio__source-note,
+.studio__context {
+  color: var(--d-muted);
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 10px 0;
+}
+.studio__module-actions {
+  flex-wrap: wrap;
+}
+.studio__row-actions {
+  flex-wrap: wrap;
+}
+.studio__layout > :deep(.collection),
+.studio__layout > :deep(.appearance-panel) {
+  width: min(350px, 100%);
+}
+
 @media (min-width: 1451px) {
   .studio--collection .studio__layout {
-    grid-template-columns: 210px minmax(0, 1fr) 380px;
+    grid-template-columns: 220px minmax(0, 1fr) 350px;
   }
 }
 .studio__paging {
@@ -1214,7 +1561,6 @@ function theme(value: 'ink' | 'paper') {
 }
 .studio__project .d-kicker {
   font-size: 10px;
-  width: 100%;
 }
 .studio__project h1 {
   font-size: 20px;
@@ -1234,12 +1580,12 @@ function theme(value: 'ink' | 'paper') {
 }
 .studio__layout {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   min-height: 0;
   flex: 1;
 }
 .studio--properties .studio__layout {
-  grid-template-columns: 210px minmax(0, 1fr) 320px;
+  grid-template-columns: 220px minmax(0, 1fr) 350px;
 }
 .studio__outline {
   display: flex;
@@ -1481,7 +1827,7 @@ function theme(value: 'ink' | 'paper') {
   .studio__properties {
     position: absolute;
     right: 0;
-    top: 100px;
+    top: 0;
     bottom: 0;
     z-index: 8;
     width: 340px;
@@ -1537,7 +1883,7 @@ function theme(value: 'ink' | 'paper') {
     flex: 1;
   }
   .studio__properties {
-    top: 130px;
+    top: 0;
     width: min(100%, 360px);
   }
   .studio__canvas {

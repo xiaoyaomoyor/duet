@@ -18,7 +18,7 @@ import type { AppearancePatch } from './appearance'
  *   这是**破坏性**变更：旧 type 的实现已从注册表删除，
  *   不迁移就会命中"模块类型未注册"分支、表现为内容消失。
  */
-export const SCHEMA_VERSION = 12
+export const SCHEMA_VERSION = 13
 export type WorkspaceKind = 'modern' | 'legacy'
 
 // ——————————————————————————————————————————————————————————

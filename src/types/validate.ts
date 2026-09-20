@@ -191,6 +191,9 @@ export function validateProject(value: unknown): Result<Project, string> {
       !Number.isInteger(snapshot.schemaVersion) ||
       snapshot.schemaVersion < 1 ||
       snapshot.schemaVersion >= SCHEMA_VERSION ||
+      (snapshot.schemaVersion >= 12 &&
+        snapshot.workspace !== 'modern' &&
+        snapshot.workspace !== 'legacy') ||
       (snapshot.appearance !== undefined && !validAppearance(snapshot.appearance)) ||
       !validateSheet(snapshot.sheet).ok
     )

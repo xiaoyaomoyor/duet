@@ -294,15 +294,17 @@ export const useProjectStore = defineStore('project', () => {
     if (!saved.ok) return saved
 
     projects.upsert(saved.value)
-    await open(saved.value.id)
-    return ok(saved.value)
+    return open(saved.value.id)
   }
 
   /** 打开一个项目（已在标签页中则直接切换） */
   async function open(id: string): Promise<Result<Project, string>> {
     if (switchingWorkspace.value) return err('正在切换工作区')
     // 切换前把当前项目落盘，避免"改了标题就切走"导致丢失
-    if (current.value && current.value.id !== id) await flush()
+    if (current.value && current.value.id !== id) {
+      const saved = await flush()
+      if (!saved.ok) return saved
+    }
 
     const project = projects.byId(id) ?? (await loadFromDb(id))
     if (!project) return err('项目不存在，可能已被删除')
@@ -342,10 +344,10 @@ export const useProjectStore = defineStore('project', () => {
   /** 关闭标签页（不删除项目） */
   async function closeTab(id: string): Promise<void> {
     if (switchingWorkspace.value) return
+    if (current.value?.id === id && !(await flush()).ok) return
     openIds.value = openIds.value.filter((item) => item !== id)
 
     if (current.value?.id === id) {
-      await flush()
       const fallbackId = openIds.value[0]
       if (fallbackId) {
         await open(fallbackId)
@@ -359,7 +361,7 @@ export const useProjectStore = defineStore('project', () => {
   /** 关闭全部标签页 */
   async function closeAllTabs(): Promise<void> {
     if (switchingWorkspace.value) return
-    await flush()
+    if (!(await flush()).ok) return
     openIds.value = []
     current.value = null
     history.clear()

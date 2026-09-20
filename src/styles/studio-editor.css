@@ -1,0 +1,48 @@
+/* Existing module editors inherit the stage palette in both inspector and dialog. */
+.studio-editor-fields {
+  --bg-base: var(--d-bg);
+  --bg-panel: var(--d-surface);
+  --bg-surface: var(--d-surface);
+  --bg-surface-2: var(--d-bg);
+  --bg-active: var(--d-raised);
+  --bg-elevated: var(--d-raised);
+  --bg-input: var(--d-bg);
+  --bg-hover: var(--d-raised);
+  --text-primary: var(--d-text);
+  --text-secondary: var(--d-muted);
+  --text-muted: var(--d-muted);
+  --text-placeholder: var(--d-faint);
+  --text-disabled: var(--d-faint);
+  --border-default: var(--d-line);
+  --border-subtle: var(--d-line);
+  --border-strong: var(--d-muted);
+  --accent: var(--d-accent);
+  --accent-contrast: var(--d-accent-ink);
+  --accent-soft: var(--d-raised);
+  --accent-500: var(--d-accent);
+  --accent-solid: var(--d-accent);
+  --accent-fg: var(--d-accent-ink);
+  --success: var(--d-b);
+  --warning: var(--d-accent);
+  --danger: var(--d-danger);
+  --color-danger: var(--d-danger);
+  color: var(--d-text);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.studio-editor-fields input:not([type='checkbox'], [type='range'], [type='file']),
+.studio-editor-fields textarea,
+.studio-editor-fields select {
+  max-width: 100%;
+  color: var(--d-text);
+  background-color: var(--d-bg);
+  border-color: var(--d-line);
+  border-radius: var(--d-radius-control);
+}
+.studio-editor-fields input[type='checkbox'],
+.studio-editor-fields input[type='range'] {
+  accent-color: var(--d-accent);
+}
+.studio-editor-fields textarea {
+  line-height: 1.8;
+}

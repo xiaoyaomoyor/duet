@@ -98,4 +98,19 @@ describe('W1 workspace persistence boundary', () => {
       workspace: 'modern',
     })
   })
+
+  it('keeps the editor and its tabs when saving fails during navigation or closing', async () => {
+    const id = store.current!.id
+    store.openIds = [id]
+    store.dispatch({ t: 'project/patch', patch: { title: '尚未保存的创作' } })
+    vi.mocked(repo.saveProject).mockRejectedValue(new Error('disk full'))
+    expect((await store.open('another-stage')).ok).toBe(false)
+    await store.closeTab(id)
+    expect(store.openIds).toEqual([id])
+    await store.closeAllTabs()
+    expect(store.current).toMatchObject({ id, title: '尚未保存的创作' })
+    expect(store.openIds).toEqual([id])
+    expect(store.dirty).toBe(true)
+    expect(store.lastError).toBe('disk full')
+  })
 })

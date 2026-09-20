@@ -214,6 +214,7 @@ async function exportMigrationSnapshot() {
       sheet: snapshot.sheet,
       ...(snapshot.comparison ? { comparison: snapshot.comparison } : {}),
       ...(snapshot.appearance ? { appearance: snapshot.appearance } : {}),
+      ...(snapshot.workspace ? { workspace: snapshot.workspace } : {}),
     }
     const result = await exportDuet([legacy], { embedMedia: true })
     if (!result.ok) {

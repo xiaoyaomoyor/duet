@@ -9,7 +9,7 @@ test('R4 six-way overview, pinned comparison and single view keep sample choices
 }) => {
   await page.setViewportSize({ width: 1920, height: 1080 })
   await importFixture(page, multiFixture())
-  await page.locator('.studio__outline button').filter({ hasText: '作品试听' }).click()
+  await page.locator('.studio__outline button').filter({ hasText: '六种回声，逐一聆听' }).click()
   await expect(page.locator('.project-scene__participant:visible')).toHaveCount(6)
   await expect(page.locator('[data-present-root] audio')).toHaveCount(6)
   await page.getByLabel('F 作品', { exact: true }).selectOption('f-two')
@@ -62,7 +62,7 @@ test('R4 object management is undoable, keeps stable labels on reorder and persi
   page,
 }) => {
   await importFixture(page, multiFixture(3))
-  await page.getByRole('button', { name: '作品与流程', exact: true }).click()
+  await page.getByRole('button', { name: '作品库', exact: true }).click()
   await page.getByRole('button', { name: '对比对象', exact: true }).click()
   for (let n = 4; n <= 6; n++) {
     await page.getByLabel('新工具名称', { exact: true }).fill(`工具 ${n}`)
@@ -80,7 +80,7 @@ test('R4 object management is undoable, keeps stable labels on reorder and persi
   await expect(items.nth(4).locator('header strong')).toHaveText('F')
   await expect(page.locator('.studio__project small')).toHaveText('已保存')
   await page.reload()
-  await page.getByRole('button', { name: '作品与流程', exact: true }).click()
+  await page.getByRole('button', { name: '作品库', exact: true }).click()
   await page.getByRole('button', { name: '对比对象', exact: true }).click()
   await expect(page.locator('.participants-manager__item')).toHaveCount(6)
 })
@@ -90,7 +90,7 @@ test('R4 compact data groups repeat the fixed reference and can return to every 
 }) => {
   await importFixture(page, multiFixture())
   await page.getByLabel('固定参照', { exact: true }).selectOption('a')
-  await page.locator('.studio__outline button').filter({ hasText: '维度比较' }).click()
+  await page.locator('.studio__outline button').filter({ hasText: '把差异放在一起' }).click()
   await expect(page.locator('.stage-table-pages')).toBeVisible()
   await expect(page.locator('.stage-table thead [data-compare-id="a"]')).toBeVisible()
   await page.getByRole('button', { name: '下一组', exact: true }).click()
@@ -144,7 +144,7 @@ for (const count of [3, 4, 5, 6])
   test('R4 ' + count + ' participants fit the theatre at 1080p and 720p', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await importFixture(page, multiFixture(count))
-    await page.locator('.studio__outline button').filter({ hasText: '作品试听' }).click()
+    await page.locator('.studio__outline button').filter({ hasText: '六种回声，逐一聆听' }).click()
     await page.getByRole('button', { name: '开始演示', exact: true }).click()
     await page.getByRole('button', { name: '干净画面', exact: true }).click()
     for (const [width, height] of [
@@ -187,7 +187,7 @@ test('R4 image overview retains contain fit and single image viewing on mobile',
       m.props = { fit: 'contain', ratio: 'auto' }
     }
   await importFixture(page, p)
-  await page.locator('.studio__outline button').filter({ hasText: '作品试听' }).click()
+  await page.locator('.studio__outline button').filter({ hasText: '六种回声，逐一聆听' }).click()
   await expect(page.locator('[data-present-root] .image img')).toHaveCount(6)
   await expect(page.locator('[data-present-root] .image img').first()).toHaveCSS(
     'object-fit',

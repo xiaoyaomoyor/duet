@@ -604,7 +604,7 @@ export default {
     dropHint: 'Release to import',
     dropNotText: '“{name}” is not a text file — lyrics accept .txt / .lrc only',
     align: 'Alignment',
-    alignHint: 'Set the alignment under Module options in the Edit module dialog.',
+    alignHint: 'Set the alignment in this module’s style options.',
   },
 
   link: {

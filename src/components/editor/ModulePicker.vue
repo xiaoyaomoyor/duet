@@ -17,6 +17,7 @@ import { t as translate } from '@/i18n/helper'
 
 const props = defineProps<{
   open: boolean
+  theme?: 'ink' | 'paper'
   /**
    * 放置位置，决定哪些模块可选：
    *   'side'   —— 放进左右某一侧（默认）：排除纯通用模块（如音频控制台，
@@ -67,11 +68,7 @@ const groups = computed(() => {
   const filtered = MODULE_META.filter((meta) => {
     if (!fitsHere(meta.type)) return false
     if (!q) return true
-    const haystack = [
-      meta.type,
-      translate(meta.titleKey),
-      ...(meta.keywords ?? []),
-    ]
+    const haystack = [meta.type, translate(meta.titleKey), ...(meta.keywords ?? [])]
       .map((item) => normalizeForSearch(item))
       .join('|')
     return haystack.includes(q)
@@ -107,16 +104,32 @@ function pick(type: string): void {
   emit('pick', type)
   emit('close')
 }
-
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="mask" @click.self="emit('close')">
-      <div ref="dialogRoot" class="picker" role="dialog" aria-modal="true" :aria-label="t('picker.title')">
+    <div
+      v-if="open"
+      class="mask"
+      :class="{ 'studio-editor-fields': !!theme }"
+      :data-design-theme="theme"
+      @click.self="emit('close')"
+    >
+      <div
+        ref="dialogRoot"
+        class="picker"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('picker.title')"
+      >
         <header class="picker__head">
           <h2 class="picker__title">{{ t('picker.title') }}</h2>
-          <button class="picker__close" type="button" :aria-label="t('common.close')" @click="emit('close')">
+          <button
+            class="picker__close"
+            type="button"
+            :aria-label="t('common.close')"
+            @click="emit('close')"
+          >
             <AppIcon name="close" :size="16" />
           </button>
         </header>
@@ -151,10 +164,7 @@ function pick(type: string): void {
                   <AppIcon :name="meta.icon" :size="16" class="card__icon" />
                   <span class="card__text">
                     <span class="card__name">{{ translate(meta.titleKey) }}</span>
-                    <span
-                      class="card__badge"
-                      :class="`card__badge--${statusOf(meta.type).tone}`"
-                    >
+                    <span class="card__badge" :class="`card__badge--${statusOf(meta.type).tone}`">
                       {{ statusOf(meta.type).label }}
                     </span>
                   </span>

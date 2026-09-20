@@ -600,7 +600,7 @@ export default {
     dropHint: '松手即可导入',
     dropNotText: '「{name}」不是文本文件，歌词只接受 .txt / .lrc',
     align: '对齐方式',
-    alignHint: '对齐方式在「模块编辑」弹窗的「模块选项」里设置。',
+    alignHint: '对齐方式可在此模块的样式选项中设置。',
   },
 
   link: {

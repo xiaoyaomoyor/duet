@@ -42,7 +42,7 @@ export const studioZh = {
   shared: '共同内容',
   participant: '参评对象',
   section: '区段',
-  overflow: '内容超出一页，已完整展开。可精简、拆成更多区段或使用阅读报告。',
+  overflow: '当前预览已完整展开。演示时自动适配画幅；长内容可拆分为多个场景。',
   ready: '点击试听',
   loading: '正在读取素材…',
   failed: '无法播放此素材，请检查文件或更换音源',
@@ -129,7 +129,7 @@ export const studioEn: Record<keyof typeof studioZh, string> = {
   participant: 'Participant',
   section: 'Section',
   overflow:
-    'This content needs more than one slide and is shown in full. Shorten it, split into sections or use the reading report.',
+    'The preview is expanded in full. Presentation adapts to the frame; long content can be split into scenes.',
   ready: 'Listen',
   loading: 'Loading media…',
   failed: 'Cannot play this media. Check the file or replace the source.',

@@ -60,8 +60,17 @@ export function createProject(options: CreateProjectOptions = {}): Project {
     accent: options.accent ?? template.accent,
     ...(options.now !== undefined ? { now: options.now } : {}),
   }
-  if (options.now !== undefined) instantiateOptions.now = options.now
-  return withComparison(instantiateTemplate(template, instantiateOptions))
+  const project = withComparison(instantiateTemplate(template, instantiateOptions))
+  if (workspace === 'modern')
+    for (const scene of project.comparison!.scenes) {
+      const row = project.sheet.rows.find((r) => r.id === scene.sectionId)
+      if (
+        row?.kind === 'paired' &&
+        Object.values(row.cells).some((cell) => cell.modules.some((m) => m.type === 'audio'))
+      )
+        scene.layout = 'listening'
+    }
+  return project
 }
 
 /**

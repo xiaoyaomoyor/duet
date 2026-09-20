@@ -114,7 +114,10 @@ test('R3 sample/case switches are atomic, stop audio and preserve independent ch
   page,
 }) => {
   await importFixture(page, fixture())
-  await page.locator('.studio__outline button').filter({ hasText: '作品试听' }).click()
+  await page
+    .locator('.studio__outline button')
+    .filter({ hasText: /盲听|第二题 · 试听/ })
+    .click()
   const old = page.locator('audio[data-track-id*="a-one:"]').first()
   await old.evaluate((a: HTMLAudioElement) => a.play())
   await expect.poll(() => old.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThan(0)
@@ -130,7 +133,10 @@ test('R3 sample/case switches are atomic, stop audio and preserve independent ch
   await expect(page.locator('.project-scene:visible')).toContainText('第二次生成的观察')
   await expect(page.locator('.project-scene:visible')).toContainText('声场更宽')
   await page.locator('.studio__selection select').first().selectOption('case-two')
-  await page.locator('.studio__outline button').filter({ hasText: '作品试听' }).click()
+  await page
+    .locator('.studio__outline button')
+    .filter({ hasText: /盲听|第二题 · 试听/ })
+    .click()
   await expect(page.locator('.project-scene:visible')).toContainText('本题未提供样本')
   await expect(page.locator('audio[data-track-id*=":b:"]')).toHaveCount(0)
   await page.locator('.studio__selection select').first().selectOption('case-one')
@@ -139,7 +145,10 @@ test('R3 sample/case switches are atomic, stop audio and preserve independent ch
 
 test('R3 next/back/restart rebuild steps without changing project content', async ({ page }) => {
   await importFixture(page, fixture())
-  await page.locator('.studio__outline button').filter({ hasText: '作品试听' }).click()
+  await page
+    .locator('.studio__outline button')
+    .filter({ hasText: /盲听|第二题 · 试听/ })
+    .click()
   await page.getByRole('button', { name: '开始演示' }).click()
   await page.locator('.stage-frame__brand:visible').click()
   const b = page.locator('.project-scene:visible [data-side-id=b]')
@@ -174,8 +183,8 @@ test('R3 collection editing, undo, saved combination and reload preserve inactiv
   page,
 }) => {
   await importFixture(page, fixture())
-  await page.getByRole('button', { name: '作品与流程', exact: true }).click()
-  const panel = page.getByRole('complementary', { name: '作品与流程' })
+  await page.getByRole('button', { name: '作品库', exact: true }).click()
+  const panel = page.getByRole('complementary', { name: '作品库' })
   await panel.getByRole('button', { name: 'Amber / 第二次生成 作品', exact: true }).click()
   await panel.getByLabel('作品名称', { exact: true }).fill('第二次生成 · 编辑后')
   await panel.getByLabel('作品名称', { exact: true }).press('Tab')
@@ -245,8 +254,8 @@ test('R3 batch image import, case removal undo and scene editing retain usable r
   page,
 }) => {
   await importFixture(page, fixture())
-  await page.getByRole('button', { name: '作品与流程', exact: true }).click()
-  const panel = page.getByRole('complementary', { name: '作品与流程' })
+  await page.getByRole('button', { name: '作品库', exact: true }).click()
+  const panel = page.getByRole('complementary', { name: '作品库' })
   await panel.locator('input[type=file]').setInputFiles([
     {
       name: 'portrait.svg',
@@ -272,11 +281,16 @@ test('R3 batch image import, case removal undo and scene editing retain usable r
   await expect(page.locator('.studio__selection select').first()).not.toContainText('新测试题')
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect(page.locator('.studio__selection select').first()).toContainText('新测试题')
-  await panel.getByRole('button', { name: '演示编排', exact: true }).click()
-  await panel.getByRole('button', { name: /第一轮 · 盲听 4 步/ }).click()
-  await panel.getByRole('button', { name: '复制场景', exact: true }).click()
-  await panel.getByLabel('场景标题', { exact: true }).fill('新讲法')
-  await panel.getByLabel('场景标题', { exact: true }).press('Tab')
+  await panel.getByRole('button', { name: '关闭', exact: true }).click()
+  await page.locator('.studio__selection select').first().selectOption('case-one')
+  await page.locator('.studio__outline button').filter({ hasText: '第一轮 · 盲听' }).click()
+  if (!(await page.locator('.studio__properties').isVisible()))
+    await page.getByRole('button', { name: '内容与属性', exact: true }).click()
+  await page.getByRole('button', { name: '复制场景', exact: true }).click()
+  await page.getByLabel('场景标题', { exact: true }).fill('新讲法')
+  await page.getByLabel('场景标题', { exact: true }).press('Tab')
+  await page.getByRole('button', { name: '作品库', exact: true }).click()
+  await panel.getByRole('button', { name: '当前页步骤', exact: true }).click()
   await panel.getByRole('button', { name: '＋当前作品', exact: true }).click()
   await expect(panel.locator('.collection__steps li')).toHaveCount(5)
   await panel.getByRole('button', { name: '关闭', exact: true }).click()

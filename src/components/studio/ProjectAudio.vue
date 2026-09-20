@@ -103,6 +103,7 @@ onBeforeUnmount(() => {
       role="status"
     >
       {{ t(media.status === 'loading' ? 'studio.loading' : 'studio.failed') }}
+      <button v-if="media.status === 'error'" type="button" @click="media.retry()">重新加载</button>
     </p>
   </div>
 </template>

@@ -22,7 +22,9 @@ export type PresentationStep =
   | { id: string; kind: 'focus'; participantId: string }
   | { id: string; kind: 'sample'; participantId: string; sampleId: string }
   | { id: string; kind: 'identity'; participantId: string }
+export type SceneLayout = 'general' | 'listening'
 export interface PresentationScene {
+  layout?: SceneLayout
   appearance?: AppearancePatch
   id: string
   title: string
@@ -56,6 +58,7 @@ export interface PresentationRuntime extends ContentSelection {
   transportState: 'paused' | 'playing'
 }
 export interface MigrationSnapshot {
+  workspace?: 'modern' | 'legacy'
   appearance?: AppearancePatch
   schemaVersion: number
   sheet: Sheet

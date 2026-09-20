@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Project } from '@/types/project'
 import type {
   ComparisonContent,
@@ -17,7 +17,12 @@ import { importFiles } from '@/services/assetService'
 import SampleArtwork from './SampleArtwork.vue'
 import ParticipantManager from './ParticipantManager.vue'
 import DButton from '@/components/design/DButton.vue'
-const props = defineProps<{ project: Project; selection: ContentSelection; sceneId: string }>()
+const props = defineProps<{
+  project: Project
+  selection: ContentSelection
+  sceneId: string
+  initialTab?: 'works' | 'story' | 'participants'
+}>()
 const emit = defineEmits<{
   select: [selection: ContentSelection]
   scene: [id: string]
@@ -25,8 +30,14 @@ const emit = defineEmits<{
 }>()
 const store = useProjectStore(),
   ui = useUiStore()
-const tab = ref<'works' | 'story' | 'participants'>('works'),
+const tab = ref<'works' | 'story' | 'participants'>(props.initialTab ?? 'works'),
   participantId = ref(props.project.sheet.sides[0].id)
+watch(
+  () => props.initialTab,
+  (value) => {
+    if (value) tab.value = value
+  },
+)
 const content = computed(() => props.project.comparison!)
 const item = computed(() => content.value.cases.find((c) => c.id === props.selection.caseId)!)
 const entry = computed(
@@ -135,6 +146,7 @@ async function importBatch(event: Event) {
     caseId = item.value.id,
     p = participantId.value
   busy.value = true
+  let importedId = ''
   try {
     const results = await importFiles(Array.from(input.files))
     if (props.project.id !== projectId || !content.value.cases.some((c) => c.id === caseId)) return
@@ -191,9 +203,14 @@ async function importBatch(event: Event) {
           ],
         }
         e.samples.push(s)
+        importedId ||= s.id
         e.defaultSampleId ??= s.id
       }
     }, '批量导入作品')
+    if (importedId && props.selection.caseId === caseId && participantId.value === p)
+      emit('select', { caseId, samples: { ...props.selection.samples, [p]: importedId } })
+  } catch (error) {
+    ui.notify(error instanceof Error ? error.message : '素材导入失败，请重试。', 'danger')
   } finally {
     busy.value = false
     input.value = ''
@@ -217,36 +234,16 @@ function addStep(kind: PresentationStep['kind']) {
     ),
   )
 }
-function moveScene(offset: number) {
-  edit((c) => {
-    const at = c.scenes.findIndex((s) => s.id === scene.value?.id)
-    const s = c.scenes.splice(at, 1)[0]
-    if (s) c.scenes.splice(Math.max(0, at + offset), 0, s)
-  }, '移动场景')
-}
-async function duplicateScene() {
-  let id = ''
-  edit((c) => {
-    if (!scene.value) return
-    const s = deepClone(scene.value)
-    s.id = id = uuid()
-    s.title += ' 副本'
-    s.steps.forEach((s) => (s.id = uuid()))
-    c.scenes.splice(c.scenes.findIndex((s) => s.id === scene.value?.id) + 1, 0, s)
-  }, '复制场景')
-  await nextTick()
-  emit('scene', id)
-}
 </script>
 <template>
-  <aside class="collection" aria-label="作品与流程">
+  <aside class="collection" aria-label="作品库">
     <header>
-      <span class="d-kicker">COLLECTION / STORY</span
+      <span class="d-kicker">LIBRARY / 作品库</span
       ><DButton compact tone="quiet" @click="emit('close')">关闭</DButton>
     </header>
     <div class="collection__tabs">
       <button :aria-pressed="tab === 'works'" @click="tab = 'works'">测试题与作品</button
-      ><button :aria-pressed="tab === 'story'" @click="tab = 'story'">演示编排</button>
+      ><button :aria-pressed="tab === 'story'" @click="tab = 'story'">当前页步骤</button>
       <button :aria-pressed="tab === 'participants'" @click="tab = 'participants'">对比对象</button>
     </div>
     <template v-if="tab === 'works'">
@@ -415,60 +412,10 @@ async function duplicateScene() {
     </template>
     <template v-else-if="tab === 'story'">
       <p class="collection__hint">
-        场景引用已有内容；复制场景不会复制作品。步骤逐次生效，回退会恢复对应状态。
+        从左侧选择场景。这里设置当前页的演示步骤；回退会恢复对应状态。
       </p>
-      <div class="collection__list">
-        <button
-          v-for="(s, n) in content.scenes"
-          :key="s.id"
-          :aria-pressed="s.id === scene?.id"
-          @click="emit('scene', s.id)"
-        >
-          <small>{{ String(n + 1).padStart(2, '0') }}</small
-          ><span>{{ s.title || '未命名场景' }}</span
-          ><small>{{ s.hidden ? '隐藏' : `${s.steps.length} 步` }}</small>
-        </button>
-      </div>
-      <template v-if="scene">
-        <label class="d-field"
-          >场景标题<input
-            class="d-input"
-            :value="scene.title"
-            @change="patchScene((s) => (s.title = ($event.target as HTMLInputElement).value))"
-        /></label>
-        <label class="d-field"
-          >引用区段<select
-            class="d-input"
-            :value="scene.sectionId"
-            @change="patchScene((s) => (s.sectionId = ($event.target as HTMLSelectElement).value))"
-          >
-            <option
-              v-for="s in content.cases.find((c) => c.id === scene!.caseId)?.sections"
-              :key="s.id"
-              :value="s.id"
-            >
-              {{ s.label || '未命名区段' }}
-            </option>
-          </select></label
-        >
-        <div class="collection__actions">
-          <DButton compact @click="moveScene(-1)">上移</DButton
-          ><DButton compact @click="moveScene(1)">下移</DButton
-          ><DButton compact @click="duplicateScene">复制场景</DButton>
-        </div>
-        <div class="collection__actions">
-          <DButton compact @click="patchScene((s) => (s.hidden = !s.hidden))">{{
-            scene.hidden ? '显示场景' : '隐藏场景'
-          }}</DButton
-          ><DButton
-            compact
-            tone="danger"
-            @click="
-              edit((c) => (c.scenes = c.scenes.filter((s) => s.id !== scene!.id)), '删除场景')
-            "
-            >删除场景</DButton
-          >
-        </div>
+      <template v-if="scene"
+        ><h3>{{ scene.title || '未命名场景' }}</h3>
         <DButton compact @click="patchScene((s) => (s.samples = { ...selection.samples }))"
           >将当前作品选择存为场景默认</DButton
         >
@@ -506,25 +453,6 @@ async function duplicateScene() {
           ><DButton compact @click="addStep('identity')">＋揭示身份</DButton>
         </div>
       </template>
-      <DButton
-        compact
-        @click="
-          edit((c) => {
-            const s = item.sections.find((s) => s.kind === 'paired') ?? item.sections[0]
-            if (s)
-              c.scenes.push({
-                id: uuid(),
-                title: s.label || '新场景',
-                caseId: item.id,
-                sectionId: s.id,
-                samples: { ...selection.samples },
-                hidden: false,
-                steps: [],
-              })
-          }, '添加场景')
-        "
-        >添加场景</DButton
-      >
     </template>
   </aside>
 </template>

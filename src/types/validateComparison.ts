@@ -93,6 +93,8 @@ export function validateComparison(
     )
   }
   for (const scene of content.scenes) {
+    if (scene?.layout !== undefined && !['general', 'listening'].includes(scene.layout))
+      return fail()
     if (scene?.appearance !== undefined && !validAppearance(scene.appearance)) return fail()
     if (
       !isPlainObject(scene) ||
