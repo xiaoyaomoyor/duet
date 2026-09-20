@@ -8,6 +8,7 @@
  * 任何来源不明的素材，而画面又是真的。
  */
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { createFromTemplate } from './helpers'
 
 const OUT = 'docs/screenshots'
 
@@ -121,8 +122,7 @@ test('生成发布用截屏', async ({ page }) => {
 
   // —— 1. 建一份空白对比，把两侧工具设成真实品牌 ——
   await page.goto('/')
-  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
-  await page.getByRole('main').getByRole('button', { name: /空白对比/ }).click()
+  await createFromTemplate(page, /空白对比/)
   await expect(page.locator('.canvas')).toBeVisible()
 
   await pickTool(page, 'left', 'DeepSeek', 'V3')

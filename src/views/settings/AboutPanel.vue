@@ -83,6 +83,11 @@ async function onInstall(): Promise<void> {
       <span>{{ t(item.labelKey) }}</span>
     </li>
   </ul>
+  <h4 class="about__subheading">{{ t('workspace.developer') }}</h4>
+  <RouterLink class="install-btn" :to="{ name: 'design-reference' }">{{
+    t('workspace.design')
+  }}</RouterLink>
+  <p class="install-hint">{{ t('workspace.designDescription') }}</p>
 </template>
 
 <style scoped>

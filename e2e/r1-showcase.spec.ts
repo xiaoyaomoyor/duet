@@ -105,7 +105,7 @@ for (const theme of ['墨色', '纸白']) {
   test(`R1 ${theme} 的 S/M/L 窗口、验证、焦点恢复`, async ({ page }, info) => {
     await open(page)
     await page.getByRole('button', { name: theme, exact: true }).click()
-    await page.getByRole('button', { name: '组件规范', exact: true }).click()
+    await page.evaluate(() => { location.hash = '/settings/development/design' })
     const launcher = page.getByRole('button', { name: /表单窗口 · M/ })
     await launcher.click()
     const dialog = page.getByRole('dialog')
@@ -128,7 +128,7 @@ for (const theme of ['墨色', '纸白']) {
       await page.keyboard.press('Escape')
       await expect(entry).toBeFocused()
     }
-    await page.getByRole('button', { name: '场景样板', exact: true }).click()
+    await page.locator('.topbar').getByRole('link', { name: '样板间', exact: true }).click()
     await expect(page.getByRole('heading', { name: '修改后的试听标题' })).toBeVisible()
   })
 }
@@ -178,11 +178,11 @@ test('R1 从现有项目进入并返回，不改动项目内容', async ({ page 
   await expect(page.locator('.canvas').getByText('工具 A', { exact: true })).toBeVisible()
   await expect(page.locator('.canvas').getByText('工具 B', { exact: true })).toBeVisible()
   const content = await page.locator('.canvas').innerText()
-  await page.getByRole('link', { name: '展示样板', exact: true }).click()
+  await page.getByRole('link', { name: '样板间', exact: true }).click()
   await expect(page.locator('.showcase__topbar')).toBeVisible()
   await page.keyboard.press('Control+z')
   await page.keyboard.press('Control+e')
-  await page.locator('.showcase__brand').click()
+  await page.locator('.showcase__heading').getByRole('link', { name: '返回工作区' }).click()
   await expect(page).toHaveURL(/#\/p\/[^/]+$/)
   await expect.poll(() => page.locator('.canvas').innerText()).toBe(content)
 })
@@ -190,7 +190,7 @@ test('R1 从现有项目进入并返回，不改动项目内容', async ({ page 
 test('R1 英文五场景保持版式，干净画面的方向键与 Escape 可用', async ({ page }, info) => {
   await page.goto('/#/settings/language')
   await page.getByRole('button', { name: 'English' }).click()
-  await page.getByRole('link', { name: 'Design showcase', exact: true }).click()
+  await page.getByRole('link', { name: 'Sample gallery', exact: true }).click()
   await page.getByRole('button', { name: 'Clean view', exact: true }).click()
   await page.locator('.stage-frame__title').click()
   await page.keyboard.press('ArrowLeft')
@@ -212,14 +212,14 @@ test('R1 英文五场景保持版式，干净画面的方向键与 Escape 可用
 
 test('R1 编辑超长文字后自动转为完整阅读布局', async ({ page }, info) => {
   await open(page)
-  await page.getByRole('button', { name: '组件规范', exact: true }).click()
+  await page.evaluate(() => { location.hash = '/settings/development/design' })
   await page.getByRole('button', { name: /扩展编辑器 · L/ }).click()
   const title = '给清晨留一点空间，用完整的作品名称和版本信息描述这一次试听。'.repeat(3)
   const note = '观察记录应当完整展示；文字增多时，让内容自然展开。'.repeat(12)
   await page.getByRole('textbox', { name: '作品名称' }).fill(title)
   await page.getByRole('textbox', { name: '观察记录' }).fill(note)
   await page.getByRole('button', { name: '应用到样板' }).click()
-  await page.getByRole('button', { name: '场景样板', exact: true }).click()
+  await page.locator('.topbar').getByRole('link', { name: '样板间', exact: true }).click()
   await expect(page.locator('.stage-frame')).toHaveClass(/stage-frame--reading/)
   await expect(page.locator('.stage-media').first()).toContainText(note)
   const gap = await page

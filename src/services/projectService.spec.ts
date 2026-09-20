@@ -22,9 +22,9 @@ describe('createProject', () => {
   it('按模板创建，标题与颜色来自模板', () => {
     const project = createProject({ name: '音乐对比', templateId: 'music' })
     expect(project.title).toBe('音乐对比')
-    // v0.5.0 起模板多一行「标题」（工具名卡片变成了普通模块）
-    expect(project.sheet.rows).toHaveLength(5)
-    expect(project.sheet.sides[0]?.accent).toBe(music.accent[0])
+    expect(project.workspace).toBe('modern')
+    expect(project.sheet.rows).toHaveLength(6)
+    expect(project.sheet.sides[0]?.accent).toBe(getTemplate('stage-music')!.accent[0])
   })
 
   it('模板 id 非法时回退到空白项目（不抛异常）', () => {
@@ -43,7 +43,7 @@ describe('createProject', () => {
   })
 
   it('默认标题可用', () => {
-    expect(createProject().title).toBe('未命名对比')
+    expect(createProject().title).toBe('未命名舞台')
   })
 })
 

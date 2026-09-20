@@ -5,7 +5,9 @@
  */
 import { showcaseEn } from './showcase'
 import { studioEn } from './studio'
+import { workspaceEn } from './workspace'
 export default {
+  workspace: workspaceEn,
   studio: studioEn,
   showcase: showcaseEn,
   app: {
@@ -51,7 +53,7 @@ export default {
   },
 
   nav: {
-    compare: 'Compare',
+    compare: 'Stages',
     settings: 'Settings',
     pages: 'Pages',
     toggleSidebar: 'Toggle project list',
@@ -67,9 +69,9 @@ export default {
   },
 
   sidebar: {
-    projects: 'Projects',
-    newProject: 'New comparison',
-    searchPlaceholder: 'Search projects…',
+    projects: 'Stages',
+    newProject: 'New stage',
+    searchPlaceholder: 'Search stages…',
     pinned: 'Pinned',
     recent: 'Recent',
     noProjects: 'No comparisons yet',
@@ -249,7 +251,7 @@ export default {
     appearance: 'Appearance',
     theme: 'Theme',
     themeHint:
-      'The workspace uses Ink / Paper; each stage project keeps its own theme. Violet applies to the compatibility canvas.',
+      'The workspace uses Ink / Paper; each stage project keeps its own theme. Violet applies to the legacy workspace.',
     themeSystem: 'Follow system',
     themeDark: 'Dark',
     themeLight: 'Light',

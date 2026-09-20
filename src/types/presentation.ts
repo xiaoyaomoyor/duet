@@ -56,6 +56,7 @@ export interface PresentationRuntime extends ContentSelection {
   transportState: 'paused' | 'playing'
 }
 export interface MigrationSnapshot {
+  appearance?: AppearancePatch
   schemaVersion: number
   sheet: Sheet
   comparison?: ComparisonContent

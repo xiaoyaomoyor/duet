@@ -15,7 +15,7 @@ export const APP = {
   taglineZh: '让不同工具，同台演奏同一道题。',
   taglineEn: 'Same prompt. Multiple tools. One stage.',
   description: '专注内容横向对比的本地优先 Web 应用',
-  version: '0.10.0',
+  version: '0.11.0',
   /** 工程文件扩展名 */
   fileExt: 'duet',
   /** 工程文件 MIME（用于分享/拖拽识别） */

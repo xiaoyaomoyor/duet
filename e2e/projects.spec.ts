@@ -1,3 +1,4 @@
+import { createFromTemplate } from './helpers'
 import { expect, test, type Page } from '@playwright/test'
 
 /**
@@ -13,11 +14,7 @@ import { expect, test, type Page } from '@playwright/test'
  * M7 起模板卡片只在主区渲染（侧栏的 ＋ 会先把主区切回画廊），
  * 因此不再需要"限定在 <aside> 内"那层防 strict mode 的保护。
  */
-async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
-  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
-  await page.getByRole('main').getByRole('button', { name }).click()
-  await expect(page.locator('.canvas')).toBeVisible()
-}
+
 
 /** 打开侧栏某个项目的右键菜单 */
 async function openItemMenu(page: Page, title: string): Promise<void> {
@@ -96,7 +93,7 @@ test.describe('M1 项目生命周期', () => {
     await expect(page.locator('.canvas')).toBeVisible()
 
     // 侧栏中两个项目都还在（关闭标签 ≠ 删除项目）
-    await expect(page.getByRole('complementary').getByText('共 2 个项目')).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('共 2 个舞台')).toBeVisible()
   })
 
   test('删除项目：危险操作需二次确认，且可撤销', async ({ page }) => {
@@ -113,11 +110,11 @@ test.describe('M1 项目生命周期', () => {
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: '删除' }).click()
 
-    await expect(page.getByRole('complementary').getByText('共 0 个项目')).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('共 0 个舞台')).toBeVisible()
 
     // Toast 提供撤销（限定在 toast 内，避免与顶栏同名按钮冲突）
     await page.locator('.toast__action').click()
-    await expect(page.getByRole('complementary').getByText('共 1 个项目')).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('共 1 个舞台')).toBeVisible()
   })
 
   test('编辑工具卡片字段触发自动保存', async ({ page }) => {
@@ -289,7 +286,7 @@ test.describe('M1 设置面板', () => {
     await confirmButton.click()
 
     // 清空后回到空状态（路由会被带回 /compare）
-    await expect(page.getByRole('heading', { name: '从一场演示开始' })).toBeVisible()
-    await expect(page.getByRole('complementary').getByText('共 0 个项目')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '把一次比较，做成一场演示' })).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('共 0 个舞台')).toBeVisible()
   })
 })

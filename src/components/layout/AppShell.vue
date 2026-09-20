@@ -36,14 +36,14 @@ const ui = useUiStore()
 const settings = useSettingsStore()
 const project = useProjectStore()
 const studio = computed(
-  () =>
-    route.meta.layout === 'compare' && project.current?.sheet.layout.presentation?.enabled === true,
+  () => route.meta.layout === 'compare' && project.current?.workspace === 'modern',
 )
+const immersive = computed(() => studio.value || route.meta.layout === 'showcase')
 
 useGlobalShortcuts()
 
 /** 设置界面不显示对比标签页 */
-const showTabs = computed(() => route.meta.layout !== 'settings')
+const showTabs = computed(() => route.meta.layout === 'compare')
 
 /** 路由级别的标题（供侧栏与顶栏共享的语义区域使用） */
 const sectionTitle = computed(() => (showTabs.value ? t('nav.compare') : t('nav.settings')))
@@ -127,7 +127,10 @@ function onWindowResize(): void {
   applySidebarWidth(ui.sidebarWidth)
 }
 
-onMounted(() => window.addEventListener('resize', onWindowResize))
+onMounted(() => {
+  if (window.innerWidth < 700) ui.sidebarCollapsed = true
+  window.addEventListener('resize', onWindowResize)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResize)
   document.body.style.userSelect = ''
@@ -136,20 +139,21 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <RouterView v-if="route.meta.layout === 'showcase'" />
   <div
-    v-else
     class="shell"
     :class="{
       'shell--compact': ui.sidebarCollapsed,
-      'shell--studio': studio && !ui.studioProjects,
+      'shell--studio': immersive && !ui.studioProjects,
     }"
   >
-    <TopBar class="shell__topbar" :inert="studio && project.current?.ui.mode === 'present'" />
+    <TopBar
+      class="shell__topbar"
+      :inert="ui.showcaseClean || (studio && project.current?.ui.mode === 'present')"
+    />
 
     <ProjectSidebar
-      v-show="!studio || ui.studioProjects"
-      :inert="studio && project.current?.ui.mode === 'present'"
+      v-show="!immersive || ui.studioProjects"
+      :inert="ui.showcaseClean || (studio && project.current?.ui.mode === 'present')"
       class="shell__sidebar"
       :aria-label="sectionTitle"
     />
@@ -161,7 +165,7 @@ onBeforeUnmount(() => {
     <div
       v-if="
         !ui.sidebarCollapsed &&
-        (!studio || (ui.studioProjects && project.current?.ui.mode !== 'present'))
+        (!immersive || (ui.studioProjects && (!studio || project.current?.ui.mode !== 'present')))
       "
       class="shell__resizer u-split u-split--v"
       role="separator"
@@ -181,7 +185,7 @@ onBeforeUnmount(() => {
     />
 
     <main class="shell__main">
-      <TabBar v-if="showTabs && !studio" />
+      <TabBar v-if="showTabs && !studio && project.openIds.length" />
       <div class="shell__content u-scroll-y">
         <RouterView />
       </div>

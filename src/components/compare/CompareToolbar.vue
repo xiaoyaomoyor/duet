@@ -23,24 +23,6 @@ import { useProjectImport } from '@/composables/useProjectImport'
 const { t } = useI18n()
 const project = useProjectStore()
 const ui = useUiStore()
-async function upgrade() {
-  if (!project.current) return
-  if (project.current.sheet.layout.presentation) {
-    project.patchLayout({
-      presentation: { ...project.current.sheet.layout.presentation, enabled: true },
-    })
-    return
-  }
-  await project.flush()
-  const copy = await project.duplicate(project.current.id)
-  if (!copy.ok) {
-    ui.notify(t('studio.upgradeError'), 'danger')
-    return
-  }
-  project.patchLayout({ presentation: { enabled: true, theme: 'ink' } })
-  await project.flush()
-  ui.notify(t('studio.upgraded'), 'success')
-}
 const { setInput, importing, accept, triggerImport, onFilePicked } = useProjectImport()
 
 const saveState = computed<'saved' | 'saving' | 'dirty'>(() => {
@@ -70,9 +52,6 @@ const saveLabel = computed(() =>
     </span>
 
     <div class="compare-toolbar__actions">
-      <button class="compare-toolbar__btn" type="button" @click="upgrade">
-        {{ t(project.current?.sheet.layout.presentation ? 'studio.stage' : 'studio.upgrade') }}
-      </button>
       <button
         class="compare-toolbar__btn"
         type="button"

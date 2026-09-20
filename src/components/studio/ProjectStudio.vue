@@ -682,14 +682,6 @@ function theme(value: 'ink' | 'paper') {
               <option value="paper">{{ t('studio.paper') }}</option>
             </select></label
           ><DButton compact tone="quiet" @click="theme('ink')">{{ t('studio.restore') }}</DButton
-          ><DButton
-            v-if="project.sheet.sides.length === 2"
-            compact
-            tone="quiet"
-            @click="
-              store.patchLayout({ presentation: { enabled: false, theme: comparison.theme } })
-            "
-            >{{ t('studio.compatibility') }}</DButton
           >
         </div>
       </nav>

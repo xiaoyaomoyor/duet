@@ -76,7 +76,7 @@ describe('R5 appearance inheritance and portable presets', () => {
     const p = createProject({ templateId: 'stage-music' })
     p.schemaVersion = 10
     const upgraded = migrateProject(p)
-    expect(upgraded.schemaVersion).toBe(11)
+    expect(upgraded.schemaVersion).toBe(12)
     expect(upgraded.migrationSnapshot?.schemaVersion).toBe(10)
     expect(migrateProject(upgraded)).toEqual(upgraded)
     expect(validateProject(upgraded).ok).toBe(true)

@@ -11,6 +11,12 @@ export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     {
+      path: '/settings/development/design',
+      name: 'design-reference',
+      component: () => import('@/views/ShowcaseView.vue'),
+      meta: { layout: 'settings' },
+    },
+    {
       path: '/showcase',
       name: 'showcase',
       component: () => import('@/views/ShowcaseView.vue'),

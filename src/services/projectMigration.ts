@@ -10,16 +10,23 @@ import {
 } from '@/db/schema'
 import { withComparison } from './comparisonContent'
 import { SCHEMA_VERSION } from '@/types/project'
+import { legacyRestrictions } from './workspace'
 
 /** Same pure migration for imports and IDB; all writes happen after validation. */
 export function migrateProject(project: Project): Project {
+  const workspace =
+    project.workspace ??
+    (project.sheet.layout.presentation?.enabled || legacyRestrictions(project).length
+      ? 'modern'
+      : 'legacy')
   if (project.schemaVersion >= 9) {
     const p = deepClone(withComparison(project))
     p.schemaVersion = SCHEMA_VERSION
+    p.workspace = workspace
     p.sheet.sides.forEach((s, n) => {
       s.catalogueLabel ??= String.fromCharCode(65 + n)
     })
-    if (p.sheet.sides.length > 2)
+    if (project.schemaVersion < 12 && p.sheet.sides.length > 2)
       p.sheet.layout.presentation = {
         enabled: true,
         theme: p.sheet.layout.presentation?.theme ?? 'ink',
@@ -29,6 +36,7 @@ export function migrateProject(project: Project): Project {
         schemaVersion: project.schemaVersion,
         sheet: deepClone(project.sheet),
         ...(project.comparison ? { comparison: deepClone(project.comparison) } : {}),
+        ...(project.appearance ? { appearance: deepClone(project.appearance) } : {}),
       }
     return p
   }
@@ -51,7 +59,7 @@ export function migrateProject(project: Project): Project {
   if (p.schemaVersion < 7) p.sheet.rows = withTitleRow(p.sheet.rows) as Row[]
   if (p.schemaVersion < 8) layout = withoutColumnRatio(layout)
   p.sheet.layout = layout as unknown as LayoutConfig
-  const result = { ...withComparison(p), migrationSnapshot: snapshot }
+  const result = { ...withComparison(p), workspace, migrationSnapshot: snapshot }
   result.sheet.sides.forEach((s, n) => {
     s.catalogueLabel ??= String.fromCharCode(65 + n)
   })

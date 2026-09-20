@@ -125,9 +125,9 @@ async function inPresentView<T>(
   const previousExport = ui.presentationExport
   const previousStep = ui.presentationCurrentStep
   ui.presentationCurrentStep = !report && currentStep.value
-  if (current.sheet.layout.presentation?.enabled)
+  if (current.workspace === 'modern')
     ui.presentationExport = report ? 'report' : 'scene'
-  const needsSwitch = previousMode !== 'present' && !current.sheet.layout.presentation?.enabled
+  const needsSwitch = previousMode !== 'present' && current.workspace === 'legacy'
 
   if (needsSwitch) store.setMode('present')
   try {
@@ -205,6 +205,7 @@ async function exportMigrationSnapshot() {
       comparison: _comparison,
       migrationSnapshot: _snapshot,
       appearance: _appearance,
+      workspace: _workspace,
       ...original
     } = p
     const legacy = {
@@ -212,6 +213,7 @@ async function exportMigrationSnapshot() {
       schemaVersion: snapshot.schemaVersion,
       sheet: snapshot.sheet,
       ...(snapshot.comparison ? { comparison: snapshot.comparison } : {}),
+      ...(snapshot.appearance ? { appearance: snapshot.appearance } : {}),
     }
     const result = await exportDuet([legacy], { embedMedia: true })
     if (!result.ok) {
@@ -274,7 +276,7 @@ async function doExportHtml(): Promise<void> {
   warnings.value = []
   progress.value = t('export.exporting')
   try {
-    if (portable.value && current.comparison && current.sheet.layout.presentation?.enabled) {
+    if (portable.value && current.comparison && current.workspace === 'modern') {
       if (!embedMedia.value) {
         warnings.value = [
           '演示网页需要内嵌媒体才能离线切换。请开启内嵌媒体，或取消“包含作品切换与步骤”。',
@@ -360,14 +362,14 @@ useModalFocus(dialogRoot, close)
           </span>
         </label>
 
-        <label v-if="project?.sheet.layout.presentation?.enabled" class="option">
+        <label v-if="project?.workspace === 'modern'" class="option">
           <input v-model="reportExport" type="checkbox" :disabled="busy" />
           <span class="option__text"
             ><span class="option__label">{{ t('studio.reportExport') }}</span
             ><span class="option__hint">{{ t('studio.reportExportHint') }}</span></span
           >
         </label>
-        <label v-if="project?.sheet.layout.presentation?.enabled" class="option"
+        <label v-if="project?.workspace === 'modern'" class="option"
           ><input v-model="portable" type="checkbox" :disabled="busy" /><span class="option__text"
             ><span class="option__label">网页包含作品切换与演示步骤</span
             ><span class="option__hint"
@@ -376,7 +378,7 @@ useModalFocus(dialogRoot, close)
             ></span
           ></label
         >
-        <label v-if="project?.sheet.layout.presentation?.enabled && !reportExport" class="option"
+        <label v-if="project?.workspace === 'modern' && !reportExport" class="option"
           ><input v-model="currentStep" type="checkbox" :disabled="busy" /><span
             class="option__text"
             ><span class="option__label">图片只保留当前步骤</span

@@ -1,11 +1,11 @@
 export const showcaseZh = {
-  entry: '展示样板',
+  entry: '样板间',
   back: '返回工作区',
   title: '把比较，变成一场演出。',
   subtitle: '试听舞台 × 数据排版',
-  edition: 'DESIGN STUDY / 01',
+  edition: 'SAMPLE STAGE / 01',
   preview: '场景样板',
-  system: '组件规范',
+  system: '设计规范',
   ink: '墨色',
   paper: '纸白',
   clean: '干净画面',
@@ -137,15 +137,15 @@ export const showcaseZh = {
   neutralDescription: '添加一段音频，让这份比较从聆听开始。',
   structure: '展示结构',
   ratio: '16:9 · 自适应舞台',
-  footer: 'R1 视觉样板 · 项目接入将在 R2 完成',
+  footer: '试听与排版示例。此页修改仅用于预览；制作评测请新建舞台。',
 }
 
 export const showcaseEn: typeof showcaseZh = {
-  entry: 'Design showcase',
+  entry: 'Sample gallery',
   back: 'Back to workspace',
   title: 'Make comparison a performance.',
   subtitle: 'A listening stage. An editorial eye.',
-  edition: 'DESIGN STUDY / 01',
+  edition: 'SAMPLE STAGE / 01',
   preview: 'Scenes',
   system: 'Components',
   ink: 'Ink',
@@ -289,5 +289,5 @@ export const showcaseEn: typeof showcaseZh = {
   neutralDescription: 'Add audio and let the comparison begin with listening.',
   structure: 'Presentation structure',
   ratio: '16:9 · adaptive stage',
-  footer: 'R1 design study · project integration follows in R2',
+  footer: 'Listening and layout examples. Changes here are temporary; create a stage to make your own review.',
 }

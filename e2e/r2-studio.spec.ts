@@ -20,9 +20,11 @@ test('R2 create, edit, undo, theme persistence and compatibility view', async ({
   await expect(page.locator('.studio__project small')).toHaveText('已保存')
   await page.reload()
   await expect(page.locator('[data-present-root]')).toHaveAttribute('data-design-theme', 'paper')
-  await page.getByRole('button', { name: '兼容画布', exact: true }).click()
+  await page.getByTestId('stage-menu').click()
+  await page.getByTestId('workspace-legacy').click()
   await expect(page.locator('.canvas')).toBeVisible()
-  await page.getByRole('button', { name: '回到舞台' }).click()
+  await page.getByTestId('stage-menu').click()
+  await page.getByTestId('workspace-modern').click()
   await expect(page.locator('.studio')).toBeVisible()
 })
 test('R2 playback is exclusive, stable across presentation, stopped on navigation; keyboard skips empty/hidden scenes', async ({
@@ -119,17 +121,19 @@ test('R2 HTML exports the entire report and plays offline; project file round-tr
   )
   await fresh.close()
 })
-test('R2 stage upgrade duplicates the legacy project and leaves its original layout intact', async ({
+test('W1 legacy upgrade switches in place and keeps its original layout intact', async ({
   page,
 }) => {
   await importFixture(page, studioFixture(false))
   const original = page.url()
-  await page.getByRole('button', { name: '另存舞台副本' }).click()
+  await page.getByTestId('stage-menu').click()
+  await page.getByTestId('workspace-modern').click()
   await expect(page.locator('.studio')).toBeVisible()
-  expect(page.url()).not.toBe(original)
-  await page.goto(original)
+  expect(page.url()).toBe(original)
+  await page.getByTestId('stage-menu').click()
+  await page.getByTestId('workspace-legacy').click()
   await expect(page.locator('.canvas')).toBeVisible()
-  await expect(page.getByRole('button', { name: '另存舞台副本' })).toBeVisible()
+  await expect(page.getByTestId('stage-menu')).toHaveText('旧版工作区')
 })
 
 test('R2 PNG respects scene/report scope and restores reading view after exporting', async ({

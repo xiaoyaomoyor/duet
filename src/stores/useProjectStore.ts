@@ -40,6 +40,7 @@ import type {
   Project,
   Row,
   SideId,
+  WorkspaceKind,
 } from '@/types/project'
 
 /** 标签页同时打开数量的软上限（超出时自动关闭最久未使用的） */
@@ -60,6 +61,7 @@ export const useProjectStore = defineStore('project', () => {
   )
   const openIds = ref<string[]>([])
   const saving = ref(false)
+  const switchingWorkspace = ref(false)
   const lastSavedAt = ref<number | null>(null)
   const lastError = ref<string | null>(null)
   /** 有未落盘的改动 */
@@ -95,9 +97,12 @@ export const useProjectStore = defineStore('project', () => {
       // 防抖间隔每次读取设置，因此改设置立刻生效，无需重建句柄
       debounceMs: () => settings.settings.autosaveDebounceMs,
       onSaved(saved) {
-        lastSavedAt.value = Date.now()
-        dirty.value = false
-        saving.value = false
+        if (current.value?.id === saved.id && current.value.updatedAt === saved.updatedAt) {
+          lastSavedAt.value = Date.now()
+          dirty.value = false
+          saving.value = false
+          lastError.value = null
+        }
         // 列表中的标题/更新时间需要同步刷新
         projects.upsert(saved)
       },
@@ -128,17 +133,59 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   /** 立即落盘（手动保存、切换项目、关闭标签页前调用） */
-  async function flush(): Promise<void> {
-    if (!current.value) return
-    const result = await persistProject(current.value)
+  async function flush(): Promise<Result<void, string>> {
+    if (!current.value) return ok(undefined)
+    // Drain queued writes before the explicit save, so an older debounce cannot overwrite it.
+    await autosave?.flush()
+    const snapshot = current.value
+    if (!snapshot) return ok(undefined)
+    const result = await persistProject(snapshot)
     if (result.ok) {
-      lastSavedAt.value = Date.now()
-      dirty.value = false
+      if (current.value === snapshot) {
+        lastSavedAt.value = Date.now()
+        dirty.value = false
+        lastError.value = null
+      }
       projects.upsert(result.value)
     } else {
       lastError.value = result.error
     }
     saving.value = false
+    return result.ok ? ok(undefined) : err(result.error)
+  }
+
+  /** Persist before mounting another workspace; failed writes leave the current editor intact. */
+  async function switchWorkspace(workspace: WorkspaceKind): Promise<Result<Project, string>> {
+    if (!current.value) return err('当前没有打开的舞台')
+    if (switchingWorkspace.value) return err('正在切换工作区')
+    if (current.value.workspace === workspace) return ok(current.value)
+    const checked = applyCommandResult(current.value, { t: 'workspace/set', workspace })
+    if (!checked.ok) return checked
+    switchingWorkspace.value = true
+    try {
+      const saved = await flush()
+      if (!saved.ok) return saved
+      const before = current.value
+      if (!before) return err('舞台已关闭')
+      const applied = applyCommandResult(before, { t: 'workspace/set', workspace })
+      if (!applied.ok) return applied
+      const next = { ...applied.value, updatedAt: Math.max(Date.now(), before.updatedAt + 1) }
+      const persisted = await persistProject(next)
+      if (!persisted.ok) {
+        lastError.value = persisted.error
+        return persisted
+      }
+      current.value = next
+      contentSelection.value = undefined
+      history.record({ before, after: next, label: '切换工作区' })
+      projects.upsert(next)
+      lastSavedAt.value = Date.now()
+      dirty.value = false
+      lastError.value = null
+      return ok(next)
+    } finally {
+      switchingWorkspace.value = false
+    }
   }
 
   // ————————————————————————————————————————————————————————
@@ -155,6 +202,7 @@ export const useProjectStore = defineStore('project', () => {
     command: Command,
     options: { transient?: boolean; coalesceKey?: string; label?: string } = {},
   ): Result<Project, string> {
+    if (switchingWorkspace.value) return err('正在保存并切换工作区')
     const before = current.value
     if (!before) return err('当前没有打开的项目')
 
@@ -164,7 +212,10 @@ export const useProjectStore = defineStore('project', () => {
       return applied
     }
 
-    const next: Project = { ...applied.value, updatedAt: Date.now() }
+    const next: Project = {
+      ...applied.value,
+      updatedAt: Math.max(Date.now(), before.updatedAt + 1),
+    }
     current.value = next
 
     if (!options.transient) {
@@ -186,6 +237,7 @@ export const useProjectStore = defineStore('project', () => {
     commands: readonly Command[],
     options: { coalesceKey?: string; label?: string } = {},
   ): Result<Project, string> {
+    if (switchingWorkspace.value) return err('正在保存并切换工作区')
     const before = current.value
     if (!before) return err('当前没有打开的项目')
 
@@ -199,7 +251,7 @@ export const useProjectStore = defineStore('project', () => {
       working = applied.value
     }
 
-    const next: Project = { ...working, updatedAt: Date.now() }
+    const next: Project = { ...working, updatedAt: Math.max(Date.now(), before.updatedAt + 1) }
     current.value = next
 
     const record: Parameters<typeof history.record>[0] = {
@@ -215,6 +267,7 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function undo(): void {
+    if (switchingWorkspace.value) return
     const restored = history.undo()
     if (!restored || !current.value) return
     current.value = restored
@@ -222,6 +275,7 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function redo(): void {
+    if (switchingWorkspace.value) return
     const restored = history.redo()
     if (!restored || !current.value) return
     current.value = restored
@@ -234,6 +288,7 @@ export const useProjectStore = defineStore('project', () => {
 
   /** 新建项目并打开 */
   async function create(options: CreateProjectOptions = {}): Promise<Result<Project, string>> {
+    if (switchingWorkspace.value) return err('正在切换工作区')
     const project = createProject(options)
     const saved = await persistProject(project)
     if (!saved.ok) return saved
@@ -245,6 +300,7 @@ export const useProjectStore = defineStore('project', () => {
 
   /** 打开一个项目（已在标签页中则直接切换） */
   async function open(id: string): Promise<Result<Project, string>> {
+    if (switchingWorkspace.value) return err('正在切换工作区')
     // 切换前把当前项目落盘，避免"改了标题就切走"导致丢失
     if (current.value && current.value.id !== id) await flush()
 
@@ -285,6 +341,7 @@ export const useProjectStore = defineStore('project', () => {
 
   /** 关闭标签页（不删除项目） */
   async function closeTab(id: string): Promise<void> {
+    if (switchingWorkspace.value) return
     openIds.value = openIds.value.filter((item) => item !== id)
 
     if (current.value?.id === id) {
@@ -301,6 +358,7 @@ export const useProjectStore = defineStore('project', () => {
 
   /** 关闭全部标签页 */
   async function closeAllTabs(): Promise<void> {
+    if (switchingWorkspace.value) return
     await flush()
     openIds.value = []
     current.value = null
@@ -316,7 +374,7 @@ export const useProjectStore = defineStore('project', () => {
    * current 变成 null 之后，CompareView 会自己把路由退回 #/compare 并显示画廊。
    */
   async function startNewComparison(): Promise<void> {
-    await flush()
+    if (switchingWorkspace.value || !(await flush()).ok) return
     current.value = null
     history.clear()
     lastError.value = null
@@ -638,6 +696,8 @@ export const useProjectStore = defineStore('project', () => {
     current,
     openIds,
     saving,
+    switchingWorkspace,
+    switchWorkspace,
     lastSavedAt,
     lastError,
     dirty,

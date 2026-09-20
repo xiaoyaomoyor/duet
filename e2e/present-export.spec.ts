@@ -7,7 +7,7 @@
  *   3. 三种导出都能产出文件，且长图**不是空白**
  */
 import { expect, test, type Page } from '@playwright/test'
-import { contentRows, fillModuleText } from './helpers'
+import { createFromTemplate,  contentRows, fillModuleText  } from './helpers'
 
 const RED_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8Dwn4EIwDiqkL4KAcxhA/1kF5WvAAAAAElFTkSuQmCC'
@@ -15,11 +15,7 @@ const RED_PNG_BASE64 =
 /** 2×2 红点 PNG（M3 的用例暂不需要上传媒体，先留作后续扩展） */
 void RED_PNG_BASE64
 
-async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
-  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
-  await page.getByRole('main').getByRole('button', { name }).click()
-  await expect(page.locator('.canvas')).toBeVisible()
-}
+
 
 /** 进入演示视图（对比页工具条上的按钮） */
 async function enterPresent(page: Page): Promise<void> {
@@ -258,7 +254,7 @@ test.describe('M3 导出', () => {
     const confirmDialog = page.getByRole('alertdialog')
     await confirmDialog.locator('input[type="text"]').fill('DELETE')
     await confirmDialog.getByRole('button', { name: '清空所有数据' }).click()
-    await expect(page.getByRole('heading', { name: '从一场演示开始' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '把一次比较，做成一场演示' })).toBeVisible()
 
     // 导入刚导出的文件
     await page

@@ -57,6 +57,7 @@ async function startNew(): Promise<void> {
 async function openProject(id: string): Promise<void> {
   const result = await store.open(id)
   if (!result.ok) ui.notify(t('errors.projectLoad', { message: result.error }), 'danger')
+  else await router.push({ name: 'project', params: { projectId: id } })
 }
 
 const menuFor = ref<string | null>(null)

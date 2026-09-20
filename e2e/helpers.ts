@@ -13,6 +13,7 @@
  *   .card__actions                                      卡片右上角操作区
  */
 import { expect, type Locator, type Page } from '@playwright/test'
+import { legacyTemplate } from './fixtures/legacy'
 
 /**
  * 从模板新建一个对比。
@@ -23,8 +24,22 @@ import { expect, type Locator, type Page } from '@playwright/test'
  * 否则会同时命中侧栏和主区两组同名卡片（strict mode 报错）。
  */
 export async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
-  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
-  await page.getByRole('main').getByRole('button', { name }).click()
+  // Historical editor regressions import a real old project; W1 tests cover modern creation.
+  await page.getByRole('complementary').getByRole('button', { name: '新建舞台' }).click()
+  await page.locator('.gallery input[type=file]').setInputFiles({
+    name: 'legacy.duet',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        $format: 'duet-project',
+        schemaVersion: 8,
+        projects: [legacyTemplate(name)],
+        assets: [],
+        tools: [],
+        integrity: { missingAssets: [] },
+      }),
+    ),
+  })
   await expect(page.locator('.canvas')).toBeVisible()
 }
 
@@ -169,11 +184,7 @@ export interface FilePayload {
  *   blob URL 只有在资源已落库、并被 useResolvedMedia 解析出来之后才存在，
  *   因此它比"等固定毫秒数"可靠，也同时适用于图片 / 音频 / 视频。
  */
-export async function importMedia(
-  page: Page,
-  target: Locator,
-  file: FilePayload,
-): Promise<void> {
+export async function importMedia(page: Page, target: Locator, file: FilePayload): Promise<void> {
   const dialog = await openModuleEditor(page, target)
   await dialog.locator('input[type="file"]').first().setInputFiles(file)
 

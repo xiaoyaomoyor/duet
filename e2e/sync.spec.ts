@@ -7,7 +7,7 @@
  * 动效开关是否真的关掉了动效。
  */
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import {contentRows, fillModuleText, importMedia } from './helpers'
+import { createFromTemplate, contentRows, fillModuleText, importMedia  } from './helpers'
 
 /** 生成一段指定时长的静音 WAV（8kHz 单声道 16bit） */
 function silentWav(seconds: number): Buffer {
@@ -36,11 +36,7 @@ function silentWav(seconds: number): Buffer {
 const WAV_A = { name: 'a.wav', mimeType: 'audio/wav', buffer: silentWav(1.5) }
 const WAV_B = { name: 'b.wav', mimeType: 'audio/wav', buffer: silentWav(2.5) }
 
-async function createFromTemplate(page: Page, name: RegExp): Promise<void> {
-  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
-  await page.getByRole('main').getByRole('button', { name }).click()
-  await expect(page.locator('.canvas')).toBeVisible()
-}
+
 
 /**
  * 加一个「音频控制台」通用模块。

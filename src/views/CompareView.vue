@@ -190,7 +190,7 @@ function onPresentExit(): void {
     <div v-if="loading" class="compare__loading">{{ t('common.loading') }}</div>
 
     <ProjectStudio
-      v-else-if="store.current?.sheet.layout.presentation?.enabled"
+      v-else-if="store.current?.workspace === 'modern'"
       :project="store.current"
     />
     <template v-else-if="store.current">
@@ -255,7 +255,7 @@ function onPresentExit(): void {
 
   <!-- 演示视图：独立遮罩层（§9.2） -->
   <PresentOverlay
-    v-if="store.current && isPresent && !store.current.sheet.layout.presentation?.enabled"
+    v-if="store.current && isPresent && store.current.workspace === 'legacy'"
     :project="store.current"
     @exit="onPresentExit"
   />

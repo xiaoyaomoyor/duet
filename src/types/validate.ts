@@ -15,6 +15,7 @@ import { ok, err } from '@/lib/result'
 import { migrateProject } from '@/services/projectMigration'
 import { validAppearance } from './appearance'
 import { validateComparison } from './validateComparison'
+import { legacyRestrictions } from '@/services/workspace'
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -167,6 +168,12 @@ export function validateProject(value: unknown): Result<Project, string> {
   if (!isNonEmptyString(value.id)) return err('项目：缺少 id')
   if (typeof value.title !== 'string') return err('项目：title 必须是字符串')
   if (!isPlainObject(value.ui)) return err('项目：缺少 ui 状态')
+  if (
+    (value.schemaVersion >= 12 || value.workspace !== undefined) &&
+    value.workspace !== 'modern' &&
+    value.workspace !== 'legacy'
+  )
+    return err('项目：workspace 必须是 modern 或 legacy')
   if (value.appearance !== undefined && !validAppearance(value.appearance))
     return err('项目外观包含非法字段')
 
@@ -183,7 +190,8 @@ export function validateProject(value: unknown): Result<Project, string> {
       typeof snapshot.schemaVersion !== 'number' ||
       !Number.isInteger(snapshot.schemaVersion) ||
       snapshot.schemaVersion < 1 ||
-      snapshot.schemaVersion > 10 ||
+      snapshot.schemaVersion >= SCHEMA_VERSION ||
+      (snapshot.appearance !== undefined && !validAppearance(snapshot.appearance)) ||
       !validateSheet(snapshot.sheet).ok
     )
       return err('升级前快照损坏，无法保证恢复，请重新导入原始工程')
@@ -196,6 +204,8 @@ export function validateProject(value: unknown): Result<Project, string> {
 
   // 补齐可选字段，保证下游不必到处判空
   const project = migrateProject(value as unknown as Project)
+  if (project.workspace === 'legacy' && legacyRestrictions(project).length)
+    return err('旧版工作区无法完整编辑此舞台，请使用新版工作区')
   const comparison = validateComparison(project.comparison, project)
   if (!comparison.ok) return comparison
   return ok({

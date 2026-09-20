@@ -20,13 +20,12 @@ import { validateProject } from '@/types/validate'
 import { SCHEMA_VERSION } from '@/types/project'
 import { APP } from '@/app.config'
 import {
-  DEFAULT_ACCENT_PAIR,
   createBlankProject,
   getTemplate,
   instantiateTemplate,
   type AccentPair,
 } from './templateService'
-import type { Project } from '@/types/project'
+import type { Project, WorkspaceKind } from '@/types/project'
 import { withComparison, rekeyProject } from './comparisonContent'
 
 export { listProjects, getProject }
@@ -36,6 +35,7 @@ export { listProjects, getProject }
 // ——————————————————————————————————————————————————————————
 
 export interface CreateProjectOptions {
+  workspace?: WorkspaceKind
   name?: string
   templateId?: string
   accent?: AccentPair
@@ -44,13 +44,22 @@ export interface CreateProjectOptions {
 
 /** 由模板创建一个项目（模板 id 非法时回退到空白模板） */
 export function createProject(options: CreateProjectOptions = {}): Project {
-  const name = options.name ?? '未命名对比'
-  const template = options.templateId ? getTemplate(options.templateId) : undefined
-  const accent = options.accent ?? DEFAULT_ACCENT_PAIR
+  const name = options.name ?? '未命名舞台'
+  const workspace = options.workspace ?? 'modern'
+  const templateId =
+    options.templateId && workspace === 'modern' && !options.templateId.startsWith('stage-')
+      ? `stage-${options.templateId}`
+      : options.templateId
+  const template = templateId ? getTemplate(templateId) : undefined
 
-  if (!template) return withComparison(createBlankProject(name, accent))
+  if (!template) return withComparison(createBlankProject(name, options.accent, workspace))
 
-  const instantiateOptions: { name: string; accent: AccentPair; now?: number } = { name, accent }
+  const instantiateOptions = {
+    name,
+    workspace,
+    accent: options.accent ?? template.accent,
+    ...(options.now !== undefined ? { now: options.now } : {}),
+  }
   if (options.now !== undefined) instantiateOptions.now = options.now
   return withComparison(instantiateTemplate(template, instantiateOptions))
 }
@@ -162,13 +171,14 @@ export function createAutosave(options: AutosaveOptions = {}): AutosaveHandle {
     async flush() {
       debounced.flush()
       // flush 触发的是异步 persist，等待它完成
-      await waitFor(() => !saving)
+      // A slow IndexedDB transaction must not let a later workspace write overtake it.
+      while (saving || latest !== null) await waitFor(() => !saving && latest === null)
     },
     dispose() {
       debounced.cancel()
       unbind()
     },
-    hasPending: () => latest !== null || debounced.pending(),
+    hasPending: () => latest !== null || debounced.pending() || saving,
     debounceMs: resolveDebounce,
   }
 }

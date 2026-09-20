@@ -21,6 +21,7 @@ import {
   type Sheet,
   type Side,
   type SideId,
+  type WorkspaceKind,
 } from '@/types'
 
 export type AccentPair = [string, string]
@@ -79,44 +80,58 @@ export interface ProjectTemplate {
 
 /** 内置模板（不落库；用户自建模板走 templates 存储） */
 export const BUILTIN_TEMPLATES: readonly ProjectTemplate[] = [
-  ...(['music', 'image', 'generic'] as const).map((kind): ProjectTemplate => ({
+  ...(['music', 'image', 'video', 'generic', 'blank'] as const).map((kind): ProjectTemplate => ({
     id: `stage-${kind}`,
     category: kind,
     nameKey: `studio.${kind}Name`,
     descKey: `studio.${kind}Desc`,
     accent: ['#d9bd91', '#9bc6bc'],
-    fields: [
-      {
-        kind: 'full',
-        label: 'studio.prompt',
-        field: { type: 'text', titleKey: 'modules.text', props: { size: 'large' } },
-      },
-      {
-        kind: 'paired',
-        label:
-          kind === 'image'
-            ? 'studio.images'
-            : kind === 'music'
-              ? 'studio.works'
-              : 'studio.observations',
-        field: {
-          type: kind === 'music' ? 'audio' : kind === 'image' ? 'image' : 'text',
-          titleKey: '',
-          props: { fit: 'contain', ratio: '16/9' },
-        },
-      },
-      {
-        kind: 'paired',
-        label: 'studio.observations',
-        field: { type: kind === 'music' ? 'lyrics' : 'text', titleKey: '' },
-      },
-      { kind: 'paired', label: 'studio.dimensions', field: { type: 'keyValue', titleKey: '' } },
-      {
-        kind: 'full',
-        label: 'studio.conclusion',
-        field: { type: 'text', titleKey: '', props: { size: 'large' } },
-      },
-    ],
+    fields:
+      kind === 'blank'
+        ? []
+        : [
+            {
+              kind: 'full',
+              label: 'studio.prompt',
+              field: { type: 'text', titleKey: 'modules.text', props: { size: 'large' } },
+            },
+            {
+              kind: 'paired',
+              label:
+                kind === 'image'
+                  ? 'studio.images'
+                  : kind === 'music'
+                    ? 'studio.works'
+                    : 'studio.observations',
+              field: {
+                type:
+                  kind === 'music'
+                    ? 'audio'
+                    : kind === 'image'
+                      ? 'image'
+                      : kind === 'video'
+                        ? 'video'
+                        : 'text',
+                titleKey: '',
+                props: { fit: 'contain', ratio: '16/9' },
+              },
+            },
+            {
+              kind: 'paired',
+              label: 'studio.observations',
+              field: { type: kind === 'music' ? 'lyrics' : 'text', titleKey: '' },
+            },
+            {
+              kind: 'paired',
+              label: 'studio.dimensions',
+              field: { type: 'keyValue', titleKey: '' },
+            },
+            {
+              kind: 'full',
+              label: 'studio.conclusion',
+              field: { type: 'text', titleKey: '', props: { size: 'large' } },
+            },
+          ],
   })),
   {
     id: 'music',
@@ -197,6 +212,7 @@ export function getTemplate(id: string): ProjectTemplate | undefined {
 }
 
 export interface InstantiateOptions {
+  workspace?: WorkspaceKind
   name: string
   accent?: AccentPair
   now?: number
@@ -213,6 +229,7 @@ export function instantiateTemplate(
 ): Project {
   const now = options.now ?? Date.now()
   const accent = options.accent ?? template.accent
+  const workspace = options.workspace ?? 'modern'
 
   const sideAId = uuid()
   const sideBId = uuid()
@@ -268,14 +285,13 @@ export function instantiateTemplate(
     rows,
     layout: {
       ...deepClone(DEFAULT_LAYOUT),
-      ...(template.id.startsWith('stage-')
-        ? { presentation: { enabled: true, theme: 'ink' as const } }
-        : {}),
+      ...(workspace === 'modern' ? { presentation: { enabled: true, theme: 'ink' as const } } : {}),
     },
   }
 
   return {
     id: uuid(),
+    workspace,
     schemaVersion: SCHEMA_VERSION,
     title: options.name,
     createdAt: now,
@@ -293,10 +309,14 @@ export function instantiateTemplate(
 }
 
 /** 创建一个不含任何行的空白项目 */
-export function createBlankProject(name: string, accent = DEFAULT_ACCENT_PAIR): Project {
-  const blank = BUILTIN_TEMPLATES.find((t) => t.id === 'blank')
+export function createBlankProject(
+  name: string,
+  accent?: AccentPair,
+  workspace: WorkspaceKind = 'modern',
+): Project {
+  const blank = BUILTIN_TEMPLATES.find((t) => t.id === 'stage-blank')
   if (blank) {
-    const project = instantiateTemplate(blank, { name, accent })
+    const project = instantiateTemplate(blank, { name, workspace, ...(accent ? { accent } : {}) })
     /*
      * 空白对比也保留「标题」行（v0.5.0）：工具名卡片现在是普通模块，
      * 连它一起清掉的话，新建的空白对比连"这是哪两个工具"都写不了。
@@ -306,7 +326,11 @@ export function createBlankProject(name: string, accent = DEFAULT_ACCENT_PAIR): 
   }
 
   // 理论上不会走到这里；保留兜底以避免非空断言
-  return instantiateTemplate(BUILTIN_TEMPLATES[0] as ProjectTemplate, { name, accent })
+  return instantiateTemplate(BUILTIN_TEMPLATES[0] as ProjectTemplate, {
+    name,
+    workspace,
+    ...(accent ? { accent } : {}),
+  })
 }
 
 /** 由模板字段创建一行（左右各一格，或单格跨两列） */

@@ -18,6 +18,7 @@ export function editParticipants(
     s.catalogueLabel ??= String.fromCharCode(65 + n)
   })
   if (command.t === 'participant/add') {
+    if (p.workspace === 'legacy') return err('请先切换到新版工作区，再添加对比对象')
     if (sides.length >= 6) return err('最多支持六个对比对象')
     const label = [...'ABCDEF'].find((l) => !sides.some((s) => s.catalogueLabel === l))!
     const id = uuid()
@@ -50,10 +51,7 @@ export function editParticipants(
       }
       c.entries[id] = { defaultSampleId: sample.id, samples: [sample] }
     }
-    p.sheet.layout.presentation = {
-      enabled: true,
-      theme: p.sheet.layout.presentation?.theme ?? 'ink',
-    }
+    p.workspace = 'modern'
   } else if (command.t === 'participant/reorder') {
     if (
       command.ids.length !== sides.length ||

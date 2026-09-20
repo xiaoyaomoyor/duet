@@ -50,7 +50,7 @@ export function useGlobalShortcuts(): void {
   const ui = useUiStore()
 
   function onKeydown(event: KeyboardEvent): void {
-    if (route.meta.layout === 'showcase') return
+    if (route.meta.layout === 'showcase' || route.name === 'design-reference') return
     if (hasOpenModal()) return
     const mod = event.ctrlKey || event.metaKey
     if (!mod || event.altKey) return

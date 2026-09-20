@@ -5,7 +5,9 @@
  */
 import { showcaseZh } from './showcase'
 import { studioZh } from './studio'
+import { workspaceZh } from './workspace'
 export default {
+  workspace: workspaceZh,
   studio: studioZh,
   showcase: showcaseZh,
   app: {
@@ -51,13 +53,13 @@ export default {
   },
 
   nav: {
-    compare: '对比',
+    compare: '舞台',
     settings: '设置',
     pages: '页面',
-    toggleSidebar: '折叠 / 展开项目列表',
-    collapseSidebar: '折叠项目列表',
-    expandSidebar: '展开项目列表',
-    resizeSidebar: '拖拽调整项目列表宽度（双击恢复默认）',
+    toggleSidebar: '折叠 / 展开舞台列表',
+    collapseSidebar: '折叠舞台列表',
+    expandSidebar: '展开舞台列表',
+    resizeSidebar: '拖拽调整舞台列表宽度（双击恢复默认）',
     switchToPresent: '进入演示视图',
     switchToEdit: '返回编辑视图',
     export: '导出',
@@ -67,15 +69,15 @@ export default {
   },
 
   sidebar: {
-    projects: '项目列表',
-    newProject: '新建对比',
-    searchPlaceholder: '搜索项目…',
+    projects: '舞台列表',
+    newProject: '新建舞台',
+    searchPlaceholder: '搜索舞台…',
     pinned: '置顶',
     recent: '最近',
-    noProjects: '还没有对比项目',
+    noProjects: '还没有舞台',
     noProjectsHint: '点左上角的「＋」，从模板开始',
-    emptySearch: '没有匹配的项目',
-    count: '共 {n} 个项目',
+    emptySearch: '没有匹配的舞台',
+    count: '共 {n} 个舞台',
     pin: '置顶',
     unpin: '取消置顶',
   },
@@ -245,7 +247,7 @@ export default {
     title: '设置',
     appearance: '外观',
     theme: '主题',
-    themeHint: '工作区使用墨色／纸白；舞台项目的风格独立保存。紫夜仅用于兼容画布。',
+    themeHint: '工作区使用墨色／纸白；舞台项目的风格独立保存。紫夜仅用于旧版工作区。',
     themeSystem: '跟随系统',
     themeDark: '暗',
     themeLight: '亮',
@@ -262,7 +264,7 @@ export default {
     autosaveDebounceHint: '数值越小越不易丢失，越大越省性能',
     editorShowEmptyModules: '编辑视图显示空模块',
     editorShowEmptyModulesHint: '关闭后，未填写内容的模块在编辑视图也会隐藏',
-    sidebarWidth: '项目列表宽度',
+    sidebarWidth: '舞台列表宽度',
     compareDefaults: '对比默认值',
     defaultAccent: '默认对比配色',
     defaultAccentHint: '新建项目时两侧的默认主题色',
@@ -505,7 +507,7 @@ export default {
     commandEmpty: '没有匹配结果',
     commandNewProject: '新建对比项目',
     commandOpenSettings: '打开设置',
-    commandToggleSidebar: '折叠 / 展开项目列表',
+    commandToggleSidebar: '折叠 / 展开舞台列表',
     commandUndo: '撤销',
     commandRedo: '重做',
     commandSectionProjects: '项目',

@@ -40,9 +40,9 @@ test.describe('应用外壳（M0）', () => {
     // 空状态与模板卡片
     // 注意：侧栏与主区各有一组模板卡片，断言必须限定在 <main> 内，否则会撞上 strict mode
     const main = page.getByRole('main')
-    await expect(page.getByRole('heading', { name: '从一场演示开始' })).toBeVisible()
-    await expect(main.getByRole('button', { name: /音乐对比/ })).toBeVisible()
-    await expect(main.getByRole('button', { name: /空白对比/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '把一次比较，做成一场演示' })).toBeVisible()
+    await expect(main.getByRole('button', { name: /音乐评测/ })).toBeVisible()
+    await expect(main.getByRole('button', { name: /空白舞台/ })).toBeVisible()
 
     // 三个主区都在
     await expect(page.getByRole('banner')).toBeVisible()

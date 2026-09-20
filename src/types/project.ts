@@ -18,7 +18,8 @@ import type { AppearancePatch } from './appearance'
  *   这是**破坏性**变更：旧 type 的实现已从注册表删除，
  *   不迁移就会命中"模块类型未注册"分支、表现为内容消失。
  */
-export const SCHEMA_VERSION = 11
+export const SCHEMA_VERSION = 12
+export type WorkspaceKind = 'modern' | 'legacy'
 
 // ——————————————————————————————————————————————————————————
 // 工具（生产源）
@@ -347,6 +348,8 @@ export interface ProjectUiState {
 }
 
 export interface Project {
+  /** Required after v12 normalization; optional only for historical input and fixtures. */
+  workspace?: WorkspaceKind
   appearance?: AppearancePatch
   /** v9 content. Optional only for in-memory legacy factories and fixtures before normalization. */
   comparison?: ComparisonContent

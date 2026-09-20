@@ -23,6 +23,7 @@ export const useUiStore = defineStore('ui', () => {
   // —— 布局 ——
   const sidebarCollapsed = ref(false)
   const studioProjects = ref(false)
+  const showcaseClean = ref(false)
   const inspectorOpen = ref(false)
   /** 侧栏宽度（px）；持久化值在 settings 中，这里只存拖拽过程中的实时值 */
   const sidebarWidth = ref<number>(APP.sidebar.defaultWidth)
@@ -120,6 +121,7 @@ export const useUiStore = defineStore('ui', () => {
   return {
     sidebarCollapsed,
     studioProjects,
+    showcaseClean,
     sidebarWidth,
     sidebarDragging,
     inspectorWidth,

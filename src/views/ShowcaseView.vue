@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { APP } from '@/app.config'
+import { useRoute } from 'vue-router'
+import { useUiStore } from '@/stores/useUiStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { createShowcaseStory, type ShowcaseFixture } from '@/data/showcaseStory'
 import { createShowcaseAudio } from '@/services/showcaseAudio'
@@ -16,13 +17,18 @@ import '@/styles/design.css'
 
 const { t } = useI18n()
 const project = useProjectStore()
+const route = useRoute()
+const ui = useUiStore()
 const themes: StageTheme[] = ['ink', 'paper']
 const scenes: SceneKind[] = ['brief', 'duet', 'observation', 'comparison', 'conclusion']
 const fixture = ref<ShowcaseFixture>('normal')
 const theme = ref<StageTheme>('ink')
 const scene = ref<SceneKind>('duet')
-const tab = ref<'preview' | 'system'>('preview')
+const tab = computed(() => (route.name === 'design-reference' ? 'system' : 'preview'))
 const clean = ref(false)
+watch(clean, (value) => {
+  ui.showcaseClean = value
+})
 const focusId = ref('sonora-demo')
 const dialog = ref<'audio' | 's' | 'm' | 'l' | null>(null)
 const uploadTarget = ref('sonora-demo')
@@ -78,12 +84,17 @@ onMounted(() => {
   document.addEventListener('visibilitychange', onVisibility)
 })
 onBeforeUnmount(() => {
+  ui.showcaseClean = false
   playback.pauseAll()
   for (const url of [...ownedUrls]) release(url)
   window.removeEventListener('keydown', onKeydown)
   document.removeEventListener('visibilitychange', onVisibility)
 })
 watch([scene, fixture, focusId, tab], () => playback.pauseAll())
+watch(tab, () => {
+  clean.value = false
+  dialog.value = null
+})
 function onVisibility(): void {
   if (document.hidden) playback.pauseAll()
 }
@@ -167,21 +178,11 @@ function restoreAudio(): void {
 <template>
   <div class="showcase" :class="{ 'showcase--clean': clean }" :data-design-theme="theme">
     <header v-show="!clean" class="showcase__topbar">
-      <RouterLink :to="returnPath" class="showcase__brand" :aria-label="t('showcase.back')"
-        ><span class="showcase__mark" aria-hidden="true"><i /><i /><i /></span
-        >{{ APP.nameEn.toLowerCase() }}<span class="showcase__brand-divider">/</span
-        ><small>{{ t('showcase.entry') }}</small></RouterLink
-      >
-      <div class="showcase__tabs" :aria-label="t('showcase.entry')">
-        <button
-          v-for="key in ['preview', 'system'] as const"
-          :key="key"
-          type="button"
-          :aria-pressed="tab === key"
-          @click="tab = key"
+      <div class="showcase__heading">
+        <h1>{{ t(tab === 'system' ? 'workspace.design' : 'showcase.entry') }}</h1>
+        <RouterLink :to="tab === 'system' ? '/settings/about' : returnPath"
+          >← {{ t(tab === 'system' ? 'workspace.backAbout' : 'showcase.back') }}</RouterLink
         >
-          {{ t(`showcase.${key}`) }}
-        </button>
       </div>
       <div class="showcase__themes" :aria-label="t('settings.theme')">
         <button
@@ -214,7 +215,7 @@ function restoreAudio(): void {
           </button>
         </nav>
         <div class="showcase__rail-foot">
-          <span class="showcase__rail-edition">R1 / 2026</span>
+          <span class="showcase__rail-edition">DUET / SAMPLES</span>
           <p>{{ t('showcase.footer') }}</p>
           <RouterLink :to="returnPath">← {{ t('showcase.back') }}</RouterLink>
         </div>
@@ -292,7 +293,10 @@ function restoreAudio(): void {
         </footer>
       </main>
     </div>
-    <main v-else><DesignSpecimen @window="openDialog" /></main>
+    <main v-else>
+      <p class="showcase__design-note">{{ t('workspace.designDescription') }}</p>
+      <DesignSpecimen @window="openDialog" />
+    </main>
     <div v-if="clean" class="showcase__clean-controls">
       <div>
         <DButton
@@ -409,8 +413,35 @@ function restoreAudio(): void {
 
 <style scoped>
 .showcase {
-  height: 100dvh;
+  min-height: 100%;
   overflow-y: auto;
+}
+.showcase--clean {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay, 100);
+  height: 100dvh;
+}
+.showcase__heading {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.showcase__heading h1 {
+  font-size: 16px;
+  font-weight: 500;
+}
+.showcase__heading a {
+  font-size: 12px;
+  color: var(--d-muted);
+}
+.showcase__design-note {
+  max-width: 1100px;
+  margin: 24px auto 0;
+  padding: 0 48px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--d-muted);
 }
 .showcase__topbar {
   display: flex;

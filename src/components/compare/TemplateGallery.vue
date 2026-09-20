@@ -27,14 +27,15 @@ const { setInput, importing, accept, triggerImport, onFilePicked } = useProjectI
 const creating = ref<string | null>(null)
 
 const cards = computed(() =>
-  BUILTIN_TEMPLATES.map((template) => ({
+  BUILTIN_TEMPLATES.filter((template) => template.id.startsWith('stage-')).map((template) => ({
     id: template.id,
     name: translate(template.nameKey),
     desc: translate(template.descKey),
-    accent: template.accent,
-    modules: template.fields.map(
-      (entry) => getModuleMeta(entry.field.type)?.titleKey ?? 'modules.text',
-    ),
+    modules: [
+      ...new Set(
+        template.fields.map((entry) => getModuleMeta(entry.field.type)?.titleKey ?? 'modules.text'),
+      ),
+    ],
   })),
 )
 
@@ -57,8 +58,8 @@ async function pick(templateId: string, name: string): Promise<void> {
   <section class="gallery">
     <header class="gallery__head">
       <span class="gallery__eyebrow">DUET / COMPARATIVE STUDIES</span>
-      <h2 class="gallery__title">{{ t('studio.templates') }}</h2>
-      <p class="gallery__desc">{{ t('compare.emptyDesc') }}</p>
+      <h2 class="gallery__title">{{ t('workspace.homeTitle') }}</h2>
+      <p class="gallery__desc">{{ t('workspace.homeDescription') }}</p>
       <RouterLink class="gallery__import" :to="{ name: 'showcase' }"
         ><AppIcon name="palette" :size="14" />{{ t('showcase.entry') }} →</RouterLink
       >
@@ -81,12 +82,13 @@ async function pick(templateId: string, name: string): Promise<void> {
       <li
         v-for="card in cards"
         :key="card.id"
-        :class="{ gallery__legacy: !card.id.startsWith('stage-') }"
+        :class="{ gallery__featured: card.id === 'stage-music' }"
       >
         <button
           class="gallery-card"
           type="button"
           :disabled="creating !== null"
+          :data-testid="`create-${card.id}`"
           @click="pick(card.id, card.name)"
         >
           <span
@@ -99,14 +101,10 @@ async function pick(templateId: string, name: string): Promise<void> {
             <span class="gallery-card__preview-pair"><i>A</i><i>B</i></span>
             <span class="gallery-card__preview-lines"><i /><i /><i /></span>
           </span>
-          <span
-            class="gallery-card__band"
-            :style="{
-              background: `linear-gradient(90deg, ${card.accent[0]}, ${card.accent[1]})`,
-            }"
-            aria-hidden="true"
-          />
           <span class="gallery-card__body">
+            <span v-if="card.id === 'stage-music'" class="gallery-card__recommended">{{
+              t('workspace.recommended')
+            }}</span>
             <span class="gallery-card__name">{{ card.name }}</span>
             <span class="gallery-card__desc">{{ card.desc }}</span>
             <span class="gallery-card__modules">
@@ -115,12 +113,13 @@ async function pick(templateId: string, name: string): Promise<void> {
               </span>
             </span>
           </span>
-          <span class="gallery-card__cta">
-            <AppIcon name="plus" :size="14" />
-          </span>
+          <span class="gallery-card__cta"
+            >{{ t('workspace.start') }} <span aria-hidden="true">↗</span></span
+          >
         </button>
       </li>
     </ul>
+    <p class="gallery__default">{{ t('workspace.defaultHint') }}</p>
   </section>
 </template>
 
@@ -137,7 +136,7 @@ async function pick(templateId: string, name: string): Promise<void> {
   padding: 24px;
   background: var(--d-bg);
   border-bottom: 1px solid var(--d-line);
-  aspect-ratio: 1.65;
+  height: 156px;
 }
 .gallery-card__preview-head {
   display: flex;
@@ -186,32 +185,23 @@ async function pick(templateId: string, name: string): Promise<void> {
   border-bottom: 1px solid var(--d-line);
   aspect-ratio: 2.2;
 }
-.gallery__legacy {
-  margin-top: 16px;
-}
-.gallery__legacy .gallery-card {
-  background: transparent;
-}
-.gallery__legacy .gallery-card__name {
-  font-size: 14px;
-}
-.gallery__legacy .gallery-card__modules {
-  display: none;
-}
 .gallery {
   max-width: 1160px;
-  padding: var(--sp-12) var(--sp-8);
+  padding: var(--sp-8);
   margin: 0 auto;
 }
 
 .gallery__head {
   margin-bottom: var(--sp-8);
-  text-align: center;
+  text-align: left;
 }
 
 .gallery__title {
   margin-bottom: var(--sp-2);
-  font-size: var(--fs-2xl);
+  font-family: var(--d-serif);
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 450;
+  line-height: 1.5;
 }
 
 .gallery__desc {
@@ -224,6 +214,7 @@ async function pick(templateId: string, name: string): Promise<void> {
   align-items: center;
   padding: var(--sp-2) var(--sp-4);
   margin-top: var(--sp-4);
+  margin-right: 12px;
   font-size: var(--fs-sm);
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
@@ -245,14 +236,55 @@ async function pick(templateId: string, name: string): Promise<void> {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-4);
 }
+.gallery__featured {
+  grid-column: span 2;
+}
+.gallery__grid > li {
+  min-width: 0;
+}
+.gallery__featured .gallery-card {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+}
+.gallery__featured .gallery-card__preview {
+  grid-row: span 2;
+  height: 100%;
+  aspect-ratio: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-bottom: 0;
+  border-right: 1px solid var(--d-line);
+}
+.gallery__featured .gallery-card__body {
+  justify-content: center;
+  padding: 28px;
+}
+.gallery__featured .gallery-card__cta {
+  padding: 0 28px 24px;
+  align-self: end;
+}
 @media (max-width: 1000px) {
   .gallery__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 600px) {
+  .gallery__featured {
+    grid-column: auto;
+  }
+  .gallery__featured .gallery-card {
+    display: flex;
+  }
+  .gallery__featured .gallery-card__preview {
+    aspect-ratio: auto;
+    width: 100%;
+    height: 156px;
+    border-right: 0;
+    border-bottom: 1px solid var(--d-line);
+  }
   .gallery__grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .gallery {
     padding: 32px 20px;
@@ -264,12 +296,13 @@ async function pick(templateId: string, name: string): Promise<void> {
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-width: 0;
   height: 100%;
   overflow: hidden;
   text-align: left;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  background: var(--d-surface);
+  border: 1px solid var(--d-line);
+  border-radius: 10px;
   transition:
     border-color var(--dur-base) var(--ease-out),
     transform var(--dur-base) var(--ease-out),
@@ -280,10 +313,6 @@ async function pick(templateId: string, name: string): Promise<void> {
   border-color: var(--border-strong);
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
-}
-
-.gallery-card__band {
-  height: 3px;
 }
 
 .gallery-card__body {
@@ -322,22 +351,30 @@ async function pick(templateId: string, name: string): Promise<void> {
 }
 
 .gallery-card__cta {
-  position: absolute;
-  top: var(--sp-3);
-  right: var(--sp-3);
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--text-muted);
-  background: var(--bg-elevated);
-  border-radius: var(--radius-full);
-  opacity: 0;
-  transition: opacity var(--dur-base) var(--ease-out);
+  justify-content: space-between;
+  padding: 0 20px 20px;
+  color: var(--d-muted);
+  font-size: 12px;
 }
 
 .gallery-card:hover .gallery-card__cta {
-  opacity: 1;
+  color: var(--d-accent);
+}
+.gallery-card__recommended {
+  color: var(--d-accent);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.gallery__default {
+  color: var(--d-muted);
+  font-size: 12px;
+  line-height: 1.8;
+  margin-top: 24px;
+}
+.gallery-card__preview--stage-blank .gallery-card__preview-pair i {
+  border-style: dashed;
+  color: var(--d-muted);
 }
 </style>

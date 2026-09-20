@@ -22,6 +22,7 @@ import AppLogo from '@/components/common/AppLogo.vue'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUiStore } from '@/stores/useUiStore'
 import { APP } from '@/app.config'
+import StageMenu from './StageMenu.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -34,9 +35,8 @@ const ui = useUiStore()
  * 用路由 meta.layout 判断而不是 path 前缀：设置页的路径将来可能变，
  * 而"这页是不是设置"这个语义不会变。
  */
-const activePage = computed<'compare' | 'settings'>(() =>
-  route.meta.layout === 'settings' ? 'settings' : 'compare',
-)
+const activePage = computed(() => route.meta.layout)
+const inProject = computed(() => activePage.value === 'compare' && !!project.current)
 
 /** 是否处于演示视图（由当前项目的视图态决定） */
 const isPresent = computed(() => project.current?.ui.mode === 'present')
@@ -76,7 +76,7 @@ function togglePresent(): void {
 
     <nav class="topbar__group topbar__group--end" :aria-label="t('nav.pages')">
       <button
-        v-if="project.current?.sheet.layout.presentation?.enabled"
+        v-if="(inProject && project.current?.workspace === 'modern') || activePage === 'showcase'"
         class="topbar__action"
         type="button"
         :aria-pressed="ui.studioProjects"
@@ -84,13 +84,17 @@ function togglePresent(): void {
       >
         {{ t('studio.projectList') }}
       </button>
+      <StageMenu v-if="inProject && !isPresent" />
       <RouterLink
         class="topbar__nav"
+        :class="{ 'u-selected': activePage === 'showcase' }"
         :to="{ name: 'showcase' }"
         :aria-label="t('showcase.entry')"
         :title="t('showcase.entry')"
-        ><AppIcon name="palette" :size="17"
-      /></RouterLink>
+        ><AppIcon name="palette" :size="17" /><span class="topbar__nav-label">{{
+          t('showcase.entry')
+        }}</span></RouterLink
+      >
       <RouterLink
         class="topbar__nav"
         :class="{ 'u-selected': activePage === 'compare' }"
@@ -127,7 +131,7 @@ function togglePresent(): void {
         不是"我在哪一页"的状态。没有打开项目时禁用。
       -->
       <button
-        v-if="!project.current?.sheet.layout.presentation?.enabled"
+        v-if="inProject && project.current?.workspace === 'legacy'"
         class="topbar__action"
         type="button"
         :disabled="!project.hasProject"
@@ -234,7 +238,9 @@ function togglePresent(): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
+  min-width: 36px;
+  padding: 0 10px;
+  gap: 7px;
   height: 32px;
   color: var(--text-secondary);
   text-decoration: none;
@@ -248,6 +254,27 @@ function togglePresent(): void {
   color: var(--text-primary);
   text-decoration: none;
   background: var(--bg-hover);
+}
+.topbar__nav-label {
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .topbar__brand-en,
+  .topbar__brand-version,
+  .topbar__nav-label {
+    display: none;
+  }
+  .topbar {
+    gap: 6px;
+  }
+  .topbar__group {
+    gap: 2px;
+  }
+  .topbar__action {
+    padding-inline: 8px;
+    font-size: 11px;
+  }
 }
 
 .topbar__nav.u-selected:hover {

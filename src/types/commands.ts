@@ -22,6 +22,7 @@ import type {
   Row,
   Side,
   SideId,
+  WorkspaceKind,
 } from './project'
 
 export type ParticipantCommand =
@@ -30,6 +31,7 @@ export type ParticipantCommand =
   | { t: 'participant/reorder'; ids: string[] }
 
 export type Command =
+  | { t: 'workspace/set'; workspace: WorkspaceKind }
   | { t: 'appearance/set'; appearance: AppearancePatch | null; sceneId?: string }
   | ParticipantCommand
   | { t: 'comparison/replace'; content: ComparisonContent }
@@ -83,6 +85,7 @@ export interface CellPatchTarget {
 
 /** 命令类型名（用于日志、历史合并键与调试） */
 export const COMMAND_TYPES = [
+  'workspace/set',
   'appearance/set',
   'participant/add',
   'participant/remove',

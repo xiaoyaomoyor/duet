@@ -56,7 +56,7 @@ export function setAppearance(
     if (value === null) delete p.appearance
     else p.appearance = deepClone(value)
     p.sheet.layout.presentation = {
-      enabled: true,
+      enabled: p.sheet.layout.presentation?.enabled ?? p.workspace === 'modern',
       theme: value === null ? 'ink' : (value.theme ?? p.sheet.layout.presentation?.theme ?? 'ink'),
     }
   }

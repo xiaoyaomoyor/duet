@@ -6,7 +6,7 @@
  * 在 jsdom 里这些一律测不了，所以必须在这一层补齐（M1 收尾时的承诺）。
  */
 import { expect, test, type Page } from '@playwright/test'
-import {contentRows, closeDialog, moduleCard, openModuleEditor, renameModule } from './helpers'
+import { createFromTemplate, contentRows, closeDialog, moduleCard, openModuleEditor, renameModule  } from './helpers'
 
 // ——————————————————————————————————————————————————————————
 // 测试素材：手工构造的合法最小文件
@@ -56,11 +56,7 @@ const WAV_FILE = {
 // 辅助
 // ——————————————————————————————————————————————————————————
 
-async function createFromTemplate(page: Page, name: string | RegExp): Promise<void> {
-  await page.getByRole('complementary').getByRole('button', { name: '新建对比' }).click()
-  await page.getByRole('main').getByRole('button', { name }).click()
-  await expect(page.locator('.canvas')).toBeVisible()
-}
+
 
 /** 打开某一行的模块选择器，并挑选一个模块类型 */
 async function addModule(page: Page, rowIndex: number, moduleName: string): Promise<void> {

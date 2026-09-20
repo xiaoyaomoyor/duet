@@ -13,6 +13,7 @@ import { uuid } from '@/lib/id'
 import { projectSelection, commitSelection, defaultSelection } from './comparisonContent'
 import { validateComparison } from '@/types/validateComparison'
 import { setAppearance } from './appearance'
+import { changeWorkspace } from './workspace'
 import { editParticipants, type ParticipantCommand } from './participants'
 import type { ContentSelection } from '@/types/presentation'
 import type { Command, NewModuleInput } from '@/types/commands'
@@ -38,6 +39,7 @@ export function applyCommandResult(
   command: Command,
   selection?: ContentSelection,
 ): Result<Project, string> {
+  if (command.t === 'workspace/set') return changeWorkspace(project, command.workspace)
   if (command.t === 'appearance/set')
     return setAppearance(project, command.appearance, command.sceneId)
   if (
@@ -74,7 +76,10 @@ export function applyCommandResult(
 
 function applySheetCommand(
   project: Project,
-  command: Exclude<Command, { t: 'comparison/replace' | 'appearance/set' } | ParticipantCommand>,
+  command: Exclude<
+    Command,
+    { t: 'comparison/replace' | 'appearance/set' | 'workspace/set' } | ParticipantCommand
+  >,
 ): Result<Project, string> {
   switch (command.t) {
     case 'project/patch':
